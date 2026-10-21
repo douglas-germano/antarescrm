@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowDown, ArrowLeft, ArrowUp, Copy, ExternalLink, GripVertical, Monitor, Plus, Smartphone, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button, ConfirmDialog } from '@/components/ui';
 import { useNotify } from '@/components/providers';
-import { patch, refreshAll } from '@/lib/api';
+import { patch, refreshAll, remove as removeRecord } from '@/lib/api';
 import { usePublicOrigin } from '@/lib/public-origin';
 import { Section, SelectInput, TextAreaInput, TextInput, ToggleInput } from '@/components/builder/controls';
 import { FormPage } from './form-view';
@@ -59,6 +60,8 @@ function toPayload(d: Draft) {
 
 export function FormBuilder({ form, stages }: { form: Row; stages: Row[] }) {
   const { notify } = useNotify();
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => toDraft(form));
   const [saved, setSaved] = useState(() => JSON.stringify(toPayload(toDraft(form))));
   const [selected, setSelected] = useState<string>('');
@@ -131,8 +134,12 @@ export function FormBuilder({ form, stages }: { form: Row; stages: Row[] }) {
       <span className="bld-status" data-dirty={dirty} role="status">{dirty ? 'Alterações não salvas' : 'Tudo salvo'}</span>
       <Button variant="ghost" aria-label="Copiar link" onClick={async () => { try { await navigator.clipboard.writeText(link); notify('Link copiado.'); } catch { notify('Não foi possível copiar.', 'error'); } }}><Copy size={16} /></Button>
       <a className="btn btn-secondary" href={'/f/' + form.id} target="_blank" rel="noreferrer"><ExternalLink size={16} /> Abrir</a>
+      <Button variant="ghost" aria-label="Excluir formulário" disabled={busy} onClick={() => setDeleting(true)}><Trash2 size={16} /></Button>
       <Button disabled={!dirty || busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar'}</Button>
     </div>
+    <ConfirmDialog open={deleting} onClose={() => setDeleting(false)} title="Excluir formulário"
+      description={`O formulário "${draft.name}" e o link público dele serão removidos. Se ele já recebeu solicitações ou está em uso em um funil, a exclusão é recusada.`}
+      onConfirm={async () => { await removeRecord('/forms/' + form.id); setSaved(JSON.stringify(toPayload(draft))); await refreshAll(); notify('Formulário excluído.'); router.push('/formularios'); }} />
     {error && <p className="form-error" role="alert">{error}</p>}
     <div className="bld">
       <aside className="bld-panel bld-sticky" aria-label="Estrutura do formulário">

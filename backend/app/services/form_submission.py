@@ -13,7 +13,7 @@ from .automations import emit
 from .domains import ensure_scope
 from .form_design import merged_design, phone_required
 from .form_fields import parse_answers
-from .funnels import record_conversion
+from .funnels import funnels_using_form, record_conversion
 
 
 def published_form(form_id):
@@ -26,6 +26,22 @@ def published_form(form_id):
         raise APIError('Formulário indisponível.', 404)
     ensure_scope(row.workspace_id)
     return row
+
+
+def ensure_deletable(row):
+    """A form that received leads is kept (each submission is the proof of consent); one used by a page would break it."""
+    received = FormSubmission.query.filter_by(form_id=row.id).count()
+    if received:
+        raise APIError(
+            f'Este formulário já recebeu {received} solicitação(ões) e não pode ser excluído. '
+            'Desative-o em Página → Formulário público ativo para parar de receber envios.',
+            409,
+        )
+    used = funnels_using_form(row.id)
+    if used:
+        raise APIError(
+            'Este formulário está em uso no funil: ' + ', '.join(used) + '. Remova o bloco antes de excluir.', 409
+        )
 
 
 def consent_text(row):

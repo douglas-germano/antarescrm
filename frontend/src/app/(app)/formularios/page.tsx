@@ -2,10 +2,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, SlidersHorizontal, ExternalLink, Copy, FileInput } from 'lucide-react';
+import { Plus, SlidersHorizontal, ExternalLink, Copy, FileInput, Trash2 } from 'lucide-react';
 import { useSession, useNotify } from '@/components/providers';
-import { useList, useData, post, refreshAll } from '@/lib/api';
-import { PageHeader, Button, DataState, FormDialog, Modal, EmptyState, Badge } from '@/components/ui';
+import { useList, useData, post, remove, refreshAll } from '@/lib/api';
+import { PageHeader, Button, DataState, FormDialog, Modal, EmptyState, Badge, ConfirmDialog } from '@/components/ui';
 import { Card, CardHeader, CardBody } from '@/components/blocks';
 import type { Field, Row } from '@/lib/types';
 
@@ -16,6 +16,7 @@ export default function FormsPage() {
   const { data: stages } = useData<{ items: Row[] }>('/pipeline/stages');
   const router = useRouter();
   const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<Row | null>(null);
   const [viewing, setViewing] = useState<Row | null>(null);
   const { data: submissions, isLoading: loadingSubmissions, error: submissionsError } = useList(viewing ? `/forms/${viewing.id}/submissions` : null);
   const { data: contacts } = useList('/contacts');
@@ -33,11 +34,15 @@ export default function FormsPage() {
           <a className="btn btn-secondary" href={'/f/' + form.id} target="_blank" rel="noreferrer" aria-label={'Abrir página de ' + form.name}><ExternalLink size={16} /></a>
           <Button variant="ghost" aria-label={'Copiar link de ' + form.name} onClick={async () => { try { await navigator.clipboard.writeText(window.location.origin + '/f/' + form.id); notify('Link copiado.'); } catch { notify('Não foi possível copiar. Abra a página e copie o endereço.', 'error'); } }}><Copy size={16} /></Button>
           {manage && <Link className="btn btn-primary" href={'/formularios/' + form.id}><SlidersHorizontal size={16} /> Personalizar</Link>}
+          {manage && <Button variant="ghost" aria-label={'Excluir ' + form.name} onClick={() => setDeleting(form)}><Trash2 size={16} /></Button>}
         </div></CardBody></Card>)}</div>}
     </DataState>
     <FormDialog open={creating} onClose={() => setCreating(false)} title="Novo formulário" fields={fields} initial={{}} onSubmit={async (data) => {
       const created = await post('/forms', { ...data, description: '' }); await refreshAll(); notify('Formulário criado. Personalize as perguntas e a aparência.'); router.push('/formularios/' + created.id);
     }} />
+    <ConfirmDialog open={!!deleting} onClose={() => setDeleting(null)} title="Excluir formulário"
+      description={`O formulário "${deleting?.name}" e o link público dele serão removidos. Formulários que já receberam solicitações ou que estão em uso em um funil não podem ser excluídos.`}
+      onConfirm={async () => { if (deleting) { await remove('/forms/' + deleting.id); await refreshAll(); notify('Formulário excluído.'); } }} />
     <Modal open={!!viewing} onClose={() => setViewing(null)} title={'Solicitações — ' + (viewing?.name || '')}>
       <DataState loading={loadingSubmissions} error={submissionsError}><div className="stack">{submissions?.map((s) => <div className="account-grant" key={s.id}><span><strong>{s.answers?.name || contacts?.find((c) => c.id === s.contact_id)?.name || 'Contato'}</strong><small>{new Date(s.created_at).toLocaleString('pt-BR')} · Contato autorizado nesta solicitação</small><dl>{Object.entries(s.answers || {}).filter(([key]) => !['name','email','phone'].includes(key)).map(([key,value]) => <div key={key}><dt>{viewing?.fields?.find((f: Row) => f.key === key)?.label || key}</dt><dd>{typeof value === 'boolean' ? (value ? 'Sim' : 'Não') : String(value)}</dd></div>)}{s.attribution?.utm_source && <div><dt>Campanha</dt><dd>{s.attribution.utm_source} · {s.attribution.utm_campaign}</dd></div>}</dl></span><Link className="btn btn-secondary" href={'/crm?opportunity=' + s.opportunity_id}>Ver negócio</Link></div>)}{!submissions?.length && <p className="muted">Nenhuma solicitação recebida.</p>}</div></DataState>
     </Modal>

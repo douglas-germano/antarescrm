@@ -115,6 +115,16 @@ def referenced_forms(funnel):
     )
 
 
+def funnels_using_form(form_id):
+    """Names of the funnels (of the current account) whose pages embed the form."""
+    names = set()
+    for step in query(FunnelStep):
+        if form_id in form_ids(step.blocks):
+            funnel = db.session.get(Funnel, step.funnel_id)
+            names.add(funnel.name if funnel else '—')
+    return sorted(names)
+
+
 def publish(funnel):
     """Publishing also turns on the forms its pages embed, otherwise visitors could not submit."""
     if not ordered_steps(funnel.id):

@@ -1,7 +1,7 @@
 from flask import request
 
-from ...common import APIError, add, commit, get, page, payload, query, require, update
-from ...extensions import limiter
+from ...common import APIError, add, audit, commit, get, page, payload, query, require, update
+from ...extensions import db, limiter
 from ...models import (
     FormSubmission,
     LeadForm,
@@ -10,7 +10,7 @@ from ...models import (
 from ...schemas.growth import FormSchema, SubmissionSchema
 from ...services.form_design import validate_settings
 from ...services.form_fields import validate_definitions
-from ...services.form_submission import after_submit, public_payload, published_form
+from ...services.form_submission import after_submit, ensure_deletable, public_payload, published_form
 from ...services.form_submission import submit as submit_form
 from . import bp
 
@@ -50,6 +50,17 @@ def form_update(form_id):
         get(PipelineStage, data['stage_id'])
     update(row, data)
     return commit(row)
+
+
+@bp.delete('/forms/<uuid:form_id>')
+@require('owner', 'admin')
+def form_delete(form_id):
+    row = get(LeadForm, form_id)
+    ensure_deletable(row)
+    audit('delete', row, {'name': row.name})
+    db.session.delete(row)
+    db.session.commit()
+    return '', 204
 
 
 @bp.get('/forms/<uuid:form_id>/submissions')

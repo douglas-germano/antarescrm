@@ -264,3 +264,37 @@ def test_form_fields_keep_layout_hints(env):
     }
     saved = client.patch(form_url(d), headers=d['headers'](), json={'fields': [field]}).json
     assert saved['fields'][0]['width'] == 'half' and saved['fields'][0]['placeholder'] == 'Cuiabá'
+
+
+# ---------- deleting forms ----------
+def test_unused_form_can_be_deleted(env):
+    client, d = env
+    form = LeadForm(workspace_id=d['ws'].id, name='Teste', headline='Oi', stage_id=d['stage'].id, fields=[])
+    db.session.add(form)
+    db.session.commit()
+    assert client.delete(f'/api/v1/forms/{form.id}', headers=d['headers'](d['member'])).status_code == 403
+    assert client.delete(f'/api/v1/forms/{form.id}', headers=d['headers'](d['outsider'])).status_code == 404
+    assert client.delete(f'/api/v1/forms/{form.id}', headers=d['headers']()).status_code == 204
+    assert client.get(f'/api/v1/forms/{form.id}', headers=d['headers']()).status_code == 404
+
+
+def test_form_with_submissions_is_kept(env):
+    client, d = env
+    d['form'].active = True
+    db.session.commit()
+    assert submit(client, d).status_code == 200
+    response = client.delete(form_url(d), headers=d['headers']())
+    assert response.status_code == 409 and '1 solicitação' in response.json['error']['message']
+    assert FormSubmission.query.count() == 1 and db.session.get(LeadForm, d['form'].id)
+
+
+def test_form_used_by_a_funnel_is_kept_until_the_block_is_removed(env):
+    client, d = env
+    funnel = create_funnel(client, d, name='Meu funil')
+    form = funnel_form(funnel)
+    response = client.delete(f'/api/v1/forms/{form.id}', headers=d['headers']())
+    assert response.status_code == 409 and 'Meu funil' in response.json['error']['message']
+    step_url = f'/api/v1/funnels/{funnel["id"]}/steps/{funnel["steps"][0]["id"]}'
+    blocks = [b for b in funnel['steps'][0]['blocks'] if b['type'] != 'form']
+    assert client.patch(step_url, headers=d['headers'](), json={'blocks': blocks}).status_code == 200
+    assert client.delete(f'/api/v1/forms/{form.id}', headers=d['headers']()).status_code == 204
