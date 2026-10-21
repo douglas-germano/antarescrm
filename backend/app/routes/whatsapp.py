@@ -1,14 +1,16 @@
-import hmac
 import hashlib
-from datetime import timedelta, timezone
-from flask import Blueprint, request, current_app, g, send_file
+import hmac
 from io import BytesIO
+
+from flask import Blueprint, current_app, g, request, send_file
+
+from ..common import APIError, audit, get, page, payload, query, require, user_ref
 from ..extensions import db, limiter
-from ..models import WhatsAppConnection, WhatsAppConversation, WhatsAppMessage, Contact, now
-from ..schemas import StrictSchema, text, choice, ref
-from ..common import require, APIError, payload, query, get, page, user_ref, audit
-from ..services.whatsapp import connection_for, conversation_for, ingest, send_outgoing, media_for, normalize_phone
+from ..models import Contact, WhatsAppConnection, WhatsAppConversation, WhatsAppMessage, now
+from ..schemas import StrictSchema, choice, ref, text
 from ..services.evolution import EvolutionService
+from ..services.whatsapp import connection_for, conversation_for, ingest, media_for, normalize_phone, send_outgoing
+from ..utils.whatsapp_message import normalize_raw_message
 
 bp = Blueprint('whatsapp', __name__)
 
@@ -33,9 +35,15 @@ class SendSchema(StrictSchema):
 
 def connection_info(connection):
     config = current_app.config
-    missing = [key for key in ('EVOLUTION_API_URL', 'EVOLUTION_API_KEY', 'WHATSAPP_WEBHOOK_BASE_URL') if not config.get(key)]
-    return {**connection.to_dict(), 'configured': not missing, 'missing_variables': missing,
-            'connected': connection.state == 'open'}
+    missing = [
+        key for key in ('EVOLUTION_API_URL', 'EVOLUTION_API_KEY', 'WHATSAPP_WEBHOOK_BASE_URL') if not config.get(key)
+    ]
+    return {
+        **connection.to_dict(),
+        'configured': not missing,
+        'missing_variables': missing,
+        'connected': connection.state == 'open',
+    }
 
 
 @bp.get('/whatsapp/connection')
@@ -43,7 +51,11 @@ def connection_info(connection):
 def connection():
     row = connection_for(g.workspace_id)
     db.session.commit()
-    if request.args.get('refresh') == 'true' and current_app.config.get('EVOLUTION_API_URL') and current_app.config.get('EVOLUTION_API_KEY'):
+    if (
+        request.args.get('refresh') == 'true'
+        and current_app.config.get('EVOLUTION_API_URL')
+        and current_app.config.get('EVOLUTION_API_KEY')
+    ):
         result = EvolutionService(row).status()
         row.state = result['state']
         if result.get('phone_number'):
@@ -97,7 +109,9 @@ def conversations():
     if request.args.get('search'):
         term = '%' + request.args['search'] + '%'
         q = q.filter(db.or_(WhatsAppConversation.phone.ilike(term), WhatsAppConversation.contact_name.ilike(term)))
-    return page(q.order_by(WhatsAppConversation.last_message_at.desc().nullslast(), WhatsAppConversation.created_at.desc()))
+    return page(
+        q.order_by(WhatsAppConversation.last_message_at.desc().nullslast(), WhatsAppConversation.created_at.desc())
+    )
 
 
 @bp.post('/whatsapp/conversations')
@@ -141,7 +155,11 @@ def mark_read(conversation_id):
 @require()
 def messages(conversation_id):
     row = get(WhatsAppConversation, conversation_id)
-    return page(query(WhatsAppMessage).filter_by(conversation_id=row.id).order_by(WhatsAppMessage.occurred_at.desc(), WhatsAppMessage.created_at.desc()))
+    return page(
+        query(WhatsAppMessage)
+        .filter_by(conversation_id=row.id)
+        .order_by(WhatsAppMessage.occurred_at.desc(), WhatsAppMessage.created_at.desc())
+    )
 
 
 @bp.post('/whatsapp/conversations/<uuid:conversation_id>/messages')
@@ -171,9 +189,24 @@ def media(message_id):
     message = get(WhatsAppMessage, message_id)
     asset = media_for(connection_for(g.workspace_id), message)
     base_mime = asset.mimetype.split(';')[0].strip().lower()
-    safe_inline = base_mime in ('image/png', 'image/jpeg', 'image/webp', 'image/gif', 'audio/ogg', 'audio/mpeg', 'audio/mp4', 'video/mp4', 'video/webm')
-    return send_file(BytesIO(asset.content), mimetype=base_mime if safe_inline else 'application/octet-stream',
-                     download_name=asset.filename, as_attachment=not safe_inline, conditional=True)
+    safe_inline = base_mime in (
+        'image/png',
+        'image/jpeg',
+        'image/webp',
+        'image/gif',
+        'audio/ogg',
+        'audio/mpeg',
+        'audio/mp4',
+        'video/mp4',
+        'video/webm',
+    )
+    return send_file(
+        BytesIO(asset.content),
+        mimetype=base_mime if safe_inline else 'application/octet-stream',
+        download_name=asset.filename,
+        as_attachment=not safe_inline,
+        conditional=True,
+    )
 
 
 @bp.post('/whatsapp/conversations/<uuid:conversation_id>/sync')
@@ -185,7 +218,6 @@ def sync_history(conversation_id):
     raw_rows = EvolutionService(connection).history(row.phone)
     count = 0
     for raw in raw_rows:
-        from ..utils.whatsapp_message import normalize_raw_message
         normalized = normalize_raw_message(raw)
         if normalized and normalize_phone(normalized['phone']) == row.phone:
             _, added = ingest(connection, raw, historical=True)
@@ -202,7 +234,7 @@ def safe_equal(a, b):
         a = a.encode('utf-8') if isinstance(a, str) else a
         b = b.encode('utf-8') if isinstance(b, str) else b
         return hmac.compare_digest(a, b)
-    except Exception:
+    except (TypeError, UnicodeError):
         return False
 
 
@@ -237,7 +269,9 @@ def webhook(event_suffix=None):
     signature_valid = safe_equal(signature, expected)
     valid = bool(connection_secret) and ((bool(secret) and secret_valid) or (bool(signature) and signature_valid))
     if not valid:
-        current_app.logger.warning('whatsapp_webhook_auth_failed connection_id=%s workspace_id=%s', connection.id, connection.workspace_id)
+        current_app.logger.warning(
+            'whatsapp_webhook_auth_failed connection_id=%s workspace_id=%s', connection.id, connection.workspace_id
+        )
         raise APIError('Autenticação de webhook inválida.', 401)
     connection.last_webhook_at = now()
     event = str(body.get('event', event_suffix or '')).lower().replace('_', '.')
@@ -252,14 +286,31 @@ def webhook(event_suffix=None):
             if isinstance(raw, dict):
                 ingest(connection, raw)
     elif event == 'messages.update':
-        mapping = {'PENDING': 'sent', 'SERVER_ACK': 'sent', 'DELIVERY_ACK': 'delivered', 'READ': 'read', 'PLAYED': 'read', '1': 'sent', '2': 'sent', '3': 'delivered', '4': 'read', '5': 'read'}
+        mapping = {
+            'PENDING': 'sent',
+            'SERVER_ACK': 'sent',
+            'DELIVERY_ACK': 'delivered',
+            'READ': 'read',
+            'PLAYED': 'read',
+            '1': 'sent',
+            '2': 'sent',
+            '3': 'delivered',
+            '4': 'read',
+            '5': 'read',
+        }
         rank = {'unknown': 0, 'pending': 0, 'sent': 1, 'delivered': 2, 'read': 3}
         for update in data if isinstance(data, list) else [data]:
             if not isinstance(update, dict):
                 continue
             provider_id = (update.get('key') or {}).get('id') or update.get('keyId') or update.get('id')
             status = mapping.get(str(update.get('status') or (update.get('update') or {}).get('status')))
-            message = WhatsAppMessage.query.filter_by(workspace_id=connection.workspace_id, provider_id=provider_id, direction='out').first() if provider_id else None
+            message = (
+                WhatsAppMessage.query.filter_by(
+                    workspace_id=connection.workspace_id, provider_id=provider_id, direction='out'
+                ).first()
+                if provider_id
+                else None
+            )
             if message and status and rank.get(status, 0) > rank.get(message.status, 0):
                 message.status = status
     db.session.commit()

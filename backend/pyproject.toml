@@ -1,0 +1,17 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["migrations/versions", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = ["E501", "B008", "SIM108", "UP017"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E701", "E702", "F401", "F811", "I001", "SIM117", "B017"]
+"app/routes/**/__init__.py" = ["E402", "F401", "I001"]
+"app/models/__init__.py" = ["F401"]
+"app/schemas/__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "single"

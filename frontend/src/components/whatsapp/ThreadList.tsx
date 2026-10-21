@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { EmptyState } from '@/components/ui';
 import { initials } from '@/lib/format';
 import type { Row } from '@/lib/types';
-import { listTime } from './helpers';
+import { listTime } from '@/components/whatsapp/helpers';
 
 export const channelName: Record<string, string> = { email: 'E-mail', sms: 'SMS', whatsapp: 'WhatsApp', instagram: 'Instagram' };
 

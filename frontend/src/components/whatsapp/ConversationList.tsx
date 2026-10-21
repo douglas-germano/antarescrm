@@ -3,8 +3,8 @@ import { DataState, EmptyState, SearchInput } from '@/components/ui';
 import { Tabs } from '@/components/blocks';
 import { Pager } from '@/components/fit';
 import type { Row } from '@/lib/types';
-import { CONVERSATIONS_PER_PAGE } from './hooks';
-import { ConversationItem } from './ConversationItem';
+import { CONVERSATIONS_PER_PAGE } from '@/components/whatsapp/hooks';
+import { ConversationItem } from '@/components/whatsapp/ConversationItem';
 
 const STATUS_TABS = [
   { value: 'open', label: 'Abertas' },

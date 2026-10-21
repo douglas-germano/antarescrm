@@ -1,6 +1,6 @@
 import { Copy, Pencil, Trash2 } from 'lucide-react';
 import type { Row } from '@/lib/types';
-import { EVENTS, ACTIONS, describeStep, formatDelay, stepsOf } from './model';
+import { EVENTS, ACTIONS, describeStep, formatDelay, stepsOf } from '@/components/automations/model';
 
 function ago(iso?: string | null) {
   if (!iso) return 'nunca executou';

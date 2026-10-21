@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { BookingSettings } from '@/components/booking-settings';
+import { BookingSettings } from '@/components/settings/booking-settings';
 import { ChevronLeft, ChevronRight, CalendarDays, ArrowUpRight, Plus } from 'lucide-react';
 import { useData, useList, post, refreshAll } from '@/lib/api';
 import { PageHeader, Button, DataState, EmptyState, FormDialog, Modal, SearchInput } from '@/components/ui';

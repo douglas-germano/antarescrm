@@ -7,14 +7,15 @@ time as events arrive) and by the historical sync path
 chat/findMessages), so both stay in sync on what counts as a "message with
 content" and how media/timestamps are read.
 """
-from datetime import datetime
-from typing import Optional
 
-from datetime import timezone
+from datetime import datetime, timezone
+
 from app.models import now as utcnow
+
 
 def utcfromtimestamp(value):
     return datetime.fromtimestamp(value, timezone.utc)
+
 
 MEDIA_MESSAGE_KEYS = {
     'imageMessage': 'image',
@@ -35,7 +36,7 @@ MEDIA_PLACEHOLDER_TEXT = {
 }
 
 
-def _sanitize_media_url(url: Optional[str]) -> Optional[str]:
+def _sanitize_media_url(url: str | None) -> str | None:
     """
     Only allow http(s) media URLs through. The frontend renders media_url
     directly as an <img src>/<audio src>/download <a href> - without this,
@@ -50,8 +51,11 @@ def _sanitize_media_url(url: Optional[str]) -> Optional[str]:
 
 
 MESSAGE_WRAPPERS = (
-    'ephemeralMessage', 'viewOnceMessage', 'viewOnceMessageV2',
-    'viewOnceMessageV2Extension', 'documentWithCaptionMessage',
+    'ephemeralMessage',
+    'viewOnceMessage',
+    'viewOnceMessageV2',
+    'viewOnceMessageV2Extension',
+    'documentWithCaptionMessage',
 )
 
 
@@ -59,16 +63,21 @@ def unwrap_message(message_obj: dict) -> dict:
     """Unwrap Baileys containers without following quoted messages."""
     current = message_obj if isinstance(message_obj, dict) else {}
     for _ in range(8):
-        nested = next((current[key].get('message') for key in MESSAGE_WRAPPERS
-                       if isinstance(current.get(key), dict)
-                       and isinstance(current[key].get('message'), dict)), None)
+        nested = next(
+            (
+                current[key].get('message')
+                for key in MESSAGE_WRAPPERS
+                if isinstance(current.get(key), dict) and isinstance(current[key].get('message'), dict)
+            ),
+            None,
+        )
         if nested is None:
             break
         current = nested
     return current
 
 
-def extract_media(message_obj: dict) -> Optional[tuple]:
+def extract_media(message_obj: dict) -> tuple | None:
     """Return (message_type, media_url, mimetype, caption) for the first media key found, or None."""
     message_obj = unwrap_message(message_obj)
     for key, media_type in MEDIA_MESSAGE_KEYS.items():
@@ -96,7 +105,6 @@ def extract_text(message_obj: dict) -> str:
     return text if isinstance(text, str) else ''
 
 
-
 def parse_message_timestamp(raw_ts) -> datetime:
     """
     Parse a Baileys/Evolution `messageTimestamp` value into a naive UTC
@@ -115,7 +123,7 @@ def parse_message_timestamp(raw_ts) -> datetime:
         return utcnow()
 
 
-def normalize_raw_message(raw: dict) -> Optional[dict]:
+def normalize_raw_message(raw: dict) -> dict | None:
     """
     Normalize one raw Evolution/Baileys message object (as found in a
     `messages.upsert` webhook payload's `data`, or a `chat/findMessages`
@@ -157,20 +165,24 @@ def normalize_raw_message(raw: dict) -> Optional[dict]:
 
     if media:
         message_type, media_url, mimetype, caption = media
-        result.update({
-            'content': caption or MEDIA_PLACEHOLDER_TEXT.get(message_type, 'Midia enviada'),
-            'message_type': message_type,
-            'media_url': media_url,
-            'media_mimetype': mimetype,
-            'caption': caption or None,
-        })
+        result.update(
+            {
+                'content': caption or MEDIA_PLACEHOLDER_TEXT.get(message_type, 'Midia enviada'),
+                'message_type': message_type,
+                'media_url': media_url,
+                'media_mimetype': mimetype,
+                'caption': caption or None,
+            }
+        )
     else:
-        result.update({
-            'content': text,
-            'message_type': 'text',
-            'media_url': None,
-            'media_mimetype': None,
-            'caption': None,
-        })
+        result.update(
+            {
+                'content': text,
+                'message_type': 'text',
+                'media_url': None,
+                'media_mimetype': None,
+                'caption': None,
+            }
+        )
 
     return result

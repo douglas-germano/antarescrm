@@ -1,6 +1,6 @@
 import { patch, post, useList } from '@/lib/api';
 import { Button, FormDialog, Modal } from '@/components/ui';
-import { EntitySelect } from '@/components/entity-select';
+import { EntitySelect } from '@/components/contacts/entity-select';
 import { useState } from 'react';
 import { useNotify } from '@/components/providers';
 import { rowOptions } from '@/lib/format';

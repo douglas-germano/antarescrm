@@ -3,10 +3,10 @@ import { useRef, useState } from 'react';
 import { Download, FileText, History, ImageIcon, Plus, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import { api, refreshAll } from '@/lib/api';
 import { day } from '@/lib/format';
-import { useNotify } from '../providers';
-import { Button, ConfirmDialog, EmptyState, Modal } from '../ui';
+import { useNotify } from '@/components/providers';
+import { Button, ConfirmDialog, EmptyState, Modal } from '@/components/ui';
 import type { Row } from '@/lib/types';
-import { FILE_KINDS, fileSize, fileUrl } from './model';
+import { FILE_KINDS, fileSize, fileUrl } from '@/components/projects/model';
 
 /** Layouts and documents of a project, grouped so each re-upload becomes a new version. */
 export function FilesPanel({ project, onRequestApproval }: { project: Row; onRequestApproval: (file: Row) => void }) {

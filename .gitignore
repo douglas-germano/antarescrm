@@ -22,3 +22,7 @@ node_modules/
 .playwright-cli/
 
 output/playwright/
+
+# Caches de ferramentas
+.coverage
+.ruff_cache/

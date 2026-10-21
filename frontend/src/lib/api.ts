@@ -1,5 +1,6 @@
 'use client';
 import useSWR from 'swr';
+import { fetchWithRetry } from './retry.ts';
 import type { Row } from './types';
 
 let activeWorkspaceId: string | undefined;
@@ -14,7 +15,7 @@ export class RequestError extends Error {
   }
 }
 export async function api<T = any>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch('/api/backend' + path, {
+  const response = await fetchWithRetry('/api/backend' + path, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...(activeWorkspaceId ? { 'X-Workspace-ID': activeWorkspaceId } : {}), ...init.headers },
     cache: 'no-store',

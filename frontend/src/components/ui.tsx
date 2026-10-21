@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useId, type ButtonHTMLAttributes, type Rea
 import { Loader2, Search, X, FolderOpen, ArrowUpRight, AlertCircle } from 'lucide-react';
 import { statuses, priorities } from '@/lib/format';
 import type { Field, FormData } from '@/lib/types';
-import { EntitySelect } from './entity-select';
+import { EntitySelect } from '@/components/contacts/entity-select';
 
 export function Button({
   variant = 'primary',

@@ -1,7 +1,8 @@
-import os
 import json
-from pathlib import Path
+import os
 from datetime import timedelta
+from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,12 +11,14 @@ load_dotenv()
 def normalize_database_url(value):
     for prefix in ('postgres://', 'postgresql://'):
         if value.startswith(prefix):
-            return 'postgresql+psycopg://' + value[len(prefix):]
+            return 'postgresql+psycopg://' + value[len(prefix) :]
     return value
 
 
 class Config:
-    BACKUP_STATUS_PATH = os.getenv('BACKUP_STATUS_PATH', str(Path.home()/'.antarescrm-deploy-backups/automatic/latest.json'))
+    BACKUP_STATUS_PATH = os.getenv(
+        'BACKUP_STATUS_PATH', str(Path.home() / '.antarescrm-deploy-backups/automatic/latest.json')
+    )
     SQLALCHEMY_DATABASE_URI = normalize_database_url(os.getenv('DATABASE_URL', 'postgresql+psycopg:///antarescrm'))
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {'pool_pre_ping': True}
@@ -35,14 +38,27 @@ class Config:
     WHATSAPP_WEBHOOK_BASE_URL = os.getenv('WHATSAPP_WEBHOOK_BASE_URL')
     WHATSAPP_WEBHOOK_SECRET = os.getenv('WHATSAPP_WEBHOOK_SECRET')
     WHATSAPP_MEDIA_MAX_BYTES = 10 * 1024 * 1024
-    PROJECT_FILES_DIR = os.getenv('PROJECT_FILES_DIR', str(Path(__file__).resolve().parents[2] / '.local-services' / 'project-files'))
+    PROJECT_FILES_DIR = os.getenv(
+        'PROJECT_FILES_DIR', str(Path(__file__).resolve().parents[2] / '.local-services' / 'project-files')
+    )
     PROJECT_FILE_MAX_BYTES = 14 * 1024 * 1024  # stays under the request limit
     MAX_CONTENT_LENGTH = 15 * 1024 * 1024
     INSTAGRAM_APP_ID = os.getenv('INSTAGRAM_APP_ID')
     INSTAGRAM_APP_SECRET = os.getenv('INSTAGRAM_APP_SECRET')
     INSTAGRAM_ENCRYPTION_KEY = os.getenv('INSTAGRAM_ENCRYPTION_KEY')
-    INSTAGRAM_REDIRECT_URI = os.getenv('INSTAGRAM_REDIRECT_URI', 'https://antares.douglasgermano.com/api/v1/instagram/callback')
+    INSTAGRAM_REDIRECT_URI = os.getenv(
+        'INSTAGRAM_REDIRECT_URI', 'https://antares.douglasgermano.com/api/v1/instagram/callback'
+    )
     INSTAGRAM_API_VERSION = os.getenv('INSTAGRAM_API_VERSION', 'v25.0')
+    # Custom domains. Visitors reach customer hostnames through the same Next.js server as PUBLIC_APP_HOST.
+    PUBLIC_APP_HOST = os.getenv('PUBLIC_APP_HOST', 'antares.douglasgermano.com')
+    CUSTOM_DOMAIN_CNAME_TARGET = os.getenv('CUSTOM_DOMAIN_CNAME_TARGET') or PUBLIC_APP_HOST
+    CUSTOM_DOMAIN_IPS = [x.strip() for x in os.getenv('CUSTOM_DOMAIN_IPS', '').split(',') if x.strip()]
+    CUSTOM_DOMAINS_PER_WORKSPACE = int(os.getenv('CUSTOM_DOMAINS_PER_WORKSPACE', '5'))
+    DNS_RESOLVER_URL = os.getenv('DNS_RESOLVER_URL', 'https://cloudflare-dns.com/dns-query')
+    # Optional: Cloudflare for SaaS issues and renews certificates for customer hostnames.
+    CLOUDFLARE_API_TOKEN = os.getenv('CLOUDFLARE_API_TOKEN')
+    CLOUDFLARE_ZONE_ID = os.getenv('CLOUDFLARE_ZONE_ID')
 
 
 class TestingConfig(Config):

@@ -3,10 +3,10 @@ import { useState } from 'react';
 import { Check, Copy, Link2, Plus, X } from 'lucide-react';
 import { api, post, refreshAll } from '@/lib/api';
 import { day, hour } from '@/lib/format';
-import { useNotify } from '../providers';
-import { Badge, Button, ConfirmDialog, EmptyState, FormDialog, Modal } from '../ui';
+import { useNotify } from '@/components/providers';
+import { Badge, Button, ConfirmDialog, EmptyState, FormDialog, Modal } from '@/components/ui';
 import type { Field, Row } from '@/lib/types';
-import { APPROVAL } from './model';
+import { APPROVAL } from '@/components/projects/model';
 
 const linkOf = (token: string) => `${window.location.origin}/aprovacao/${token}`;
 

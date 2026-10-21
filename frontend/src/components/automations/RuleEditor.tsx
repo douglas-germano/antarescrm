@@ -2,11 +2,11 @@
 import { useState } from 'react';
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from 'lucide-react';
 import { post, patch, refreshAll } from '@/lib/api';
-import { useNotify } from '../providers';
-import { Button, Modal } from '../ui';
-import { ConditionsEditor, emptyConditions, type Conditions } from '../conditions-editor';
+import { useNotify } from '@/components/providers';
+import { Button, Modal } from '@/components/ui';
+import { ConditionsEditor, emptyConditions, type Conditions } from '@/components/automations/conditions-editor';
 import type { Row } from '@/lib/types';
-import { ACTIONS, DELAY_UNITS, EVENTS, newStep, splitDelay, stepsOf, type Step } from './model';
+import { ACTIONS, DELAY_UNITS, EVENTS, newStep, splitDelay, stepsOf, type Step } from '@/components/automations/model';
 
 /** Draft of a rule; `id` is present when editing an existing one. */
 export type RuleDraft = Partial<Row> & { name?: string; event?: string; steps?: Step[] };

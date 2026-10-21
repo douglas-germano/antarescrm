@@ -1,10 +1,14 @@
-from functools import wraps
+import uuid
 from datetime import date, datetime
+from functools import wraps
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from flask import request, g
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+
+from flask import g, request
+from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
+
+from .access import account_users, workspace_role
 from .extensions import db
-from .models import User, Workspace, AuditLog
+from .models import AuditLog, User, Workspace
 
 
 class APIError(Exception):
@@ -14,6 +18,7 @@ class APIError(Exception):
 
 def require(*roles):
     """Authenticate and authorize the account selected in the signed session."""
+
     def decorator(fn):
         @wraps(fn)
         @jwt_required()
@@ -21,7 +26,7 @@ def require(*roles):
             user = db.session.get(User, get_jwt_identity())
             if not user or not user.active or user.token_version != get_jwt().get('ver'):
                 raise APIError('Sessão inválida ou revogada.', 401)
-            from .access import workspace_role
+
             workspace_id = get_jwt().get('wid', user.workspace_id)
             workspace = db.session.get(Workspace, workspace_id)
             role = workspace_role(user, workspace)
@@ -34,7 +39,9 @@ def require(*roles):
                 raise APIError('Você não tem permissão para esta operação.', 403)
             g.user, g.workspace_id, g.role = user, workspace_id, role
             return fn(*args, **kwargs)
+
         return wrapped
+
     return decorator
 
 
@@ -56,7 +63,6 @@ def payload(schema, partial=False):
         raise APIError('Envie um objeto JSON válido.')
     result = schema().load(data, partial=partial)
     # SQLAlchemy portable UUIDs are stored as strings.
-    import uuid
 
     def convert(value):
         if isinstance(value, uuid.UUID):
@@ -64,6 +70,7 @@ def payload(schema, partial=False):
         if isinstance(value, list):
             return [convert(item) for item in value]
         return value
+
     return {key: convert(value) for key, value in result.items()}
 
 
@@ -72,9 +79,16 @@ def audit(action, row, details=None):
     target = row.id if row.__tablename__ == 'workspaces' else getattr(row, 'workspace_id', g.workspace_id)
     if target and target != g.workspace_id:
         details['target_workspace_id'] = target
-    db.session.add(AuditLog(workspace_id=g.workspace_id, user_id=g.user.id,
-                            action=action, resource=row.__tablename__, resource_id=row.id,
-                            details=details or {}))
+    db.session.add(
+        AuditLog(
+            workspace_id=g.workspace_id,
+            user_id=g.user.id,
+            action=action,
+            resource=row.__tablename__,
+            resource_id=row.id,
+            details=details or {},
+        )
+    )
 
 
 def add(model, data):
@@ -101,10 +115,15 @@ def page(q, serializer=None):
         number = max(1, int(request.args.get('page', 1)))
         size = min(100, max(1, int(request.args.get('per_page', 20))))
     except ValueError:
-        raise APIError('Paginação inválida.')
+        raise APIError('Paginação inválida.') from None
     result = q.paginate(page=number, per_page=size, error_out=False)
-    return {'items': [(serializer(x) if serializer else x.to_dict()) for x in result.items],
-            'page': number, 'per_page': size, 'total': result.total, 'pages': result.pages}
+    return {
+        'items': [(serializer(x) if serializer else x.to_dict()) for x in result.items],
+        'page': number,
+        'per_page': size,
+        'total': result.total,
+        'pages': result.pages,
+    }
 
 
 def date_arg(name, default):
@@ -114,7 +133,7 @@ def date_arg(name, default):
     try:
         return date.fromisoformat(value)
     except ValueError:
-        raise APIError(f'Data inválida: {name}. Use AAAA-MM-DD.')
+        raise APIError(f'Data inválida: {name}. Use AAAA-MM-DD.') from None
 
 
 def today():
@@ -126,7 +145,7 @@ def validate_timezone(value):
     try:
         ZoneInfo(value)
     except (ZoneInfoNotFoundError, ValueError):
-        raise APIError('Fuso horário inválido.')
+        raise APIError('Fuso horário inválido.') from None
 
 
 def dates_valid(start, end):
@@ -136,7 +155,6 @@ def dates_valid(start, end):
 
 def user_ref(identifier):
     if identifier:
-        from .access import account_users
         user = next((u for u in account_users(g.workspace_id) if u.id == str(identifier)), None)
         if not user:
             raise APIError('Responsável não encontrado nesta conta.', 404)
@@ -146,4 +164,12 @@ def user_ref(identifier):
 
 def money_string(value):
     from decimal import Decimal
+
     return format(Decimal(value).quantize(Decimal('0.01')), '.2f')
+
+
+def active(model, identifier, label):
+    row = get(model, identifier)
+    if row.archived:
+        raise APIError(f'{label} está arquivado.')
+    return row

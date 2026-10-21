@@ -8,11 +8,11 @@ import type { Field, Row } from '@/lib/types';
 import { useSession, useNotify } from '@/components/providers';
 import { Button, Badge, PageHeader, EmptyState, DataState, SearchInput, FormDialog, ConfirmDialog, Modal } from '@/components/ui';
 import { PagedTable } from '@/components/fit';
-import { CrmDataTools, metadataFields, metadataInitial, metadataPayload } from '@/components/crm-data-tools';
+import { CrmDataTools, metadataFields, metadataInitial, metadataPayload } from '@/components/contacts/crm-data-tools';
 import { Card } from '@/components/blocks';
-import { ContactFilterBar, emptyContactFilters } from '@/components/contact-filters';
-import { RecordActivityDialog, type ActivityRecord } from '@/components/record-activity-dialog';
-import { ContactTimeline } from '@/components/contact-timeline';
+import { ContactFilterBar, emptyContactFilters } from '@/components/contacts/contact-filters';
+import { RecordActivityDialog, type ActivityRecord } from '@/components/contacts/record-activity-dialog';
+import { ContactTimeline } from '@/components/contacts/contact-timeline';
 
 export default function ContactsPage() {
   const { user } = useSession();

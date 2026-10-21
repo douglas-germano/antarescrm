@@ -6,9 +6,9 @@ import { Plus, Pencil, CalendarDays, CalendarPlus, MessageCircle, Phone, Mail, C
 import { useList, useData, post, patch, refreshAll } from '@/lib/api';
 import { brl, day, hour, rowOptions, opts, kinds, toLocalInput, today, searchMatch } from '@/lib/format';
 import type { Field, Row } from '@/lib/types';
-import { RecordActivityDialog, type ActivityRecord } from '@/components/record-activity-dialog';
-import { SendWhatsAppDialog, type WhatsAppTarget } from '@/components/send-whatsapp-dialog';
-import { followUpReasons } from '@/components/follow-up-queue';
+import { RecordActivityDialog, type ActivityRecord } from '@/components/contacts/record-activity-dialog';
+import { SendWhatsAppDialog, type WhatsAppTarget } from '@/components/whatsapp/send-whatsapp-dialog';
+import { followUpReasons } from '@/components/contacts/follow-up-queue';
 import { useSession, useNotify } from '@/components/providers';
 import { Button, Badge, PageHeader, EmptyState, DataState, SearchInput, FormDialog, Modal } from '@/components/ui';
 import {

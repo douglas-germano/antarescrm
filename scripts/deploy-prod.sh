@@ -10,12 +10,15 @@
 # .next-public are restored from the backup just taken, then services are
 # restarted again.
 #
-# Usage: scripts/deploy-prod.sh
+# Usage: scripts/deploy-prod.sh   (deploys the checkout it lives in; SOURCE_DIR must be set to deploy another copy)
 # Env overrides: SOURCE_DIR, PROD_DIR, BACKUP_DIR, PROD_DB_NAME, SMOKE_URL
 
 set -euo pipefail
 
-SOURCE_DIR="${SOURCE_DIR:-/Users/douglasgermano/.openmausbot/task-workspaces/9c348af9-5d3b-41ce-99d1-608958538cae/a4b85cd4-d859-4f46-ba83-56e0685fa32c/antarescrm}"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Default: deploy the checkout this script lives in. Pointing SOURCE_DIR at another copy makes the rsync below
+# overwrite and delete files in PROD_DIR, so that has to be explicit.
+SOURCE_DIR="${SOURCE_DIR:-$SCRIPT_ROOT}"
 PROD_DIR="${PROD_DIR:-/Users/douglasgermano/Documents/ChatGPT/antarescrm}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/.antarescrm-deploy-backups}"
 PROD_DB_NAME="${PROD_DB_NAME:-antarescrm}"
@@ -64,6 +67,10 @@ restart_services() {
   log "Reiniciando com.antarescrm.frontend"
   launchctl kickstart -k "gui/$UID_NUM/com.antarescrm.frontend"
   sleep 3
+  # The worker keeps the old code in memory until restarted.
+  log "Reiniciando com.antarescrm.worker"
+  launchctl kickstart -k "gui/$UID_NUM/com.antarescrm.worker"
+  sleep 2
   # com.antarescrm.tunnel is never touched by this script.
 }
 

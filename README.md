@@ -29,6 +29,64 @@ cd ../frontend && npm install
 
 Acesse http://localhost:3002 — workspace `demo`, e-mail `admin@antarescrm.local`.
 
+## Estrutura do código
+
+```
+backend/app/
+  models/      modelos SQLAlchemy por domínio (base, tenancy, crm, whatsapp, automation, instagram, communications, booking, projects)
+  schemas/     schemas Marshmallow (base, auth, crm, projects; growth é importado direto para evitar ciclo com services)
+  routes/      blueprints HTTP finos; crm/, growth/ e projects/ são pacotes divididos por recurso
+  services/    regras de negócio e integrações (opportunities, form_submission, rules, projects, whatsapp, instagram, ...)
+  errors.py, security.py   handlers de erro JSON, callbacks JWT, headers e checagem de config de produção
+  common.py, access.py, config.py, extensions.py, cli.py
+frontend/src/
+  app/         rotas Next.js (App Router)
+  components/  ui.tsx, blocks.tsx, fit.tsx, providers.tsx (compartilhados) + pastas por feature:
+               auth, layout, contacts, settings, booking, automations, inbox, projects, whatsapp
+  lib/         api, bff (gateway), format, types
+```
+
+Convenção: rotas só validam a entrada e chamam um service; regra de negócio e consultas ficam em `services/`.
+
+Qualidade (ruff, pytest com cobertura, typecheck e testes do gateway):
+
+```bash
+./scripts/check.sh
+```
+
+## Funis de páginas e formulários
+
+- **Formulários** (`/formularios/<id>`): construtor com prévia ao vivo. Campos de texto, e-mail, telefone, link, número,
+  data, listas, escolha única/múltipla, caixa de seleção e blocos de layout (título, texto, divisória); largura inteira ou
+  meia linha, ordem por arraste, condições, cores, fonte, arredondamento, botão, logotipo, texto de consentimento e
+  ação após o envio (mensagem ou redirecionamento). Tudo é validado no servidor (`services/form_design.py`).
+- **Funis** (`/funis`): sequência de páginas feitas de blocos (título, texto, imagem, vídeo, botão, formulário, lista,
+  depoimento, perguntas, contagem regressiva, espaço). Modelos prontos (captura, vendas, em branco), publicação,
+  duplicação e métricas por página (visitantes, conversões, abandono). A página pública fica em `/p/<funil>/<página>`;
+  o formulário embutido reaproveita a captura existente (contato, negócio e automações). Os blocos são dados
+  validados em `services/funnel_blocks.py` (links só `https`, sem HTML livre) e renderizados como nós React.
+- Publicar um funil ativa os formulários usados nas suas páginas.
+
+## Domínios personalizados
+
+Em **Configurações → Domínios** cada conta cadastra domínios próprios (ex.: `paginas.cliente.com.br`) para publicar
+funis, formulários e agendas. Fluxo: o cliente cria um registro **TXT** (`_antares-verify.<domínio>`) que prova a
+posse e um **CNAME** (ou A, para domínio raiz) para a plataforma; **Verificar agora** consulta o DNS por DNS-over-HTTPS
+(sem dependência extra). O domínio só serve páginas depois de comprovada a posse, e só do próprio workspace: o gateway
+Next.js envia o `Host` ao Flask (`X-Custom-Domain`) e os endpoints públicos recusam conteúdo de outras contas.
+Em domínios de clientes só as páginas públicas respondem (`/p`, `/f`, `/agendar`, `/agendamento`, `/aprovacao`,
+`/api/public`); CRM, login e o gateway autenticado ficam apenas no domínio da plataforma. A raiz `/` mostra o funil
+escolhido para o domínio (`src/middleware.ts`).
+
+HTTPS e roteamento são infraestrutura, fora do código:
+- **Cloudflare for SaaS** (recomendado para o túnel atual): ative *Custom Hostnames* na zona da plataforma, defina
+  `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ZONE_ID` e o Antares registra o domínio e acompanha o certificado após a
+  verificação. O `ingress` do cloudflared precisa de uma regra final para `http://127.0.0.1:3002` (hoje o fallback é
+  `http_status:404` e só o hostname da plataforma é atendido).
+- **Sem provedor**: termine o TLS em um proxy com certificado sob demanda (ex.: Caddy `on_demand_tls`) usando
+  `GET /api/v1/public/domains/resolve?host=<domínio>` como endpoint de autorização (200 = emitir).
+- Variáveis em `backend/.env.example`. A API só deve ser alcançável pelo gateway, pois confia no cabeçalho `X-Custom-Domain`.
+
 ## Multi-tenant
 
 Cada workspace tem seus próprios dados; toda consulta é filtrada por `workspace_id` e um UUID de
@@ -48,7 +106,7 @@ Para receber webhooks localmente, exponha a porta da API com um túnel (ex.: Clo
 
 `auth`, `users`, `workspace`, `companies`, `contacts` (+ `/timeline`), `pipeline/stages`,
 `opportunities` (+ `/close`), `activities`, `tasks`, `dashboard`, `reports/*`, `calendar`,
-`whatsapp/*`. Erros: `{error:{code,message,details?}}`; listas: `{items,page,per_page,total,pages}`.
+`forms`, `funnels` (+ `/steps`, `/stats`, `/duplicate`), `whatsapp/*`. Erros: `{error:{code,message,details?}}`; listas: `{items,page,per_page,total,pages}`.
 
 ## Domínio público e Cloudflare Tunnel
 

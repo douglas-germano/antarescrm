@@ -1,6 +1,7 @@
 """Resolve account access from current database state on every authenticated request."""
+
 from .extensions import db
-from .models import Workspace, WorkspaceAccess, User
+from .models import User, Workspace, WorkspaceAccess
 
 
 def workspace_role(user, workspace):

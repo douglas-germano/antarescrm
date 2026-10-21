@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { CheckCircle2, FileText, MessageSquare, Repeat, ShieldCheck, Sparkles } from 'lucide-react';
 import { post, refreshAll } from '@/lib/api';
 import { day, hour } from '@/lib/format';
-import { useNotify } from '../providers';
-import { Button } from '../ui';
+import { useNotify } from '@/components/providers';
+import { Button } from '@/components/ui';
 import type { Row } from '@/lib/types';
 
 const ICON: Record<string, React.ReactNode> = {

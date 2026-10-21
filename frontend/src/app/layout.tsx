@@ -10,6 +10,9 @@ import './inbox.css';
 import './automations.css';
 import './reports.css';
 import './projects.css';
+import './forms.css';
+import './builder.css';
+import './funnels.css';
 import { Providers } from '@/components/providers';
 export const metadata: Metadata = {
   title: { default: 'Antares CRM', template: '%s · Antares CRM' },

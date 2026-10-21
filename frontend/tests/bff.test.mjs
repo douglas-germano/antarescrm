@@ -111,6 +111,59 @@ test('public booking proxy restricts paths and does not forward account credenti
   });
 });
 
+test('public funnel proxy allows only page and view routes and never forwards credentials', async () => {
+  const { handlePublicFunnel } = await import('../src/lib/bff.ts');
+  const id = '11111111-1111-4111-8111-111111111111';
+  const step = '22222222-2222-4222-8222-222222222222';
+  await mockFetch(async (url, init) => {
+    assert.equal(init.headers.Authorization, undefined);
+    assert.equal(init.headers.cookie, undefined);
+    assert.equal(url, 'http://backend.test/api/v1/public/funnels/' + id + '/obrigado');
+    return Response.json({ step: {} });
+  }, async () => {
+    assert.equal((await handlePublicFunnel(request('/test'), [id, 'obrigado'], env)).status, 200);
+  });
+  await mockFetch(async (url) => {
+    assert.equal(url, 'http://backend.test/api/v1/public/funnels/' + id + '/steps/' + step + '/view');
+    return new Response(null, { status: 204 });
+  }, async () => {
+    assert.equal((await handlePublicFunnel(request('/test', { text: '{"visitor_id":"x"}' }), [id, 'steps', step, 'view'], env)).status, 204);
+  });
+  await mockFetch(() => { throw new Error('unexpected upstream call'); }, async () => {
+    assert.equal((await handlePublicFunnel(request('/test'), ['auth', 'me'], env)).status, 404);
+    assert.equal((await handlePublicFunnel(request('/test'), [id, '../../auth'], env)).status, 404);
+    assert.equal((await handlePublicFunnel(request('/test'), [id, 'steps', step, 'view'], env)).status, 404);
+    assert.equal((await handlePublicFunnel(request('/test', { text: '{}' }), [id, 'obrigado'], env)).status, 404);
+    assert.equal((await handlePublicFunnel(request('/test', { visitor_id: 'x' }, { origin: 'https://other.test' }), [id, 'steps', step, 'view'], env)).status, 403);
+    assert.equal((await handlePublicFunnel(request('/test', { text: 'x'.repeat(2000) }), [id, 'steps', step, 'view'], env)).status, 413);
+  });
+});
+
+test('public handlers tell the API which customer domain served the page', async () => {
+  const { handlePublicFunnel, handlePublicBooking } = await import('../src/lib/bff.ts');
+  const id = '11111111-1111-4111-8111-111111111111';
+  const step = '22222222-2222-4222-8222-222222222222';
+  const seen = [];
+  await mockFetch(async (url, init) => { seen.push(init.headers['X-Custom-Domain']); return Response.json({}); }, async () => {
+    await handlePublicFunnel(request('/test', undefined, { host: 'paginas.cliente.com.br' }), [id], env);
+    await handlePublicFunnel(request('/test', undefined, { host: 'crm.test' }), [id], env);
+    await handlePublicFunnel(request('/test', undefined, { host: '127.0.0.1:3002' }), [id], env);
+    await handlePublicFunnel(request('/test', undefined, { host: 'x.com', 'x-forwarded-host': 'Loja.Cliente.com.br:443' }), [id], env);
+    await handlePublicBooking(request('/test?date=2030-01-08', undefined, { host: 'paginas.cliente.com.br' }), ['calendars', id, 'slots'], env);
+  });
+  assert.deepEqual(seen, ['paginas.cliente.com.br', undefined, undefined, 'loja.cliente.com.br', 'paginas.cliente.com.br']);
+  // A POST from the customer's own domain is accepted; one from a different site is not.
+  await mockFetch(async () => new Response(null, { status: 204 }), async () => {
+    const view = [id, 'steps', step, 'view'];
+    const own = request('/test', { visitor_id: 'x' }, { host: 'paginas.cliente.com.br', origin: 'https://paginas.cliente.com.br' });
+    assert.equal((await handlePublicFunnel(own, view, env)).status, 204);
+    const foreign = request('/test', { visitor_id: 'x' }, { host: 'paginas.cliente.com.br', origin: 'https://evil.example' });
+    assert.equal((await handlePublicFunnel(foreign, view, env)).status, 403);
+    const onPlatform = request('/test', { visitor_id: 'x' }, { host: 'crm.test', origin: 'https://evil.example' });
+    assert.equal((await handlePublicFunnel(onPlatform, view, env)).status, 403);
+  });
+});
+
 test('Evolution webhook preserves signed bytes and does not forward user credentials', async () => {
   const { handleEvolutionWebhook } = await import('../src/lib/bff.ts');
   const body = '{ "instance": "crm-test", "event": "CONNECTION_UPDATE", "data": {"state":"open"} }\n';
