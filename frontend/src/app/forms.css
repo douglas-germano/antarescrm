@@ -1,0 +1,41 @@
+/* Public form rendering. Colors, font, radius and width come from the form's design settings via --f-* variables. */
+.fv-page { min-height: 100dvh; display: grid; place-items: center; padding: var(--space-6) var(--space-4); background: var(--f-bg, #f2f2f2); color: var(--f-text, #25282b); font-family: var(--f-font, inherit); }
+.fv-card { width: min(100%, var(--f-width, 520px)); }
+.fv-card .fv-brand ~ * { max-width: 100%; }
+.fv-page.fv-card .fv-card { background: var(--f-card, #fff); padding: clamp(var(--space-4), 5vw, 40px); border: 1px solid #0000001a; border-radius: var(--f-radius, 6px); }
+.fv-page.fv-plain .fv-card { padding: 0; }
+.fv-brand { display: flex; align-items: center; gap: var(--space-2); font-size: 17px; font-weight: 700; margin-bottom: var(--space-5); color: var(--f-accent); }
+.fv-brand img { max-height: 40px; max-width: 100%; object-fit: contain; }
+.fv-align-center .fv-brand, .fv-align-center .fv-head, .fv-align-center .fv-success { justify-content: center; text-align: center; }
+.fv-head h1 { font-size: clamp(24px, 5vw, 30px); line-height: 1.3; letter-spacing: -.5px; text-transform: none; margin: 0; }
+.fv-head p { margin: var(--space-3) 0 var(--space-5); opacity: .72; line-height: 1.7; white-space: pre-wrap; }
+.fv-embedded .fv-head h1 { font-size: 22px; }
+.fv-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); border: 0; padding: 0; margin: 0; min-width: 0; }
+.fv-full { grid-column: 1 / -1; }
+.fv-half { grid-column: span 1; }
+@media (max-width: 520px) { .fv-half { grid-column: 1 / -1; } }
+.fv-field { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; margin: 0; }
+.fv-field label, .fv-group legend { font-size: 13px; font-weight: 600; padding: 0; }
+.fv-optional { opacity: .6; font-weight: 400; }
+.fv-field input:not([type='checkbox']):not([type='radio']), .fv-field select, .fv-field textarea { width: 100%; padding: var(--space-3); font: inherit; font-size: 14px; color: inherit; background: #fff; border: 1px solid #25282b; border-radius: min(var(--f-radius, 6px), 12px); }
+.fv-field input:focus-visible, .fv-field select:focus-visible, .fv-field textarea:focus-visible { outline: 2px solid var(--f-accent); outline-offset: 1px; }
+.fv-help { opacity: .65; font-size: 12px; line-height: 1.5; }
+.fv-group { border: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.fv-check { display: flex; align-items: flex-start; gap: var(--space-2); font-size: 13px; line-height: 1.6; font-weight: 400; cursor: pointer; }
+.fv-check input { margin-top: var(--space-1); flex-shrink: 0; accent-color: var(--f-accent); }
+.fv-heading { font-size: 18px; margin: var(--space-2) 0 0; text-transform: none; letter-spacing: 0; }
+.fv-paragraph { font-size: 14px; line-height: 1.7; opacity: .8; margin: 0; white-space: pre-wrap; }
+.fv-divider { border: 0; border-top: 1px solid #0000002b; margin: var(--space-2) 0; }
+.fv-honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.fv-error { color: #b83c3c; font-size: 13px; margin-top: var(--space-3); }
+.fv-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); margin-top: var(--space-5); min-height: 44px; padding: var(--space-3) var(--space-5); border: 1px solid var(--f-accent); border-radius: var(--f-button-radius, 60px); background: var(--f-accent); color: var(--f-on-accent, #fff); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.fv-button:hover:not(:disabled) { filter: brightness(.9); }
+.fv-button:disabled { opacity: .6; cursor: progress; }
+.fv-button-full { width: 100%; }
+.fv-success { text-align: center; padding: var(--space-5) 0; }
+.fv-success svg { color: var(--f-accent, #e60000); margin-bottom: var(--space-5); }
+.fv-success p { opacity: .72; margin-top: var(--space-4); line-height: 1.6; }
+.fv-form [data-selected] { outline: 2px dashed transparent; outline-offset: 4px; border-radius: 4px; cursor: pointer; }
+.fv-form [data-selected]:hover { outline-color: #e6000066; }
+.fv-form [data-selected='true'] { outline: 2px solid #e60000; }
+@media (prefers-reduced-motion: no-preference) { .fv-button { transition: filter .15s; } }

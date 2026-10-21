@@ -17,6 +17,28 @@ function sameOrigin(request: Request, env: GatewayEnv) {
   const expected = env.APP_URL ? new URL(env.APP_URL).origin : new URL(request.url).origin;
   return !origin || origin === expected;
 }
+/** Hostname the visitor actually used, without port. Behind the tunnel this is the public name, not 127.0.0.1. */
+function requestHost(request: Request) {
+  const raw = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+  return raw.split(',')[0].trim().toLowerCase().replace(/:\d+$/, '');
+}
+export function canonicalHosts(env: GatewayEnv) {
+  const hosts = new Set(['localhost', '127.0.0.1', '[::1]']);
+  if (env.APP_URL) hosts.add(new URL(env.APP_URL).hostname.toLowerCase());
+  return hosts;
+}
+/** A customer domain, if the page is being served on one. The API trusts this header only because it sits behind this gateway. */
+function domainHeader(request: Request, env: GatewayEnv): Record<string, string> {
+  const host = requestHost(request);
+  return host && !canonicalHosts(env).has(host) ? { 'X-Custom-Domain': host } : {};
+}
+/** Public pages on a customer domain post from that domain, so accept an Origin that matches the Host actually used. */
+function samePublicOrigin(request: Request, env: GatewayEnv) {
+  if (sameOrigin(request, env)) return true;
+  const origin = request.headers.get('origin');
+  try { return !!origin && new URL(origin).hostname.toLowerCase() === requestHost(request) && !canonicalHosts(env).has(requestHost(request)); }
+  catch { return false; }
+}
 function cookies(request: Request) {
   return new Map((request.headers.get('cookie') || '').split(';').map((part) => {
     const i = part.indexOf('=');
@@ -145,12 +167,12 @@ export async function handleBackend(request: Request, path: string[], env: Gatew
 export async function handlePublicForm(request: Request, formId: string, submit: boolean, env: GatewayEnv): Promise<Response> {
   if (!/^[0-9a-f-]{36}$/i.test(formId)) return failure('Formulário indisponível.', 404);
   if (request.method !== (submit ? 'POST' : 'GET')) return failure('Método não permitido.', 405);
-  if (!sameOrigin(request, env)) return failure('Origem inválida.', 403);
+  if (!samePublicOrigin(request, env)) return failure('Origem inválida.', 403);
   try {
     const body = submit ? await request.text() : undefined;
     if (body && new TextEncoder().encode(body).length > 8192) return failure('Solicitação muito grande.', 413);
     const upstream = await fetch(`${base(env)}/public/forms/${formId}${submit ? '/submit' : ''}`, {
-      method: request.method, headers: { 'Content-Type': 'application/json' }, body,
+      method: request.method, headers: { 'Content-Type': 'application/json', ...domainHeader(request, env) }, body,
       cache: 'no-store', signal: AbortSignal.timeout(20000),
     });
     const data = await upstream.json();
@@ -166,16 +188,35 @@ export async function handlePublicBooking(request: Request, path: string[], env:
   const booking = path[0] === 'bookings' && /^[A-Za-z0-9_.-]{20,700}$/.test(path[1] || '') &&
     ((path.length === 2 && request.method === 'GET') || (path.length === 3 && ['cancel','reschedule'].includes(path[2]) && request.method === 'POST'));
   if (!calendar && !booking) return failure('Rota indisponível.', 404);
-  if (!sameOrigin(request, env)) return failure('Origem inválida.', 403);
+  if (!samePublicOrigin(request, env)) return failure('Origem inválida.', 403);
   try {
     const body = request.method === 'POST' ? await request.text() : undefined;
     if (body && new TextEncoder().encode(body).length > 8192) return failure('Solicitação muito grande.', 413);
     const response = await fetch(`${base(env)}/public/${path.join('/')}${new URL(request.url).search}`, {
-      method: request.method, headers: { 'Content-Type': 'application/json' }, body,
+      method: request.method, headers: { 'Content-Type': 'application/json', ...domainHeader(request, env) }, body,
       cache: 'no-store', signal: AbortSignal.timeout(20000),
     });
     return json(await response.json(), response.status);
   } catch { return failure('Não foi possível acessar a agenda. Tente novamente.', 502); }
+}
+
+/** Public funnel pages: page JSON and view tracking only; never forwards session credentials. */
+export async function handlePublicFunnel(request: Request, path: string[], env: GatewayEnv): Promise<Response> {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const slug = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+  const page = uuid.test(path[0] || '') && request.method === 'GET' && (path.length === 1 || (path.length === 2 && slug.test(path[1]) && path[1].length <= 60));
+  const view = uuid.test(path[0] || '') && request.method === 'POST' && path.length === 4 && path[1] === 'steps' && uuid.test(path[2]) && path[3] === 'view';
+  if (!page && !view) return failure('Rota indisponível.', 404);
+  if (!samePublicOrigin(request, env)) return failure('Origem inválida.', 403);
+  try {
+    const body = view ? await request.text() : undefined;
+    if (body && new TextEncoder().encode(body).length > 1024) return failure('Solicitação muito grande.', 413);
+    const upstream = await fetch(`${base(env)}/public/funnels/${path.join('/')}`, {
+      method: request.method, headers: { 'Content-Type': 'application/json', ...domainHeader(request, env) }, body, cache: 'no-store', signal: AbortSignal.timeout(20000),
+    });
+    if (upstream.status === 204) return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
+    return json(await upstream.json(), upstream.status);
+  } catch { return failure('Não foi possível carregar a página. Tente novamente.', 502); }
 }
 
 /** Client approval links: exact routes, no credentials forwarded. The file route streams the layout back to the browser. */
@@ -184,13 +225,13 @@ export async function handlePublicApproval(request: Request, path: string[], env
   const ok = path[0] === 'approvals' && token && ((path.length === 2 && request.method === 'GET') ||
     (path.length === 3 && ((path[2] === 'file' && request.method === 'GET') || (path[2] === 'decide' && request.method === 'POST'))));
   if (!ok) return failure('Rota indisponível.', 404);
-  if (!sameOrigin(request, env)) return failure('Origem inválida.', 403);
+  if (!samePublicOrigin(request, env)) return failure('Origem inválida.', 403);
   try {
     const body = request.method === 'POST' ? await request.text() : undefined;
     if (body && new TextEncoder().encode(body).length > 8192) return failure('Solicitação muito grande.', 413);
     const ip = request.headers.get('cf-connecting-ip') || (request.headers.get('x-forwarded-for') || '').split(',')[0].trim();
     const upstream = await fetch(`${base(env)}/public/${path.join('/')}${new URL(request.url).search}`, {
-      method: request.method, headers: { 'Content-Type': 'application/json', ...(ip ? { 'X-Client-IP': ip } : {}) },
+      method: request.method, headers: { 'Content-Type': 'application/json', ...domainHeader(request, env), ...(ip ? { 'X-Client-IP': ip } : {}) },
       body, cache: 'no-store', signal: AbortSignal.timeout(30000),
     });
     const headers = new Headers({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' });

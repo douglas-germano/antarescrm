@@ -2,7 +2,7 @@ import { ArrowLeft, Link2, MessageCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { initials } from '@/lib/format';
 import type { Row } from '@/lib/types';
-import { contactName } from './helpers';
+import { contactName } from '@/components/whatsapp/helpers';
 
 export function ChatHeader({
   conversation,

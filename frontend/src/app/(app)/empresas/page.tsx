@@ -7,7 +7,7 @@ import type { Field, Row } from '@/lib/types';
 import { useNotify } from '@/components/providers';
 import { Button, Badge, PageHeader, EmptyState, DataState, SearchInput, FormDialog, ConfirmDialog, Modal } from '@/components/ui';
 import { PagedTable } from '@/components/fit';
-import { CrmDataTools, metadataFields, metadataInitial, metadataPayload } from '@/components/crm-data-tools';
+import { CrmDataTools, metadataFields, metadataInitial, metadataPayload } from '@/components/contacts/crm-data-tools';
 import { Card } from '@/components/blocks';
 
 const fields: Field[] = [

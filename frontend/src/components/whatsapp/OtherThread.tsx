@@ -2,7 +2,7 @@ import { ArrowLeft, Loader2, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button, DataState } from '@/components/ui';
 import type { Row } from '@/lib/types';
-import { ChannelIcon, ThreadAvatar, channelName } from './ThreadList';
+import { ChannelIcon, ThreadAvatar, channelName } from '@/components/whatsapp/ThreadList';
 
 const statusName: Record<string, string> = {
   queued: 'Na fila', sending: 'Em envio', blocked: 'Configuração pendente', unknown: 'Verificar no provedor', sent: 'Enviada',

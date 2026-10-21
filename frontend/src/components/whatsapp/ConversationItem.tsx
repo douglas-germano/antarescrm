@@ -1,6 +1,6 @@
 import { initials } from '@/lib/format';
 import type { Row } from '@/lib/types';
-import { clockTime, contactName } from './helpers';
+import { clockTime, contactName } from '@/components/whatsapp/helpers';
 
 export function ConversationItem({
   conversation,

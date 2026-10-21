@@ -8,7 +8,7 @@ import { ConversationDetailsDialog, NewConversationDialog } from '@/components/w
 import { OtherThread } from '@/components/whatsapp/OtherThread';
 import { ThreadList, channelName } from '@/components/whatsapp/ThreadList';
 import { useConnection } from '@/components/whatsapp/hooks';
-import { BroadcastsPanel, TemplatesPanel } from '@/components/inbox-panels';
+import { BroadcastsPanel, TemplatesPanel } from '@/components/inbox/inbox-panels';
 import { api, useList, useData, post, patch, refreshAll } from '@/lib/api';
 import { useSession, useNotify } from '@/components/providers';
 import { PageHeader, Button, FormDialog, DataState } from '@/components/ui';

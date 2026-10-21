@@ -1,7 +1,7 @@
 import type { Row } from '@/lib/types';
-import { clockTime } from './helpers';
-import { MessageMedia } from './MessageMedia';
-import { MessageStatus } from './MessageStatus';
+import { clockTime } from '@/components/whatsapp/helpers';
+import { MessageMedia } from '@/components/whatsapp/MessageMedia';
+import { MessageStatus } from '@/components/whatsapp/MessageStatus';
 
 export function MessageBubble({ message }: { message: Row }) {
   const outgoing = message.direction === 'out';

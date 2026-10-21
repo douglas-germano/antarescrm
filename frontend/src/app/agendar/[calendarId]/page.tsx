@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { publicApi } from '@/lib/public-api';
 import { Button, DataState } from '@/components/ui';
-import { BookingSlots } from '@/components/booking-slots';
+import { BookingSlots } from '@/components/booking/booking-slots';
 import type { Row } from '@/lib/types';
 export default function PublicBooking() {
   const { calendarId } = useParams<{ calendarId: string }>();

@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { post } from '@/lib/api';
 import { useNotify } from '@/components/providers';
 import type { Row } from '@/lib/types';
-import { ChatHeader } from './ChatHeader';
-import { Composer } from './Composer';
-import { useMessages } from './hooks';
-import { MessageList } from './MessageList';
+import { ChatHeader } from '@/components/whatsapp/ChatHeader';
+import { Composer } from '@/components/whatsapp/Composer';
+import { useMessages } from '@/components/whatsapp/hooks';
+import { MessageList } from '@/components/whatsapp/MessageList';
 
 /** One open conversation. Mount it with `key={conversation.id}` so per-conversation state resets on switch. */
 export function ChatPane({

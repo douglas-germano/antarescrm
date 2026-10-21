@@ -1,4 +1,4 @@
-import type { Conditions } from '../conditions-editor';
+import type { Conditions } from '@/components/automations/conditions-editor';
 
 export const EVENTS: Record<string, { label: string; hint: string }> = {
   'contact.created': { label: 'Contato criado', hint: 'Um novo contato entra na conta.' },

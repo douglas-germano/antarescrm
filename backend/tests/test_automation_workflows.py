@@ -8,26 +8,40 @@ from app.services.automations import process
 
 def contact_for(d, **kw):
     row = Contact(workspace_id=d['ws'].id, name=kw.pop('name', 'Lead'), tags=kw.pop('tags', []), **kw)
-    db.session.add(row); db.session.commit(); return row
+    db.session.add(row)
+    db.session.commit()
+    return row
 
 
 def template_for(d, **kw):
-    row = MessageTemplate(workspace_id=d['ws'].id, name='Boas-vindas', channel=kw.pop('channel', 'email'),
-                          subject=kw.pop('subject', 'Olá {{name}}'), content=kw.pop('content', 'Oi {{name}}'))
-    db.session.add(row); db.session.commit(); return row
+    row = MessageTemplate(
+        workspace_id=d['ws'].id,
+        name='Boas-vindas',
+        channel=kw.pop('channel', 'email'),
+        subject=kw.pop('subject', 'Olá {{name}}'),
+        content=kw.pop('content', 'Oi {{name}}'),
+    )
+    db.session.add(row)
+    db.session.commit()
+    return row
 
 
 def test_actions_schedule_jobs_with_cumulative_delay_and_run_stays_queued(env, monkeypatch):
     client, d = env
     import app.services.automations as module
+
     base = datetime(2026, 10, 21, 10, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(module, 'now', lambda: base)
     template = template_for(d)
-    rule(d, event='contact.created', actions=[
-        {'kind': 'create_task', 'title': 'Ligar', 'delay_minutes': 0, 'due_days': 1},
-        {'kind': 'send_message', 'template_id': template.id, 'delay_minutes': 30},
-        {'kind': 'follow_up', 'title': 'Revisar', 'delay_minutes': 90, 'due_days': 2},
-    ])
+    rule(
+        d,
+        event='contact.created',
+        actions=[
+            {'kind': 'create_task', 'title': 'Ligar', 'delay_minutes': 0, 'due_days': 1},
+            {'kind': 'send_message', 'template_id': template.id, 'delay_minutes': 30},
+            {'kind': 'follow_up', 'title': 'Revisar', 'delay_minutes': 90, 'due_days': 2},
+        ],
+    )
     contact = contact_for(d)
     module.emit(d['ws'].id, 'contact.created', contact.id, contact)
     db.session.commit()
@@ -40,13 +54,18 @@ def test_actions_schedule_jobs_with_cumulative_delay_and_run_stays_queued(env, m
 def test_process_runs_steps_in_order_and_skips_step_due_before_predecessor(env, monkeypatch):
     client, d = env
     import app.services.automations as module
+
     base = datetime(2026, 10, 21, 10, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(module, 'now', lambda: base)
     contact = contact_for(d)
-    rule(d, event='contact.created', actions=[
-        {'kind': 'create_task', 'title': 'Primeiro', 'delay_minutes': 0, 'due_days': 0},
-        {'kind': 'create_task', 'title': 'Segundo', 'delay_minutes': 0, 'due_days': 0},
-    ])
+    rule(
+        d,
+        event='contact.created',
+        actions=[
+            {'kind': 'create_task', 'title': 'Primeiro', 'delay_minutes': 0, 'due_days': 0},
+            {'kind': 'create_task', 'title': 'Segundo', 'delay_minutes': 0, 'due_days': 0},
+        ],
+    )
     module.emit(d['ws'].id, 'contact.created', contact.id, contact)
     db.session.commit()
     first, second = AutomationJob.query.order_by(AutomationJob.position).all()
@@ -62,6 +81,7 @@ def test_process_runs_steps_in_order_and_skips_step_due_before_predecessor(env, 
 def test_send_message_action_enqueues_rendered_inbox_message(env, monkeypatch):
     client, d = env
     import app.services.automations as module
+
     monkeypatch.setattr(module, 'now', lambda: datetime(2026, 10, 21, 10, 0, tzinfo=timezone.utc))
     template = template_for(d, subject='Olá {{name}}', content='Oi {{name}}, bem-vindo')
     contact = contact_for(d, name='Ana', email='ana@example.test')
@@ -78,12 +98,18 @@ def test_send_message_action_enqueues_rendered_inbox_message(env, monkeypatch):
 def test_follow_up_action_creates_activity_with_cumulative_offset(env, monkeypatch):
     client, d = env
     import app.services.automations as module
+
     base = datetime(2026, 10, 21, 10, 0, tzinfo=timezone.utc)
     monkeypatch.setattr(module, 'now', lambda: base)
     contact = contact_for(d)
-    rule(d, event='contact.created', assignee_id=d['owner'].id, actions=[
-        {'kind': 'follow_up', 'title': 'Checar interesse', 'delay_minutes': 15, 'due_days': 3},
-    ])
+    rule(
+        d,
+        event='contact.created',
+        assignee_id=d['owner'].id,
+        actions=[
+            {'kind': 'follow_up', 'title': 'Checar interesse', 'delay_minutes': 15, 'due_days': 3},
+        ],
+    )
     module.emit(d['ws'].id, 'contact.created', contact.id, contact)
     db.session.commit()
     monkeypatch.setattr(module, 'now', lambda: base + timedelta(minutes=15))
@@ -96,8 +122,14 @@ def test_follow_up_action_creates_activity_with_cumulative_offset(env, monkeypat
 def test_required_tag_condition_filters_contacts(env, monkeypatch):
     client, d = env
     import app.services.automations as module
+
     monkeypatch.setattr(module, 'now', lambda: datetime(2026, 10, 21, 10, 0, tzinfo=timezone.utc))
-    rule(d, event='contact.created', required_tag='vip', actions=[{'kind': 'create_task', 'title': 'Atender VIP', 'delay_minutes': 0, 'due_days': 0}])
+    rule(
+        d,
+        event='contact.created',
+        required_tag='vip',
+        actions=[{'kind': 'create_task', 'title': 'Atender VIP', 'delay_minutes': 0, 'due_days': 0}],
+    )
     plain = contact_for(d, name='Comum', tags=[])
     vip = contact_for(d, name='VIP', tags=['vip'])
     module.emit(d['ws'].id, 'contact.created', plain.id, plain)
@@ -109,9 +141,12 @@ def test_required_tag_condition_filters_contacts(env, monkeypatch):
 def test_send_message_with_unavailable_template_fails_job_without_crashing_worker(env, monkeypatch):
     client, d = env
     import app.services.automations as module
+
     monkeypatch.setattr(module, 'now', lambda: datetime(2026, 10, 21, 10, 0, tzinfo=timezone.utc))
     contact = contact_for(d)
-    rule(d, event='contact.created', actions=[{'kind': 'send_message', 'template_id': str(uuid4()), 'delay_minutes': 0}])
+    rule(
+        d, event='contact.created', actions=[{'kind': 'send_message', 'template_id': str(uuid4()), 'delay_minutes': 0}]
+    )
     module.emit(d['ws'].id, 'contact.created', contact.id, contact)
     db.session.commit()
     process(d['ws'].id)
@@ -123,9 +158,15 @@ def test_send_message_with_unavailable_template_fails_job_without_crashing_worke
 def test_job_skipped_when_contact_is_archived_before_its_turn(env, monkeypatch):
     client, d = env
     import app.services.automations as module
+
     monkeypatch.setattr(module, 'now', lambda: datetime(2026, 10, 21, 10, 0, tzinfo=timezone.utc))
     contact = contact_for(d)
-    rule(d, event='contact.created', assignee_id=d['member'].id, actions=[{'kind': 'create_task', 'title': 'X', 'delay_minutes': 0, 'due_days': 0}])
+    rule(
+        d,
+        event='contact.created',
+        assignee_id=d['member'].id,
+        actions=[{'kind': 'create_task', 'title': 'X', 'delay_minutes': 0, 'due_days': 0}],
+    )
     module.emit(d['ws'].id, 'contact.created', contact.id, contact)
     db.session.commit()
     contact.archived = True
@@ -137,6 +178,7 @@ def test_job_skipped_when_contact_is_archived_before_its_turn(env, monkeypatch):
 def test_jobs_and_process_routes_are_scoped_and_role_restricted(env, monkeypatch):
     client, d = env
     import app.services.automations as module
+
     monkeypatch.setattr(module, 'now', lambda: datetime(2026, 10, 21, 10, 0, tzinfo=timezone.utc))
     contact = contact_for(d)
     rule(d, event='contact.created', actions=[{'kind': 'create_task', 'title': 'X', 'delay_minutes': 0, 'due_days': 0}])
@@ -153,8 +195,18 @@ def test_jobs_and_process_routes_are_scoped_and_role_restricted(env, monkeypatch
 def test_rule_action_validation_requires_template_or_title_and_scopes_template(env):
     client, d = env
     base_body = {'name': 'Fluxo', 'event': 'contact.created', 'task_title': 'Fallback', 'due_days': 0}
-    assert client.post('/api/v1/automations', headers=d['headers'](), json={**base_body, 'actions': [{'kind': 'send_message'}]}).status_code == 422
-    assert client.post('/api/v1/automations', headers=d['headers'](), json={**base_body, 'actions': [{'kind': 'create_task'}]}).status_code == 422
+    assert (
+        client.post(
+            '/api/v1/automations', headers=d['headers'](), json={**base_body, 'actions': [{'kind': 'send_message'}]}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            '/api/v1/automations', headers=d['headers'](), json={**base_body, 'actions': [{'kind': 'create_task'}]}
+        ).status_code
+        == 422
+    )
     foreign = {**base_body, 'actions': [{'kind': 'send_message', 'template_id': str(uuid4())}]}
     assert client.post('/api/v1/automations', headers=d['headers'](), json=foreign).status_code == 404
     template = template_for(d)

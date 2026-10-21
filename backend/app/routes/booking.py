@@ -1,12 +1,15 @@
-from datetime import date, time
-from flask import Blueprint, request, g
-from marshmallow import fields as f, validate
-from ..schemas import StrictSchema, text, ref
+from datetime import date
+
+from flask import Blueprint, request
+from marshmallow import fields as f
+from marshmallow import validate
+
+from ..common import APIError, add, commit, get, page, payload, query, require, update, user_ref
 from ..extensions import limiter
-from ..models import BookingCalendar, Booking
-from ..common import require, query, page, payload, get, add, update, commit, user_ref, APIError
+from ..models import Booking, BookingCalendar
+from ..schemas import StrictSchema, ref, text
+from ..schemas.growth import SubmissionSchema
 from ..services import booking as service
-from .growth import SubmissionSchema
 
 bp = Blueprint('booking', __name__)
 
@@ -24,7 +27,10 @@ class CalendarSchema(StrictSchema):
     buffer_minutes = f.Integer(validate=validate.Range(min=0, max=120))
     lead_minutes = f.Integer(validate=validate.Range(min=0, max=43200))
     horizon_days = f.Integer(validate=validate.Range(min=1, max=180))
-    availability = f.Dict(keys=f.String(validate=validate.OneOf(list('0123456'))), values=f.List(f.Nested(WindowSchema), validate=validate.Length(max=4)))
+    availability = f.Dict(
+        keys=f.String(validate=validate.OneOf(list('0123456'))),
+        values=f.List(f.Nested(WindowSchema), validate=validate.Length(max=4)),
+    )
     active = f.Boolean()
 
 
@@ -42,7 +48,7 @@ def validate_calendar(data):
         for windows in data['availability'].values():
             windows.sort(key=lambda w: w['start'])
             for i, window in enumerate(windows):
-                if window['start'] >= window['end'] or (i and windows[i-1]['end'] > window['start']):
+                if window['start'] >= window['end'] or (i and windows[i - 1]['end'] > window['start']):
                     raise APIError('Use intervalos válidos, sem sobreposição.', 422)
             for window in windows:
                 window['start'], window['end'] = window['start'].strftime('%H:%M'), window['end'].strftime('%H:%M')
@@ -50,13 +56,15 @@ def validate_calendar(data):
 
 @bp.get('/booking-calendars')
 @require()
-def calendars(): return page(query(BookingCalendar).order_by(BookingCalendar.name))
+def calendars():
+    return page(query(BookingCalendar).order_by(BookingCalendar.name))
 
 
 @bp.post('/booking-calendars')
 @require('owner', 'admin')
 def create_calendar():
-    data = payload(CalendarSchema); validate_calendar(data)
+    data = payload(CalendarSchema)
+    validate_calendar(data)
     return commit(add(BookingCalendar, data), 201)
 
 
@@ -64,34 +72,40 @@ def create_calendar():
 @require('owner', 'admin')
 def edit_calendar(calendar_id):
     row = get(BookingCalendar, calendar_id)
-    data = payload(CalendarSchema, partial=True); validate_calendar(data)
+    data = payload(CalendarSchema, partial=True)
+    validate_calendar(data)
     update(row, data)
     return commit(row)
 
 
 @bp.get('/bookings')
 @require()
-def bookings(): return page(query(Booking).order_by(Booking.starts_at.desc()))
+def bookings():
+    return page(query(Booking).order_by(Booking.starts_at.desc()))
 
 
 @bp.get('/public/calendars/<uuid:calendar_id>')
 @limiter.limit('120 per minute')
-def public_calendar(calendar_id): return service.public_copy(service.published(calendar_id))
+def public_calendar(calendar_id):
+    return service.public_copy(service.published(calendar_id))
 
 
 @bp.get('/public/calendars/<uuid:calendar_id>/slots')
 @limiter.limit('120 per minute')
 def slots(calendar_id):
     calendar = service.published(calendar_id)
-    try: day = date.fromisoformat(request.args.get('date', ''))
-    except ValueError: raise APIError('Informe uma data válida.', 422)
+    try:
+        day = date.fromisoformat(request.args.get('date', ''))
+    except ValueError:
+        raise APIError('Informe uma data válida.', 422) from None
     return {'items': service.availability(calendar, day), 'timezone': str(service.timezone_for(calendar))}
 
 
 @bp.post('/public/calendars/<uuid:calendar_id>/book')
 @limiter.limit('10 per minute;100 per hour')
 def book(calendar_id):
-    if request.content_length and request.content_length > 8192: raise APIError('Solicitação muito grande.', 413)
+    if request.content_length and request.content_length > 8192:
+        raise APIError('Solicitação muito grande.', 413)
     data = payload(ReserveSchema)
     row = service.reserve(service.published(calendar_id), data)
     return {'message': 'Agendamento confirmado.', 'token': service.manage_token(row)}, 200
@@ -102,8 +116,13 @@ def book(calendar_id):
 def manage(token):
     row = service.managed(token)
     calendar = BookingCalendar.query.filter_by(id=row.calendar_id, workspace_id=row.workspace_id).first()
-    return {'name': calendar.name, 'starts_at': row.starts_at.isoformat(), 'status': row.status,
-            'calendar_id': calendar.id, 'timezone': str(service.timezone_for(calendar))}
+    return {
+        'name': calendar.name,
+        'starts_at': row.starts_at.isoformat(),
+        'status': row.status,
+        'calendar_id': calendar.id,
+        'timezone': str(service.timezone_for(calendar)),
+    }
 
 
 @bp.post('/public/bookings/<token>/cancel')

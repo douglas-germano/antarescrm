@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, KeyRound, KanbanSquare, FolderKanban, Plug, UserCircle, Users, Building2, Save, Activity } from 'lucide-react';
-import { ConnectionsSettings } from '@/components/connections-settings';
-import { ProfileSettings } from '@/components/profile-settings';
-import { ProjectStageSettings } from '@/components/project-stage-settings';
-import { PipelineSettings } from '@/components/pipeline-settings';
-import { OperationsSettings } from '@/components/operations-settings';
+import { Plus, Pencil, KeyRound, KanbanSquare, FolderKanban, Plug, UserCircle, Users, Building2, Save, Activity, Globe } from 'lucide-react';
+import { ConnectionsSettings } from '@/components/settings/connections-settings';
+import { DomainsSettings } from '@/components/settings/domains-settings';
+import { ProfileSettings } from '@/components/settings/profile-settings';
+import { ProjectStageSettings } from '@/components/settings/project-stage-settings';
+import { PipelineSettings } from '@/components/settings/pipeline-settings';
+import { OperationsSettings } from '@/components/settings/operations-settings';
 import { useSession, useNotify } from '@/components/providers';
 import { useList, post, patch, refreshAll } from '@/lib/api';
 import { PageHeader, DataState, Button, FormDialog, Badge } from '@/components/ui';
@@ -26,6 +27,7 @@ export default function SettingsPage() {
     if (requested === 'funis') setTab('pipelines');
     if (requested === 'projetos') setTab('projects');
     if (canManage && requested === 'conexoes') setTab('connections');
+    if (canManage && requested === 'dominios') setTab('domains');
   }, [canManage]);
   function selectTab(value: string) {
     setTab(value);
@@ -34,6 +36,7 @@ export default function SettingsPage() {
     else if (value === 'pipelines') url.searchParams.set('tab', 'funis');
     else if (value === 'projects') url.searchParams.set('tab', 'projetos');
     else if (value === 'connections') url.searchParams.set('tab', 'conexoes');
+    else if (value === 'domains') url.searchParams.set('tab', 'dominios');
     else url.searchParams.delete('tab');
     window.history.replaceState(null, '', url.pathname + url.search + url.hash);
   }
@@ -91,6 +94,7 @@ export default function SettingsPage() {
             { value: 'pipelines', label: 'Funis', icon: <KanbanSquare size={14} /> },
             { value: 'projects', label: 'Projetos', icon: <FolderKanban size={14} /> },
             ...(canManage ? [{ value: 'connections', label: 'Conexões', icon: <Plug size={14} /> }] : []),
+            ...(canManage ? [{ value: 'domains', label: 'Domínios', icon: <Globe size={14} /> }] : []),
             ...(canManage ? [{ value: 'operations', label: 'Operação', icon: <Activity size={14} /> }] : []),
           ]}
         />
@@ -101,6 +105,7 @@ export default function SettingsPage() {
       {tab === 'pipelines' && <PipelineSettings />}
       {tab === 'projects' && <ProjectStageSettings />}
       {tab === 'connections' && canManage && <ConnectionsSettings />}
+      {tab === 'domains' && canManage && <DomainsSettings />}
       {tab === 'workspace' && (
         <Card as="section">
           <CardHeader title="Conta" description={`Identificador de acesso: ${workspace?.slug || ''}`} />

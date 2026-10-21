@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { publicApi } from '@/lib/public-api';
 import { Button, DataState, ConfirmDialog } from '@/components/ui';
-import { BookingSlots } from '@/components/booking-slots';
+import { BookingSlots } from '@/components/booking/booking-slots';
 import type { Row } from '@/lib/types';
 export default function ManageBooking() {
   const { token } = useParams<{ token: string }>(); const [data,setData] = useState<Row>(), [error,setError] = useState<Error>();

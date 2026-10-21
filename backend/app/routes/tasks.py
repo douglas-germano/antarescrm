@@ -1,8 +1,9 @@
-from flask import Blueprint, request, g
+from flask import Blueprint, g, request
+
+from ..common import add, audit, commit, get, page, payload, query, require, update, user_ref
 from ..extensions import db
-from ..models import Task, Contact, Company, Opportunity, now
+from ..models import Company, Contact, Opportunity, Task, now
 from ..schemas import TaskSchema
-from ..common import require, payload, query, get, add, update, commit, page, user_ref, audit
 
 bp = Blueprint('tasks', __name__)
 

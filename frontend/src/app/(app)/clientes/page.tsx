@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Plus, ArrowUpRight, Users, Pencil, Building2 } from 'lucide-react';
 import { useSession, useNotify } from '@/components/providers';
 import { useList, useData, post, patch, remove, refreshAll } from '@/lib/api';
-import { switchWorkspace, WorkspaceSwitcher } from '@/components/workspace-switcher';
+import { switchWorkspace, WorkspaceSwitcher } from '@/components/layout/workspace-switcher';
 import { PageHeader, Button, DataState, FormDialog, Modal, ConfirmDialog, EmptyState, Badge } from '@/components/ui';
 import { Card, CardHeader, CardBody } from '@/components/blocks';
 import type { Row, Field } from '@/lib/types';

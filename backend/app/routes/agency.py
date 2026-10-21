@@ -1,12 +1,14 @@
 from flask import Blueprint, g
-from marshmallow import fields as f, validate
+from marshmallow import fields as f
+from marshmallow import validate
 from werkzeug.security import generate_password_hash
-from ..extensions import db
-from ..models import Workspace, WorkspaceAccess, User, PipelineStage
-from ..schemas import StrictSchema, RegisterSchema, WorkspaceSchema, ref, choice
-from ..common import require, APIError, payload, page, audit, validate_timezone
+
 from ..access import accessible_workspaces, workspace_role
-from .auth import tokens, DEFAULT_STAGES
+from ..common import APIError, audit, page, payload, query, require, validate_timezone
+from ..extensions import db
+from ..models import AuditLog, PipelineStage, User, Workspace, WorkspaceAccess
+from ..schemas import RegisterSchema, StrictSchema, WorkspaceSchema, choice, ref
+from .auth import DEFAULT_STAGES, tokens
 
 bp = Blueprint('agency', __name__)
 
@@ -74,10 +76,18 @@ def account_create():
     home = agency_home()
     data = payload(AccountSchema)
     validate_timezone(data['timezone'])
-    workspace = Workspace(name=data['workspace_name'], slug=data['slug'], timezone=data['timezone'], parent_workspace_id=home.id)
-    db.session.add(workspace); db.session.flush()
-    owner = User(workspace_id=workspace.id, name=data['name'], email=data['email'].lower(),
-                 password_hash=generate_password_hash(data['password']), role='owner')
+    workspace = Workspace(
+        name=data['workspace_name'], slug=data['slug'], timezone=data['timezone'], parent_workspace_id=home.id
+    )
+    db.session.add(workspace)
+    db.session.flush()
+    owner = User(
+        workspace_id=workspace.id,
+        name=data['name'],
+        email=data['email'].lower(),
+        password_hash=generate_password_hash(data['password']),
+        role='owner',
+    )
     db.session.add(owner)
     for position, name in enumerate(DEFAULT_STAGES):
         db.session.add(PipelineStage(workspace_id=workspace.id, name=name, position=position))
@@ -135,13 +145,13 @@ def access_revoke(account_id, user_id):
     if not row:
         raise APIError('Acesso não encontrado.', 404)
     audit('revoke_account_access', row, {'user_id': str(user_id)})
-    db.session.delete(row); db.session.commit()
+    db.session.delete(row)
+    db.session.commit()
     return '', 204
 
 
 @bp.get('/audit-logs')
 @require('owner', 'admin')
 def audit_logs():
-    from ..models import AuditLog
-    from ..common import query, page
+
     return page(query(AuditLog).order_by(AuditLog.created_at.desc()))

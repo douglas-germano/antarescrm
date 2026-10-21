@@ -43,7 +43,13 @@ def test_run_creates_contacts_companies_tags_and_skips_duplicates(env):
     body = {'content': GOOGLE, 'options': {'default_ddd': '66', 'source': 'Google Contatos', 'ignored_tags': ['VIP']}}
     first = post(client, d, 'run', body)
     assert first.status_code == 201
-    assert first.get_json() == {'imported': 2, 'updated': 0, 'skipped_duplicates': 0, 'skipped_invalid': 1, 'companies_created': 1}
+    assert first.get_json() == {
+        'imported': 2,
+        'updated': 0,
+        'skipped_duplicates': 0,
+        'skipped_invalid': 1,
+        'companies_created': 1,
+    }
     ana = Contact.query.filter_by(name='Ana Souza').one()
     assert ana.phone == '+5566996156555' and ana.email == 'ana@example.com' and ana.source == 'Google Contatos'
     assert ana.tags == ['Importado em 26/12'] and ana.custom_fields['telefones_adicionais'] == '+556634211234'
@@ -54,9 +60,14 @@ def test_run_creates_contacts_companies_tags_and_skips_duplicates(env):
 
 def test_update_mode_fills_blanks_without_overwriting(env):
     client, d = env
-    existing = Contact(workspace_id=d['ws'].id, name='Ana existente', phone='66996156555', notes='Manter', tags=['antigo'])
-    db.session.add(existing); db.session.commit()
-    result = post(client, d, 'run', {'content': GOOGLE, 'options': {'default_ddd': '66', 'duplicates': 'update'}}).get_json()
+    existing = Contact(
+        workspace_id=d['ws'].id, name='Ana existente', phone='66996156555', notes='Manter', tags=['antigo']
+    )
+    db.session.add(existing)
+    db.session.commit()
+    result = post(
+        client, d, 'run', {'content': GOOGLE, 'options': {'default_ddd': '66', 'duplicates': 'update'}}
+    ).get_json()
     assert result['updated'] == 1 and result['imported'] == 1
     db.session.refresh(existing)
     assert existing.name == 'Ana existente' and existing.notes == 'Manter'
@@ -65,10 +76,20 @@ def test_update_mode_fills_blanks_without_overwriting(env):
 
 def test_generic_semicolon_latin1_file_and_manual_mapping(env):
     client, d = env
-    raw = 'Cliente;Celular;E-mail comercial;Observações\nJoão da Silva;(65) 99999-1111;joao@x.com;Indicação\n'.encode('cp1252')
+    raw = 'Cliente;Celular;E-mail comercial;Observações\nJoão da Silva;(65) 99999-1111;joao@x.com;Indicação\n'.encode(
+        'cp1252'
+    )
     assert ci.decode(raw).startswith('Cliente')
     text = ci.decode(raw)
-    body = {'content': text, 'mapping': {'full_name': ['Cliente'], 'phone': ['Celular'], 'email': ['E-mail comercial'], 'notes': ['Observações']}}
+    body = {
+        'content': text,
+        'mapping': {
+            'full_name': ['Cliente'],
+            'phone': ['Celular'],
+            'email': ['E-mail comercial'],
+            'notes': ['Observações'],
+        },
+    }
     result = post(client, d, 'run', body).get_json()
     assert result['imported'] == 1
     row = Contact.query.filter_by(name='João da Silva').one()
@@ -86,12 +107,25 @@ def test_vcard_import(env):
 
 def test_import_does_not_trigger_automations_unless_asked(env):
     client, d = env
-    db.session.add(AutomationRule(workspace_id=d['ws'].id, name='r', event='contact.created', task_title='t', active=True)); db.session.commit()
+    db.session.add(
+        AutomationRule(workspace_id=d['ws'].id, name='r', event='contact.created', task_title='t', active=True)
+    )
+    db.session.commit()
     from app.models import AutomationRun
+
     post(client, d, 'run', {'content': GOOGLE, 'options': {'default_ddd': '66'}})
     assert AutomationRun.query.count() == 0
-    post(client, d, 'run', {'content': GOOGLE.replace('ana@example.com', 'ana2@example.com').replace('99615-6555', '99111-0000').replace('66996156555', '66991110000'),
-                            'options': {'default_ddd': '66', 'trigger_automations': True}})
+    post(
+        client,
+        d,
+        'run',
+        {
+            'content': GOOGLE.replace('ana@example.com', 'ana2@example.com')
+            .replace('99615-6555', '99111-0000')
+            .replace('66996156555', '66991110000'),
+            'options': {'default_ddd': '66', 'trigger_automations': True},
+        },
+    )
     assert AutomationRun.query.count() >= 1
 
 
@@ -100,5 +134,9 @@ def test_invalid_payloads_are_rejected_and_cross_account_isolated(env):
     assert post(client, d, 'preview', {'content': ''}).status_code == 400
     assert post(client, d, 'run', {'content': 'a,b\n'}).status_code in (200, 201, 422)
     post(client, d, 'run', {'content': GOOGLE, 'options': {'default_ddd': '66'}})
-    other = client.post('/api/v1/contacts/import/preview', json={'content': GOOGLE, 'options': {'default_ddd': '66'}}, headers=d['headers'](d['outsider'])).get_json()
+    other = client.post(
+        '/api/v1/contacts/import/preview',
+        json={'content': GOOGLE, 'options': {'default_ddd': '66'}},
+        headers=d['headers'](d['outsider']),
+    ).get_json()
     assert other['summary']['duplicates'] == 0  # another account never sees these as duplicates

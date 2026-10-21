@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "test:gateway": "node --experimental-strip-types --test tests/bff.test.mjs"
+    "test:gateway": "node --experimental-strip-types --test tests/*.test.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

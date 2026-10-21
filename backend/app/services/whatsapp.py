@@ -1,16 +1,26 @@
 """Conversation persistence, idempotency and media recovery adapted from SDental."""
+
 import base64
 import binascii
 import re
 import secrets
 from datetime import timedelta
+
 from flask import current_app
 from sqlalchemy.exc import IntegrityError
-from ..extensions import db
-from ..models import (WhatsAppConnection, WhatsAppConversation, WhatsAppMessage, WhatsAppMedia,
-                      Contact, now)
+
 from ..common import APIError
-from ..utils.whatsapp_message import normalize_raw_message, MEDIA_PLACEHOLDER_TEXT
+from ..extensions import db
+from ..models import (
+    CommunicationSuppression,
+    Contact,
+    WhatsAppConnection,
+    WhatsAppConversation,
+    WhatsAppMedia,
+    WhatsAppMessage,
+    now,
+)
+from ..utils.whatsapp_message import MEDIA_PLACEHOLDER_TEXT, normalize_raw_message
 from .evolution import EvolutionService
 
 
@@ -27,8 +37,12 @@ def connection_for(workspace_id):
         return row
     try:
         with db.session.begin_nested():
-            row = new(WhatsAppConnection, workspace_id, instance_name='crm-' + workspace_id.replace('-', '')[:20],
-                      webhook_secret=secrets.token_urlsafe(40))
+            row = new(
+                WhatsAppConnection,
+                workspace_id,
+                instance_name='crm-' + workspace_id.replace('-', '')[:20],
+                webhook_secret=secrets.token_urlsafe(40),
+            )
         return row
     except IntegrityError:
         return WhatsAppConnection.query.filter_by(workspace_id=workspace_id).one()
@@ -61,8 +75,13 @@ def normalize_text(value):
 def conversation_for(connection, phone, name=None):
     phone = normalize_phone(phone)
     variants = phone_variants(phone)
-    row = WhatsAppConversation.query.filter(WhatsAppConversation.workspace_id == connection.workspace_id,
-                                            WhatsAppConversation.phone.in_(variants)).order_by(WhatsAppConversation.created_at).first()
+    row = (
+        WhatsAppConversation.query.filter(
+            WhatsAppConversation.workspace_id == connection.workspace_id, WhatsAppConversation.phone.in_(variants)
+        )
+        .order_by(WhatsAppConversation.created_at)
+        .first()
+    )
     if row:
         return row
     try:
@@ -71,15 +90,28 @@ def conversation_for(connection, phone, name=None):
             accepted = set(phone_variants(phone)) | {v[2:] for v in phone_variants(phone) if v.startswith('55')}
             contact = next((c for c in contacts if c.phone and re.sub(r'\D', '', c.phone) in accepted), None)
             if not contact:
-                contact = new(Contact, connection.workspace_id, name=(name or phone)[:180], phone=phone, source='WhatsApp')
+                contact = new(
+                    Contact, connection.workspace_id, name=(name or phone)[:180], phone=phone, source='WhatsApp'
+                )
                 from .automations import emit
+
                 emit(connection.workspace_id, 'contact.created', contact.id, contact)
-            row = new(WhatsAppConversation, connection.workspace_id, phone=phone, contact_name=(name or contact.name)[:180],
-                      contact_id=contact.id)
+            row = new(
+                WhatsAppConversation,
+                connection.workspace_id,
+                phone=phone,
+                contact_name=(name or contact.name)[:180],
+                contact_id=contact.id,
+            )
         return row
     except IntegrityError:
-        return WhatsAppConversation.query.filter(WhatsAppConversation.workspace_id == connection.workspace_id,
-                                                 WhatsAppConversation.phone.in_(variants)).order_by(WhatsAppConversation.created_at).first()
+        return (
+            WhatsAppConversation.query.filter(
+                WhatsAppConversation.workspace_id == connection.workspace_id, WhatsAppConversation.phone.in_(variants)
+            )
+            .order_by(WhatsAppConversation.created_at)
+            .first()
+        )
 
 
 def ingest(connection, raw, historical=False):
@@ -99,9 +131,12 @@ def ingest(connection, raw, historical=False):
     outgoing = normalized['from_me']
     if outgoing and not historical:
         kind, content = normalized['message_type'], normalize_text(normalized['content'])
-        candidates = WhatsAppMessage.query.filter_by(conversation_id=conversation.id, direction='out').filter(
-            WhatsAppMessage.provider_id.is_(None), WhatsAppMessage.created_at >= now() - timedelta(minutes=3)
-        ).order_by(WhatsAppMessage.created_at.desc()).all()
+        candidates = (
+            WhatsAppMessage.query.filter_by(conversation_id=conversation.id, direction='out')
+            .filter(WhatsAppMessage.provider_id.is_(None), WhatsAppMessage.created_at >= now() - timedelta(minutes=3))
+            .order_by(WhatsAppMessage.created_at.desc())
+            .all()
+        )
 
         def same(candidate):
             if candidate.kind != kind:
@@ -109,6 +144,7 @@ def ingest(connection, raw, historical=False):
             if kind != 'text' and (not content or content == normalize_text(MEDIA_PLACEHOLDER_TEXT.get(kind, ''))):
                 return True
             return normalize_text(candidate.content) == content
+
         pending = next((c for c in candidates if c.status in ('pending', 'unknown') and same(c)), None)
         if pending:
             pending.provider_id, pending.status = provider_id, 'sent'
@@ -120,11 +156,19 @@ def ingest(connection, raw, historical=False):
             if sent_by_us.status in ('pending', 'unknown'):
                 sent_by_us.status = 'sent'
             return sent_by_us, False
-    row = new(WhatsAppMessage, connection.workspace_id, conversation_id=conversation.id, provider_id=provider_id,
-              direction='out' if outgoing else 'in', content=str(normalized['content'])[:20000],
-              kind=normalized['message_type'], status='sent' if outgoing else 'received',
-              occurred_at=normalized['timestamp'], raw_message={k: raw[k] for k in ('key', 'message', 'messageTimestamp') if k in raw},
-              mimetype=normalized['media_mimetype'])
+    row = new(
+        WhatsAppMessage,
+        connection.workspace_id,
+        conversation_id=conversation.id,
+        provider_id=provider_id,
+        direction='out' if outgoing else 'in',
+        content=str(normalized['content'])[:20000],
+        kind=normalized['message_type'],
+        status='sent' if outgoing else 'received',
+        occurred_at=normalized['timestamp'],
+        raw_message={k: raw[k] for k in ('key', 'message', 'messageTimestamp') if k in raw},
+        mimetype=normalized['media_mimetype'],
+    )
     # Preserve chronology when importing old records.
     timestamp = normalized['timestamp']
     previous = conversation.last_message_at
@@ -138,16 +182,28 @@ def ingest(connection, raw, historical=False):
         conversation.status = 'open'
         if conversation.contact_id:
             from .automations import received_reply
+
             received_reply(connection.workspace_id, db.session.get(Contact, conversation.contact_id), row.id)
     return row, True
 
 
 def send_outgoing(connection, conversation, content, idempotency_key, user_id=None, file=None):
-    from ..models import CommunicationSuppression
-    if conversation.contact_id and CommunicationSuppression.query.filter_by(workspace_id=connection.workspace_id, contact_id=conversation.contact_id, channel='whatsapp').first():
+
+    if (
+        conversation.contact_id
+        and CommunicationSuppression.query.filter_by(
+            workspace_id=connection.workspace_id, contact_id=conversation.contact_id, channel='whatsapp'
+        ).first()
+    ):
         raise APIError('Contato não autoriza mensagens neste canal.', 409)
-    conversation = WhatsAppConversation.query.filter_by(id=conversation.id, workspace_id=connection.workspace_id).with_for_update().one()
-    existing = WhatsAppMessage.query.filter_by(workspace_id=connection.workspace_id, idempotency_key=idempotency_key).first()
+    conversation = (
+        WhatsAppConversation.query.filter_by(id=conversation.id, workspace_id=connection.workspace_id)
+        .with_for_update()
+        .one()
+    )
+    existing = WhatsAppMessage.query.filter_by(
+        workspace_id=connection.workspace_id, idempotency_key=idempotency_key
+    ).first()
     if existing:
         expected_content = content or MEDIA_PLACEHOLDER_TEXT.get(existing.kind, '')
         if existing.conversation_id != conversation.id or existing.content != expected_content:
@@ -170,6 +226,7 @@ def send_outgoing(connection, conversation, content, idempotency_key, user_id=No
             raise APIError('O arquivo deve ter entre 1 byte e 10 MB.')
         mime = file.mimetype or 'application/octet-stream'
         from werkzeug.utils import secure_filename
+
         filename = secure_filename(file.filename or 'arquivo')[:255] or 'arquivo'
         if mime.startswith('image/') and mime not in ('image/svg+xml', 'image/html'):
             kind = 'image'
@@ -181,9 +238,20 @@ def send_outgoing(connection, conversation, content, idempotency_key, user_id=No
             kind = 'document'
         if kind == 'audio' and content:
             raise APIError('Áudios não aceitam legenda. Envie o texto separadamente.')
-    row = new(WhatsAppMessage, connection.workspace_id, conversation_id=conversation.id, direction='out',
-              content=content or MEDIA_PLACEHOLDER_TEXT.get(kind, ''), kind=kind, status='pending', idempotency_key=idempotency_key,
-              sent_by_id=user_id, sent_via='platform', mimetype=mime, filename=filename)
+    row = new(
+        WhatsAppMessage,
+        connection.workspace_id,
+        conversation_id=conversation.id,
+        direction='out',
+        content=content or MEDIA_PLACEHOLDER_TEXT.get(kind, ''),
+        kind=kind,
+        status='pending',
+        idempotency_key=idempotency_key,
+        sent_by_id=user_id,
+        sent_via='platform',
+        mimetype=mime,
+        filename=filename,
+    )
     if data:
         new(WhatsAppMedia, connection.workspace_id, message_id=row.id, content=data, mimetype=mime, filename=filename)
     if user_id and not conversation.assigned_to_id:
@@ -191,7 +259,11 @@ def send_outgoing(connection, conversation, content, idempotency_key, user_id=No
     conversation.last_message_at, conversation.last_message_preview = now(), row.content[:255]
     db.session.commit()  # Durable outbox BEFORE network; ambiguous sends are not blindly retried.
     try:
-        result = gateway.send_media(conversation.phone, kind, base64.b64encode(data).decode(), mime, filename, content) if data else gateway.send_text(conversation.phone, content)
+        result = (
+            gateway.send_media(conversation.phone, kind, base64.b64encode(data).decode(), mime, filename, content)
+            if data
+            else gateway.send_text(conversation.phone, content)
+        )
         row = db.session.get(WhatsAppMessage, row.id)
         provider_id = (result.get('key') or {}).get('id') or result.get('id')
         if provider_id:
@@ -222,15 +294,31 @@ def media_for(connection, message):
     try:
         content = base64.b64decode(encoded.split(',', 1)[-1], validate=True)
     except (binascii.Error, ValueError):
-        raise APIError('A Evolution retornou uma mídia inválida.', 502)
+        raise APIError('A Evolution retornou uma mídia inválida.', 502) from None
     if not content or len(content) > current_app.config['WHATSAPP_MEDIA_MAX_BYTES']:
         raise APIError('Mídia vazia ou superior a 10 MB.', 413)
     mime = str(response.get('mimetype') or message.mimetype or 'application/octet-stream')[:150]
     from werkzeug.utils import secure_filename
-    filename = secure_filename(response.get('fileName') or response.get('filename') or message.filename or ('arquivo.' + mime.split('/')[-1]))[:255] or 'arquivo'
+
+    filename = (
+        secure_filename(
+            response.get('fileName')
+            or response.get('filename')
+            or message.filename
+            or ('arquivo.' + mime.split('/')[-1])
+        )[:255]
+        or 'arquivo'
+    )
     try:
         with db.session.begin_nested():
-            cached = new(WhatsAppMedia, connection.workspace_id, message_id=message.id, content=content, mimetype=mime, filename=filename)
+            cached = new(
+                WhatsAppMedia,
+                connection.workspace_id,
+                message_id=message.id,
+                content=content,
+                mimetype=mime,
+                filename=filename,
+            )
         db.session.commit()
         return cached
     except IntegrityError:

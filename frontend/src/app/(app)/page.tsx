@@ -6,8 +6,8 @@ import { brl, day, hour, kinds, today } from '@/lib/format';
 import { DataState, StatCard, PageHeader, Button } from '@/components/ui';
 import { useFitCount } from '@/components/fit';
 import { Card, CardHeader } from '@/components/blocks';
-import { RecordActivityDialog, type ActivityRecord } from '@/components/record-activity-dialog';
-import { followUpReasons } from '@/components/follow-up-queue';
+import { RecordActivityDialog, type ActivityRecord } from '@/components/contacts/record-activity-dialog';
+import { followUpReasons } from '@/components/contacts/follow-up-queue';
 import { Users, CheckSquare, TrendingUp, ArrowUpRight, Clock3, Handshake, Percent, Receipt, CalendarPlus, CheckCircle2 } from 'lucide-react';
 import type { Row } from '@/lib/types';
 

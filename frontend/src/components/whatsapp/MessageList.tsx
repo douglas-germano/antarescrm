@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useRef } from 'react';
 import { Button, DataState, EmptyState } from '@/components/ui';
 import type { Row } from '@/lib/types';
-import { dayLabel, messageDay } from './helpers';
-import { MessageBubble } from './MessageBubble';
+import { dayLabel, messageDay } from '@/components/whatsapp/helpers';
+import { MessageBubble } from '@/components/whatsapp/MessageBubble';
 
 export function MessageList({
   messages,
