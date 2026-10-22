@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { useData, setActiveWorkspace } from '@/lib/api';
@@ -31,6 +31,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
   setActiveWorkspace(data?.workspace?.id);
   setZone(data?.workspace?.timezone);
   const [notices, setNotices] = useState<{ id: number; message: string; type: string }[]>([]);
+  const toasts = useRef<HTMLDivElement>(null);
+  // Open dialogs live in the browser's top layer and would cover the toasts (including error messages), so the
+  // stack is promoted to the top layer too, each time a notice is added so that it sits above any open dialog.
+  useEffect(() => {
+    const el = toasts.current;
+    if (!el || typeof el.showPopover !== 'function') return;
+    if (el.matches(':popover-open')) el.hidePopover();
+    if (notices.length) el.showPopover();
+  }, [notices]);
   const notify = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = Date.now() + Math.random();
     setNotices((n) => [...n.slice(-2), { id, message, type }]);
@@ -42,7 +51,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     >
       <NoticeContext.Provider value={{ notify }}>
         {children}
-        <div className="toast-stack" aria-live="polite">
+        <div className="toast-stack" aria-live="polite" popover="manual" ref={toasts}>
           {notices.map((n) => (
             <div className={'toast ' + n.type} key={n.id}>
               {n.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}

@@ -167,7 +167,12 @@ export function Modal({
   const id = useId();
   useEffect(() => {
     const el = dialog.current;
-    if (open && !el?.open) el?.showModal();
+    if (open && !el?.open) {
+      el?.showModal();
+      // The browser focuses the first focusable element, which is the close button: typing would go nowhere and
+      // Enter would dismiss the dialog. Start on the first field instead (confirmation dialogs keep the default).
+      el?.querySelector<HTMLElement>('.modal-content :is(input:not([type="hidden"]), select, textarea):not([disabled])')?.focus();
+    }
     if (!open && el?.open) el.close();
   }, [open]);
   useEffect(() => {

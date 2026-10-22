@@ -270,6 +270,17 @@
   gap: 12px;
   max-width: min(440px, calc(100% - 30px));
 }
+.toast-stack[popover] {
+  inset: auto 25px 25px auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+  width: auto;
+  height: auto;
+}
 .toast {
   display: flex;
   align-items: center;
@@ -963,10 +974,9 @@
   .chat-message {
     max-width: 100%;
   }
-  .toast-stack {
-    right: 16px;
-    left: 16px;
-    bottom: 16px;
+  .toast-stack,
+  .toast-stack[popover] {
+    inset: auto 16px 16px 16px;
     max-width: none;
   }
 
