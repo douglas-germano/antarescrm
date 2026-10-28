@@ -6,6 +6,7 @@ import { post, useData } from '@/lib/api';
 import { useNotify } from '@/components/providers';
 import { Button, ConfirmDialog, DataState } from '@/components/ui';
 import { Card, CardHeader, CardBody } from '@/components/blocks';
+import { HistorySync } from '@/components/settings/history-sync';
 import type { Row } from '@/lib/types';
 
 export function InstagramSettings() {
@@ -25,7 +26,7 @@ export function InstagramSettings() {
   }, [notify]);
   async function connect() {
     setBusy(true);
-    try { const result = await post('/instagram/connect', {}); window.location.assign(result.url); }
+    try { const result = await post<{ url: string }>('/instagram/connect', {}); window.location.assign(result.url); }
     catch (e) { notify((e as Error).message, 'error'); setBusy(false); }
   }
   const current = state.data?.connection;
@@ -59,7 +60,7 @@ export function InstagramSettings() {
             {state.data.connected && <Button variant="secondary" disabled={busy} onClick={async () => {
               setBusy(true);
               try {
-                const result = await post('/instagram/verify', {});
+                const result = await post<Row>('/instagram/verify', {});
                 setDelivery(result);
                 notify(result.subscribed ? (result.activated ? 'Recebimento de mensagens ativado.' : 'Recebimento de mensagens ativo.') : 'O Instagram não confirmou o recebimento.', result.subscribed ? 'success' : 'error');
               } catch (e) { setDelivery(null); notify((e as Error).message, 'error'); }
@@ -67,6 +68,7 @@ export function InstagramSettings() {
             }}>Verificar recebimento</Button>}
             {current?.active && <Button variant="danger" onClick={() => setDisconnect(true)}>Desvincular</Button>}
           </div>
+          <HistorySync channel="instagram" connected={Boolean(state.data.connected)} />
           {delivery && (
             <ul className="connection-list" aria-label="Resultado da verificação">
               <li><span className="connection-info"><strong>Mensagens</strong><small>{delivery.subscribed ? 'A conta está assinada para receber mensagens.' : 'A conta não está assinada. Confira se o app está em modo de desenvolvimento e se a conta é testadora.'}</small></span>

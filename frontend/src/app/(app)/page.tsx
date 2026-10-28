@@ -8,7 +8,7 @@ import { useFitCount } from '@/components/fit';
 import { Card, CardHeader } from '@/components/blocks';
 import { RecordActivityDialog, type ActivityRecord } from '@/components/contacts/record-activity-dialog';
 import { followUpReasons } from '@/components/contacts/follow-up-queue';
-import { Users, CheckSquare, TrendingUp, ArrowUpRight, Clock3, Handshake, Percent, Receipt, CalendarPlus, CheckCircle2 } from 'lucide-react';
+import { Users, TrendingUp, ArrowUpRight, Clock3, Handshake, Percent, Receipt, CalendarPlus, CheckCircle2, Plus, CalendarDays } from 'lucide-react';
 import type { Row } from '@/lib/types';
 
 /** Rows that fill the panel height exactly; whatever does not fit is summarised by a link, so nothing scrolls. */
@@ -24,6 +24,22 @@ function FitRows<T>({ items, size, render, empty, more }: {
         {items.slice(0, Math.max(1, hidden ? shown : count)).map(render)}
         {hidden > 0 && <Link href={more.href} className="dash-more">{more.label} (+{items.length - Math.max(1, shown)})<ArrowUpRight size={13} /></Link>}
       </>}
+    </div>
+  );
+}
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+/** "R$ 3 mil" style labels for chart columns, where the full amount would not fit. */
+const compactBrl = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', notation: 'compact', maximumFractionDigits: 1 }).format(value);
+
+function DashEmpty({ icon, text, action }: { icon: ReactNode; text: string; action?: { href: string; label: string } }) {
+  return (
+    <div className="dash-empty-state">
+      <span className="dash-empty-icon">{icon}</span>
+      <p>{text}</p>
+      {action && <Link href={action.href} className="btn btn-soft"><Plus size={14} />{action.label}</Link>}
     </div>
   );
 }
@@ -61,26 +77,32 @@ export default function Dashboard() {
   const sales = stats?.sales;
   const stages = funnel?.items || [];
   const maxStage = Math.max(1, ...stages.map((s) => s.count));
+  const wonCount = Number(sales?.won_count || 0);
+  const lostCount = Number(sales?.lost_count || 0);
+  const openCount = Number(sales?.open_count || 0);
   const months = lastMonths(monthly?.items || []);
   const maxMonth = Math.max(1, ...months.map((m) => m.amount));
   const monthTotal = months.reduce((sum, m) => sum + m.amount, 0);
+  // Month-over-month change of closed sales; only shown when last month had sales to compare with.
+  const [previousMonth, currentMonth] = months.slice(-2);
+  const salesTrend = previousMonth?.amount ? Math.round(((currentMonth.amount - previousMonth.amount) / previousMonth.amount) * 100) : null;
   const upcoming = calendar?.items || [];
   const myTasks = tasks || [];
   const attentionItems = attention?.items || [];
   return (
     <div className="page dashboard-page">
       <PageHeader title="Visão geral">
-        <Link href="/crm" className="btn btn-secondary"><TrendingUp size={16} /> Funil</Link>
-        <Link href="/tarefas" className="btn btn-primary"><CheckSquare size={16} /> Minhas tarefas</Link>
+        <Link href="/crm?new=true" className="btn btn-primary"><Plus size={16} /> Novo negócio</Link>
       </PageHeader>
       <DataState loading={isLoading} error={error}>
         <div className="stat-grid dash-stats">
-          <StatCard label="Em negociação" value={brl(sales?.open_amount)} detail={`${sales?.open_count || 0} negócios em aberto`} icon={<TrendingUp />} />
-          <StatCard label="Vendido" value={brl(sales?.won_amount)} detail={`${sales?.won_count || 0} negócios ganhos`} icon={<Handshake />} />
-          <StatCard label="Conversão" value={`${sales?.conversion_rate ?? 0}%`} detail={`${sales?.won_count || 0} ganhos · ${sales?.lost_count || 0} perdidos`} icon={<Percent />} />
+          <StatCard label="Em negociação" value={brl(sales?.open_amount)} detail={`${plural(openCount, 'negócio', 'negócios')} em aberto`} icon={<TrendingUp />} />
+          <StatCard label="Vendido" value={brl(sales?.won_amount)} detail={plural(wonCount, 'negócio ganho', 'negócios ganhos')} icon={<Handshake />}
+            trend={salesTrend === null ? undefined : { value: salesTrend, label: 'este mês vs. anterior' }} />
+          <StatCard label="Conversão" value={`${sales?.conversion_rate ?? 0}%`} detail={`${plural(wonCount, 'ganho', 'ganhos')} · ${plural(lostCount, 'perdido', 'perdidos')}`} icon={<Percent />} />
           <StatCard label="Ticket médio" value={brl(sales?.average_ticket)} detail="Por negócio ganho" icon={<Receipt />} />
-          <StatCard label="Tarefas atrasadas" value={stats?.overdue_tasks || 0} detail={`${stats?.open_tasks || 0} abertas · ${stats?.my_tasks || 0} minhas`} icon={<Clock3 />} />
-          <StatCard label="Contatos" value={stats?.contacts || 0} detail={`${stats?.companies || 0} ${stats?.companies === 1 ? 'empresa' : 'empresas'}`} icon={<Users />} />
+          <StatCard label="Tarefas atrasadas" value={stats?.overdue_tasks || 0} detail={`${plural(stats?.open_tasks || 0, 'aberta', 'abertas')} · ${plural(stats?.my_tasks || 0, 'minha', 'minhas')}`} icon={<Clock3 />} />
+          <StatCard label="Contatos" value={stats?.contacts || 0} detail={plural(stats?.companies || 0, 'empresa', 'empresas')} icon={<Users />} />
         </div>
         <div className="dash-grid">
           <Card as="section" className="card-fill dash-attention">
@@ -95,7 +117,7 @@ export default function Dashboard() {
                     <Link href={'/crm?opportunity=' + row.id} className="dash-name">{row.title}</Link>
                     <small>{[row.contact_name || row.company_name, row.owner_name || 'Sem responsável', brl(row.amount)].filter(Boolean).join(' · ')}</small>
                   </div>
-                  <Button variant="secondary" onClick={() => setRecord({ label: row.title, opportunity_id: row.id, contact_id: row.contact_id, company_id: row.company_id, owner_id: row.owner_id })}>
+                  <Button variant="soft" onClick={() => setRecord({ label: row.title, opportunity_id: row.id, contact_id: row.contact_id, company_id: row.company_id, owner_id: row.owner_id })}>
                     <CalendarPlus size={15} />Agendar
                   </Button>
                 </div>
@@ -106,9 +128,10 @@ export default function Dashboard() {
             <div className="dash-funnel">
               {stages.map((s) => (
                 <div className="dash-stage" key={s.stage_id}>
-                  <div className="dash-stage-top"><span>{s.name}</span><strong>{s.count}</strong></div>
-                  <div className="dash-bar"><span style={{ width: `${Math.max(2, (s.count / maxStage) * 100)}%`, background: s.color }} /></div>
+                  <span className="dash-stage-name">{s.name}</span>
                   <small>{brl(s.amount)}</small>
+                  <strong>{s.count}</strong>
+                  <div className="dash-bar"><span style={{ width: s.count ? `${(s.count / maxStage) * 100}%` : 0 }} /></div>
                 </div>
               ))}
               {!stages.length && <p className="muted">Nenhuma etapa configurada.</p>}
@@ -117,7 +140,7 @@ export default function Dashboard() {
           <Card as="section" className="card-fill">
             <CardHeader title="Próximos 14 dias" actions={<Link href="/agenda" className="btn btn-ghost">Atividades<ArrowUpRight size={13} /></Link>} />
             <FitRows items={upcoming} size={52} more={{ href: '/agenda', label: 'Ver agenda' }}
-              empty={<p className="dash-empty">Nenhuma atividade ou prazo nos próximos dias.</p>}
+              empty={<DashEmpty icon={<CalendarDays size={20} />} text="Nenhuma atividade ou prazo nos próximos 14 dias." action={{ href: '/agenda', label: 'Agendar atividade' }} />}
               render={(e) => (
                 <Link href={e.kind === 'task' ? '/tarefas' : '/agenda'} key={e.kind + e.id} className="dash-row dash-event">
                   <span className="date-tile">
@@ -131,13 +154,13 @@ export default function Dashboard() {
                 </Link>
               )} />
           </Card>
-          <Card as="section" className="card-fill">
+          <Card as="section" className="card-fill dash-sales">
             <CardHeader title="Vendas por mês" description="Últimos 6 meses" actions={<strong className="dash-total">{brl(monthTotal)}</strong>} />
             <div className="dash-chart">
               {months.map((m) => (
                 <div className="dash-col" key={m.key} title={`${brl(m.amount)} · ${m.count} ${m.count === 1 ? 'venda' : 'vendas'}`}>
-                  <small className="dash-col-value">{m.count || ''}</small>
-                  <span style={{ height: `max(3px, ${(m.amount / maxMonth) * 100}%)` }} className={m.amount ? '' : 'empty-col'} />
+                  <small className="dash-col-value">{m.amount ? compactBrl(m.amount) : ''}</small>
+                  <span style={m.amount ? { height: `${(m.amount / maxMonth) * 100}%` } : undefined} className={m.amount ? '' : 'empty-col'} />
                   <small>{monthLabel(m.key)}</small>
                 </div>
               ))}
@@ -146,7 +169,7 @@ export default function Dashboard() {
           <Card as="section" className="card-fill">
             <CardHeader title="Minhas tarefas" actions={<Link href="/tarefas" className="btn btn-ghost">Todas<ArrowUpRight size={13} /></Link>} />
             <FitRows items={myTasks} size={44} more={{ href: '/tarefas', label: 'Ver tarefas' }}
-              empty={<p className="dash-empty">Nenhuma tarefa pendente para você.</p>}
+              empty={<DashEmpty icon={<CheckCircle2 size={20} />} text="Nenhuma tarefa pendente para você." action={{ href: '/tarefas?new=true', label: 'Criar tarefa' }} />}
               render={(t) => (
                 <Link href="/tarefas" key={t.id} className="dash-row dash-task">
                   <span className="dash-name">{t.title}</span>

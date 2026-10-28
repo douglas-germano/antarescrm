@@ -7,18 +7,20 @@ import { Button, DataState, Modal, Badge, EmptyState } from '@/components/ui';
 import { Card, CardHeader, CardBody } from '@/components/blocks';
 import { AvailabilityEditor, type Availability } from '@/components/settings/availability-editor';
 import type { Row } from '@/lib/types';
+import { searchMatch } from '@/lib/format';
 const weekdays = Object.fromEntries(Array.from({ length: 5 }, (_,i) => [String(i), [{ start: '09:00', end: '18:00' }]]));
-export function BookingSettings() {
+export function BookingSettings({ search = '' }: { search?: string }) {
   const { user, workspace } = useSession(); const { notify } = useNotify();
   const manage = ['owner','admin'].includes(user?.role || '');
   const calendars = useList('/booking-calendars'), staff = useList('/users');
+  const rows = (calendars.data || []).filter(calendar => searchMatch(search, [calendar.name, calendar.description, staff.data?.find(user => user.id === calendar.assignee_id)?.name]));
   const [editing, setEditing] = useState<Row | null | false>(false);
   const [availability, setAvailability] = useState<Availability>(weekdays);
   const [busy,setBusy] = useState(false), [error,setError] = useState('');
   function edit(row: Row | null) { setEditing(row); setAvailability(row?.availability || weekdays); setError(''); }
   return <div className="stack"><div className="booking-settings-header"><div><h2>Disponibilidade para reservas</h2></div>{manage && <Button onClick={() => edit(null)}><Plus size={17} />Nova agenda</Button>}</div>
     <DataState loading={calendars.isLoading} error={calendars.error}>
-      {!calendars.data?.length ? <EmptyState title="Nenhuma agenda" /> : <div className="account-grid">{calendars.data.map(calendar => <Card key={calendar.id}><CardHeader title={calendar.name} description={calendar.description} actions={<Badge value={calendar.active ? 'completed':'cancelled'} label={calendar.active ? 'Ativa':'Pausada'} />} /><CardBody><p>{calendar.duration_minutes} minutos · {staff.data?.find(u => u.id === calendar.assignee_id)?.name || 'Equipe'}</p><p className="muted">Intervalo: {calendar.buffer_minutes} min · Antecedência: {calendar.lead_minutes} min</p><div className="account-actions">{manage && <Button variant="secondary" onClick={() => edit(calendar)}>Editar disponibilidade</Button>}<a className="btn btn-secondary" href={'/agendar/' + calendar.id} target="_blank" rel="noreferrer"><ExternalLink size={16} />Abrir link</a><Button variant="ghost" onClick={async () => { try { await navigator.clipboard.writeText(window.location.origin + '/agendar/' + calendar.id); notify('Link copiado.'); } catch { notify('Abra o link e copie o endereço.', 'error'); } }}>Copiar link</Button></div></CardBody></Card>)}</div>}
+      {!rows.length ? <EmptyState title={search.trim() ? 'Nenhuma agenda encontrada' : 'Nenhuma agenda'} /> : <div className="account-grid">{rows.map(calendar => <Card key={calendar.id}><CardHeader title={calendar.name} description={calendar.description} actions={<Badge value={calendar.active ? 'completed':'cancelled'} label={calendar.active ? 'Ativa':'Pausada'} />} /><CardBody><p>{calendar.duration_minutes} minutos · {staff.data?.find(u => u.id === calendar.assignee_id)?.name || 'Equipe'}</p><p className="muted">Intervalo: {calendar.buffer_minutes} min · Antecedência: {calendar.lead_minutes} min</p><div className="account-actions">{manage && <Button variant="secondary" onClick={() => edit(calendar)}>Editar disponibilidade</Button>}<a className="btn btn-secondary" href={'/agendar/' + calendar.id} target="_blank" rel="noreferrer"><ExternalLink size={16} />Abrir link</a><Button variant="ghost" onClick={async () => { try { await navigator.clipboard.writeText(window.location.origin + '/agendar/' + calendar.id); notify('Link copiado.'); } catch { notify('Abra o link e copie o endereço.', 'error'); } }}>Copiar link</Button></div></CardBody></Card>)}</div>}
     </DataState>
     <Modal open={editing !== false} onClose={() => { if (!busy) setEditing(false); }} title={editing ? 'Editar agenda':'Nova agenda'} wide>
       {editing !== false && <form key={editing?.id || 'new'} className="stack" onSubmit={async event => {

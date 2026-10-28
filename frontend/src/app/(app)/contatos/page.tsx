@@ -1,12 +1,12 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Pencil, Archive, Users, Mail, Phone, Building2, MessageCircle, CalendarPlus, FileText } from 'lucide-react';
-import { useList, useData, post, patch, remove, refreshAll } from '@/lib/api';
-import { initials, rowOptions, day, brl, kinds, searchMatch } from '@/lib/format';
-import type { Field, Row } from '@/lib/types';
+import { Plus, Pencil, Archive, Users, User, Mail, Phone, Building2, MessageCircle, CalendarPlus, FileText } from 'lucide-react';
+import { useList, usePage, useData, post, patch, remove, refreshAll } from '@/lib/api';
+import { initials, rowOptions, hasRealName, formatPhone } from '@/lib/format';
+import type { Field, Row, Contact, ContactPage } from '@/lib/types';
 import { useSession, useNotify } from '@/components/providers';
-import { Button, Badge, PageHeader, EmptyState, DataState, SearchInput, FormDialog, ConfirmDialog, Modal } from '@/components/ui';
+import { Button, PageHeader, EmptyState, DataState, FormDialog, ConfirmDialog, Modal } from '@/components/ui';
 import { PagedTable } from '@/components/fit';
 import { CrmDataTools, metadataFields, metadataInitial, metadataPayload } from '@/components/contacts/crm-data-tools';
 import { Card } from '@/components/blocks';
@@ -19,18 +19,22 @@ export default function ContactsPage() {
   const { notify } = useNotify();
   const [filters, setFilters] = useState({ ...emptyContactFilters });
   const { search, archived } = filters;
+  const displayName = (row?: Contact | null) => (row && hasRealName(row.name) ? row.name : 'Sem nome');
   const hasFilters = Object.values(filters).some(Boolean);
   const [activityRecord, setActivityRecord] = useState<ActivityRecord | null>(null);
   const [activityMode, setActivityMode] = useState<'follow_up' | 'note'>('follow_up');
-  const contacts = useList('/contacts?archived=' + archived);
+  const params = new URLSearchParams({ archived: String(archived), search,
+    owner_id: filters.owner, company_id: filters.company, source: filters.source, has_email: filters.email, tag: filters.tag });
+  const contacts = usePage<Contact, ContactPage>('/contacts?' + params);
+
   const companies = useList('/companies');
   const users = useList('/users');
-  const [editing, setEditing] = useState<Row | null | undefined>();
-  const [deleting, setDeleting] = useState<Row | null>(null);
-  const [detail, setDetail] = useState<Row | null>(null);
+  const [editing, setEditing] = useState<Contact | null | undefined>();
+  const [deleting, setDeleting] = useState<Contact | null>(null);
+  const [detail, setDetail] = useState<Contact | null>(null);
   const timeline = useData<Row>(detail ? '/contacts/' + detail.id + '/timeline' : null);
   const companyList = companies.data || [];
-  const companyName = (id?: string) => companyList.find((c) => c.id === id)?.name;
+  const companyName = (id?: string | null) => companyList.find((c) => c.id === id)?.name;
   const fields: Field[] = [
     { name: 'name', label: 'Nome', required: true },
     { name: 'company_id', label: 'Empresa', type: 'company' },
@@ -42,14 +46,8 @@ export default function ContactsPage() {
     { name: 'notes', label: 'Observações', type: 'textarea', wide: true },
     ...metadataFields,
   ];
-  const sources = [...new Set<string>((contacts.data || []).map(r => r.source).filter(Boolean))].sort();
-  const rows = (contacts.data || []).filter(r =>
-    (!filters.owner || (filters.owner === 'unassigned' ? !r.owner_id : r.owner_id === filters.owner)) &&
-    (!filters.company || (filters.company === 'unassigned' ? !r.company_id : r.company_id === filters.company)) &&
-    (!filters.source || r.source === filters.source)
-  ).filter((r) =>
-    searchMatch(search, [r.name, r.email, r.phone, ...(r.tags || []), ...Object.values(r.custom_fields || {}), companyName(r.company_id)]),
-  );
+  const sources = contacts.data?.sources || [];
+  const rows = contacts.data?.items || [];
   return (
     <div className="page">
       <PageHeader title="Contatos">
@@ -58,21 +56,14 @@ export default function ContactsPage() {
           <Plus size={17} /> Novo contato
         </Button>
       </PageHeader>
-      <ContactFilterBar value={filters} onChange={setFilters} companies={companyList} users={users.data || []} sources={sources} total={rows.length} />
       <Card fill>
-        <div className="toolbar clients-toolbar">
-          <SearchInput value={search} onChange={search => setFilters(previous => ({ ...previous, search }))} placeholder="Buscar nome, telefone, e-mail ou empresa" />
-          <div className="clients-toolbar-actions">
-            <label className="checkbox-label">
-              <input type="checkbox" checked={archived} onChange={(e) => setFilters(previous => ({ ...previous, archived: e.target.checked }))} />
-              Ver arquivados
-            </label>
-          </div>
-        </div>
+        <ContactFilterBar value={filters} onChange={setFilters} companies={companyList} users={users.data || []} sources={sources} tags={contacts.data?.tags || []} />
         <DataState loading={contacts.isLoading} error={contacts.error}>
           {rows.length ? (
             <PagedTable
               rows={rows}
+              className="contacts-table"
+              pagination={contacts.data ? { ...contacts.data, onChange: contacts.setPage } : undefined}
               header={
                 <tr>
                   <th>Contato</th>
@@ -83,28 +74,31 @@ export default function ContactsPage() {
                 </tr>
               }
               renderRow={(row) => (
-                <tr key={row.id}>
+                <tr key={row.id} className="clickable" onClick={() => setDetail(row)}>
                   <td>
-                    <button className="client-identity" onClick={() => setDetail(row)}>
-                      <span className="avatar">{initials(row.name)}</span>
-                      {row.name}
-                    </button>
-                  </td>
-                  <td>{companyName(row.company_id) || '—'}</td>
-                  <td>
-                    <div className="contact-lines">
-                      <span>{row.phone || 'Sem telefone'}</span>
-                      <span className="muted">{row.email || 'Sem e-mail'}</span>
+                    <div className="contact-cell">
+                      <button className="client-identity" onClick={(e) => { e.stopPropagation(); setDetail(row); }}>
+                        <span className="avatar">{hasRealName(row.name) ? initials(row.name) : <User size={14} />}</span>
+                        <span className={hasRealName(row.name) ? '' : 'contact-unnamed'}>{displayName(row)}</span>
+                      </button>
+                      {!!row.tags?.length && <span className="contact-tags">{row.tags.slice(0, 2).map(tag => <span className="deal-chip" key={tag}>{tag}</span>)}{row.tags.length > 2 && <small>+{row.tags.length - 2}</small>}</span>}
                     </div>
                   </td>
-                  <td>{row.source || '—'}</td>
+                  <td>{companyName(row.company_id)}</td>
                   <td>
-                    <div className="row-actions">
-                      <Button variant="ghost" aria-label={'Editar ' + row.name} onClick={() => setEditing(row)}>
+                    <div className="contact-lines">
+                      {row.phone && <span>{formatPhone(row.phone)}</span>}
+                      {row.email && <span className="muted">{row.email}</span>}
+                    </div>
+                  </td>
+                  <td>{row.source && <span className="deal-chip">{row.source}</span>}</td>
+                  <td>
+                    <div className="row-actions" onClick={(e) => e.stopPropagation()}>
+                      <Button variant="ghost" aria-label={'Editar ' + displayName(row)} onClick={() => setEditing(row)}>
                         <Pencil size={16} />
                       </Button>
                       {!archived && (
-                        <Button variant="ghost" aria-label={'Arquivar ' + row.name} onClick={() => setDeleting(row)}>
+                        <Button variant="ghost" aria-label={'Arquivar ' + displayName(row)} onClick={() => setDeleting(row)}>
                           <Archive size={16} />
                         </Button>
                       )}
@@ -143,7 +137,7 @@ export default function ContactsPage() {
         open={!!deleting}
         onClose={() => setDeleting(null)}
         title="Arquivar contato?"
-        description={`${deleting?.name || 'O contato'} sairá da lista ativa. O histórico será preservado.`}
+        description={`${deleting && hasRealName(deleting.name) ? deleting.name : 'O contato'} sairá da lista ativa. O histórico será preservado.`}
         onConfirm={async () => {
           await remove('/contacts/' + deleting!.id);
           await refreshAll();
@@ -151,10 +145,10 @@ export default function ContactsPage() {
           setDeleting(null);
         }}
       />
-      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail?.name || 'Contato'} wide>
+      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail && hasRealName(detail.name) ? detail.name : formatPhone(detail?.phone) || 'Contato'} wide>
         <div className="stack">
           <dl className="record-details">
-            <div><dt><Phone size={15} /> Telefone</dt><dd>{detail?.phone || 'Não informado'}</dd></div>
+            <div><dt><Phone size={15} /> Telefone</dt><dd>{formatPhone(detail?.phone) || 'Não informado'}</dd></div>
             <div><dt><Mail size={15} /> E-mail</dt><dd>{detail?.email || 'Não informado'}</dd></div>
             <div><dt><Building2 size={15} /> Empresa</dt><dd>{companyName(detail?.company_id) || 'Não informada'}</dd></div>
             <div><dt>Cargo / origem</dt><dd>{[detail?.position, detail?.source].filter(Boolean).join(' · ') || 'Não informados'}</dd></div>
@@ -184,7 +178,7 @@ export default function ContactsPage() {
                 variant="secondary"
                 onClick={async () => {
                   try {
-                    const conv = await post('/whatsapp/conversations', { phone: detail.phone, contact_id: detail.id, contact_name: detail.name });
+                    const conv = await post<{ id: string }>('/whatsapp/conversations', { phone: detail.phone, contact_id: detail.id, contact_name: detail.name });
                     window.location.assign('/mensagens?conversation=' + conv.id);
                   } catch (e) {
                     notify((e as Error).message, 'error');

@@ -8,7 +8,7 @@ import { Card, CardBody, CardHeader } from '@/components/blocks';
 import type { Row } from '@/lib/types';
 
 const PALETTE = [
-  { value: '#e60000', label: 'Vermelho' }, { value: '#25282b', label: 'Grafite' }, { value: '#6b6e71', label: 'Cinza' }, { value: '#b80000', label: 'Vinho' },
+  { value: '#ef2f70', label: 'Rosa Antares' }, { value: '#25282b', label: 'Grafite' }, { value: '#6b6e71', label: 'Cinza' }, { value: '#d91c5b', label: 'Rosa escuro' },
   { value: '#c77d00', label: 'Âmbar' }, { value: '#2e7d52', label: 'Verde' }, { value: '#2f6f8f', label: 'Azul' },
 ];
 

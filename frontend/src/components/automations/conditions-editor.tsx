@@ -4,7 +4,7 @@ import { Button } from '@/components/ui';
 export type Conditions = { mode: 'all' | 'any'; items: { field: string; operator: string; value: string }[] };
 export const emptyConditions = (): Conditions => ({ mode:'all', items:[] });
 export function ConditionsEditor({ value, onChange, label = 'Condições adicionais' }: { value: Conditions; onChange: (value: Conditions) => void; label?: string }) {
-  const stages = useData('/pipeline/stages');
+  const stages = useData<{ items: { id: string; name: string; pipeline_name: string }[] }>('/pipeline/stages');
   const update = (index: number, patch: Partial<Conditions['items'][0]>) => onChange({ ...value, items: value.items.map((item,i) => i === index ? { ...item,...patch }:item) });
   return <section className="stack"><h3>{label}</h3>{!!value.items.length && <label>Aplicar quando<select value={value.mode} onChange={e => onChange({ ...value, mode:e.target.value as Conditions['mode'] })}><option value="all">Todas as condições forem atendidas</option><option value="any">Pelo menos uma condição for atendida</option></select></label>}
     {value.items.map((item,i) => <div className="form-grid" key={i}><label>Campo<select value={item.field.startsWith('custom.') ? 'custom':item.field} onChange={e => update(i,{ field:e.target.value === 'custom' ? 'custom.':e.target.value })}>{[['source','Origem'],['name','Nome'],['email','E-mail'],['phone','Telefone'],['tag','Tag'],['deal.stage_id','Etapa do negócio'],['deal.status','Estado do negócio'],['deal.amount','Valor do negócio'],['comment.text','Texto do comentário (Instagram)'],['comment.media_id','Publicação (ID) do comentário'],['custom','Campo personalizado']].map(([v,l]) => <option value={v} key={v}>{l}</option>)}</select></label>

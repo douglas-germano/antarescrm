@@ -53,7 +53,7 @@ export function ApprovalsPanel({ project, request, onNew, onClose }: { project: 
                 </div>
                 {a.status === 'pending' && (
                   <div className="approval-actions">
-                    {a.channel === 'public' && <Button variant="secondary" onClick={async () => { const r = await post(`/projects/${project.id}/approvals/${a.id}/regenerate`, {}); setLink(linkOf(r.token)); await refreshAll(); }}><Link2 size={15} /> Novo link</Button>}
+                    {a.channel === 'public' && <Button variant="secondary" onClick={async () => { const r = await post<{ token: string }>(`/projects/${project.id}/approvals/${a.id}/regenerate`, {}); setLink(linkOf(r.token)); await refreshAll(); }}><Link2 size={15} /> Novo link</Button>}
                     <Button variant="secondary" onClick={() => setDeciding(a)}><Check size={15} /> Registrar resposta</Button>
                     <Button variant="ghost" onClick={() => setCancelling(a)}><X size={15} /> Cancelar</Button>
                   </div>
@@ -70,7 +70,7 @@ export function ApprovalsPanel({ project, request, onNew, onClose }: { project: 
           const body: Record<string, any> = { title: data.title, channel: data.channel || 'public', expires_days: Number(data.expires_days) || 30 };
           if (data.file_id) body.file_id = data.file_id;
           if (data.message) body.message = data.message;
-          const created = await post(`/projects/${project.id}/approvals`, body);
+          const created = await post<{ token: string }>(`/projects/${project.id}/approvals`, body);
           await refreshAll();
           if (created.token) setLink(linkOf(created.token));
           notify('Solicitação criada.');
@@ -91,9 +91,9 @@ export function ApprovalsPanel({ project, request, onNew, onClose }: { project: 
           { name: 'name', label: 'Quem respondeu', required: true, placeholder: 'Nome do cliente (e canal, ex.: WhatsApp)' },
           { name: 'comment', label: 'Comentário', type: 'textarea', wide: true, help: 'Obrigatório quando houver ajustes.' },
         ]}
-        onSubmit={async (data) => { await post(`/projects/${project.id}/approvals/${deciding!.id}/decide`, { decision: data.decision, name: data.name, ...(data.comment ? { comment: data.comment } : {}) }); await refreshAll(); notify('Resposta registrada.'); }} />
+        onSubmit={async (data) => { await post<{ token: string }>(`/projects/${project.id}/approvals/${deciding!.id}/decide`, { decision: data.decision, name: data.name, ...(data.comment ? { comment: data.comment } : {}) }); await refreshAll(); notify('Resposta registrada.'); }} />
       <ConfirmDialog open={!!cancelling} onClose={() => setCancelling(null)} title="Cancelar solicitação?" description="O link deixa de funcionar. O histórico é mantido."
-        onConfirm={async () => { await post(`/projects/${project.id}/approvals/${cancelling!.id}/cancel`, {}); await refreshAll(); setCancelling(null); notify('Solicitação cancelada.'); }} />
+        onConfirm={async () => { await post<{ token: string }>(`/projects/${project.id}/approvals/${cancelling!.id}/cancel`, {}); await refreshAll(); setCancelling(null); notify('Solicitação cancelada.'); }} />
     </section>
   );
 }

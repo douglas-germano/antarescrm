@@ -94,3 +94,198 @@ def test_concurrent_dispatch_claims_one_message_once(pg, monkeypatch):
     assert len(calls) == 1
     db.session.expire_all()
     assert InboxMessage.query.filter_by(workspace_id=workspace_id).one().status == 'sent'
+
+
+def test_paginated_deals_keep_summary_with_attention_and_stale_sort(pg):
+    from datetime import timedelta
+    from flask_jwt_extended import create_access_token
+    from app.models import Opportunity, PipelineStage, now
+
+    app, workspace_id, _, user_id = pg
+    contact = Contact(workspace_id=workspace_id, name='João da Silva', phone='+5566996499089', source='Site')
+    db.session.add(contact)
+    stage = PipelineStage.query.filter_by(workspace_id=workspace_id).first()
+    stage.probability = 50
+    db.session.flush()
+    for index in range(3):
+        db.session.add(
+            Opportunity(
+                workspace_id=workspace_id,
+                contact_id=contact.id,
+                stage_id=stage.id,
+                title=f'Negócio {index}',
+                amount=100,
+                created_at=now() - timedelta(days=index),
+            )
+        )
+    db.session.commit()
+    token = create_access_token(identity=user_id, additional_claims={'ver': 0, 'wid': workspace_id})
+    with app.test_client() as client:
+        result = client.get(
+            '/api/v1/opportunities?status=open&attention=true&sort=stale&direction=desc&search=joao+silva&per_page=1&page=2',
+            headers={'Authorization': 'Bearer ' + token},
+        )
+        assert result.status_code == 200
+        assert result.json['total'] == 3 and result.json['items'][0]['title'] == 'Negócio 1'
+        assert result.json['summary']['weighted'] == '150.00'
+
+
+def test_concurrent_instagram_echo_is_recorded_once_without_a_lead(pg):
+    import hashlib
+    import hmac
+    import json
+    from threading import Barrier
+    from cryptography.fernet import Fernet
+    from app.models import InstagramConnection, InstagramEvent, InboxThread, now
+
+    app, workspace_id, _, _ = pg
+    app.config.update(INSTAGRAM_APP_SECRET='echo-test-secret', INSTAGRAM_ENCRYPTION_KEY=Fernet.generate_key().decode())
+    connection = InstagramConnection(
+        workspace_id=workspace_id, instagram_id='12345678', username='fixture', encrypted_token='unused'
+    )
+    db.session.add(connection)
+    db.session.commit()
+    body = json.dumps(
+        {
+            'object': 'instagram',
+            'entry': [
+                {
+                    'id': '12345678',
+                    'messaging': [
+                        {
+                            'sender': {'id': '12345678'},
+                            'recipient': {'id': '87654321'},
+                            'timestamp': int(now().timestamp() * 1000),
+                            'message': {'mid': 'concurrent-echo', 'text': 'Native app send', 'is_echo': True},
+                        }
+                    ],
+                }
+            ],
+        }
+    ).encode()
+    signature = 'sha256=' + hmac.new(b'echo-test-secret', body, hashlib.sha256).hexdigest()
+    barrier = Barrier(2)
+
+    def post():
+        with app.test_client() as client:
+            barrier.wait(timeout=10)
+            return client.post(
+                '/api/v1/instagram/webhook',
+                data=body,
+                content_type='application/json',
+                headers={'X-Hub-Signature-256': signature},
+            ).status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert list(pool.map(lambda _: post(), range(2))) == [200, 200]
+    db.session.expire_all()
+    assert InstagramEvent.query.filter_by(workspace_id=workspace_id).count() == 1
+    assert InboxThread.query.filter_by(workspace_id=workspace_id).count() == 1
+    assert InboxMessage.query.filter_by(workspace_id=workspace_id).one().direction == 'out'
+    assert Contact.query.filter_by(workspace_id=workspace_id).count() == 0
+
+
+def test_access_token_can_be_consumed_only_once_concurrently(pg):
+    import hashlib
+    from datetime import timedelta
+    from threading import Barrier
+    from app.models import User, UserAccessToken, now
+
+    app, workspace_id, _, user_id = pg
+    user = db.session.get(User, user_id)
+    token = 'single-use-postgres-fixture-token-with-enough-entropy'
+    db.session.add(
+        UserAccessToken(
+            workspace_id=workspace_id,
+            user_id=user_id,
+            token_hash=hashlib.sha256(token.encode()).hexdigest(),
+            purpose='reset',
+            token_version=user.token_version,
+            email=user.email,
+            expires_at=now() + timedelta(minutes=30),
+        )
+    )
+    db.session.commit()
+    barrier = Barrier(2)
+
+    def accept():
+        with app.test_client() as client:
+            barrier.wait(timeout=10)
+            return client.post(
+                '/api/v1/auth/accept-access', json={'token': token, 'password': 'postgres-new-password'}
+            ).status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(lambda _: accept(), range(2))) == [200, 422]
+    db.session.expire_all()
+    assert db.session.get(User, user_id).token_version == 1
+
+
+def test_campaign_send_claim_is_not_repeated_by_concurrent_requests(pg, monkeypatch):
+    from flask_jwt_extended import create_access_token
+    from app.models import BrevoConnection, CampaignRecipient, EmailCampaign, now
+    from app.services import brevo, campaigns
+
+    app, workspace_id, _, user_id = pg
+    connection = BrevoConnection(
+        workspace_id=workspace_id,
+        sender_email='sender@example.test',
+        sender_name='Fixture',
+        encrypted_key=brevo.cipher().encrypt(b'fixture-key').decode(),
+        webhook_secret='fixture-secret',
+        validated_at=now(),
+        webhook_id=51,
+    )
+    person = Contact(workspace_id=workspace_id, name='Fixture', email='recipient@example.test', tags=['Newsletter'])
+    db.session.add_all([connection, person])
+    db.session.flush()
+    row = EmailCampaign(
+        workspace_id=workspace_id,
+        name='Fixture',
+        subject='Fixture',
+        content='Fixture',
+        audience={'tag': 'Newsletter'},
+        status='ready',
+        connection_id=connection.id,
+        connection_version=connection.version,
+        provider_id=44,
+        audience_hash=campaigns.fingerprint([{'email': person.email}]),
+        recipient_count=1,
+    )
+    db.session.add(row)
+    db.session.flush()
+    db.session.add(
+        CampaignRecipient(workspace_id=workspace_id, campaign_id=row.id, contact_id=person.id, email=person.email)
+    )
+    db.session.commit()
+    path = f'/api/v1/campaigns/{row.id}/send'
+    body = {'consent_confirmed': True, 'audience_hash': row.audience_hash}
+    token = create_access_token(identity=user_id, additional_claims={'ver': 0, 'wid': workspace_id})
+    entered, release, calls = Event(), Event(), []
+
+    def api(key, route, method='GET', **kwargs):
+        calls.append(route)
+        entered.set()
+        assert release.wait(timeout=10)
+        return {}
+
+    monkeypatch.setattr(brevo, 'api', api)
+
+    def send():
+        with app.test_client() as client:
+            return client.post(path, json=body, headers={'Authorization': 'Bearer ' + token}).status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(send)
+        try:
+            assert entered.wait(timeout=10)
+            assert pool.submit(send).result(timeout=10) == 200
+        finally:
+            release.set()
+        assert first.result(timeout=10) == 200
+    assert calls == ['emailCampaigns/44/sendNow']
+    with app.test_client() as client:
+        result = client.get(
+            '/api/v1/contacts?has_email=true&tag=Newsletter', headers={'Authorization': 'Bearer ' + token}
+        )
+        assert result.status_code == 200 and result.json['total'] == 1

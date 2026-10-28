@@ -1,47 +1,62 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, KeyRound, KanbanSquare, FolderKanban, Plug, UserCircle, Users, Building2, Save, Activity, Globe } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Plus, Pencil, KeyRound, KanbanSquare, FolderKanban, Plug, UserCircle, Users, Building2, Save, Activity, Globe, Briefcase, Bell, CalendarClock } from 'lucide-react';
 import { ConnectionsSettings } from '@/components/settings/connections-settings';
 import { DomainsSettings } from '@/components/settings/domains-settings';
 import { ProfileSettings } from '@/components/settings/profile-settings';
 import { ProjectStageSettings } from '@/components/settings/project-stage-settings';
 import { PipelineSettings } from '@/components/settings/pipeline-settings';
 import { OperationsSettings } from '@/components/settings/operations-settings';
+import { ClientAccountsSettings } from '@/components/settings/client-accounts-settings';
+import { NotificationSettings } from '@/components/settings/notification-settings';
+import { BookingSettings } from '@/components/settings/booking-settings';
 import { useSession, useNotify } from '@/components/providers';
-import { useList, post, patch, refreshAll } from '@/lib/api';
+import { useList, useData, post, patch, refreshAll } from '@/lib/api';
+import type { Workspace, Row, Field } from '@/lib/types';
 import { PageHeader, DataState, Button, FormDialog, Badge } from '@/components/ui';
 import { PagedTable } from '@/components/fit';
 import { Card, CardHeader, CardBody, Tabs, Toolbar } from '@/components/blocks';
 import { roles, opts, initials } from '@/lib/format';
-import type { Row, Field } from '@/lib/types';
 
 export default function SettingsPage() {
   const { user, workspace, reload } = useSession();
   const { notify } = useNotify();
   const canManage = ['owner', 'admin'].includes(user?.role || '');
+  const agencyAdmin = workspace && !workspace.parent_workspace_id && user?.workspace_id === workspace.id && canManage;
+  const { data: accessibleAccounts } = useData<{ items: Workspace[] }>(user ? '/auth/workspaces' : null);
+  const canChooseAccount = agencyAdmin || (workspace && user?.workspace_id !== workspace.id) || (accessibleAccounts?.items.length || 0) > 1;
   const { data: users, isLoading, error } = useList('/users');
   const [tab, setTab] = useState('profile');
+  const searchParams = useSearchParams();
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get('tab');
+    const requested = searchParams.get('tab');
+    if (requested === 'notificacoes') setTab('notifications');
     if (canManage && requested === 'operacao') setTab('operations');
     if (requested === 'funis') setTab('pipelines');
     if (requested === 'projetos') setTab('projects');
+    if (requested === 'agendamento') setTab('booking');
     if (canManage && requested === 'conexoes') setTab('connections');
     if (canManage && requested === 'dominios') setTab('domains');
-  }, [canManage]);
+    if (canChooseAccount && requested === 'clientes') setTab('clients');
+  }, [canManage, canChooseAccount, searchParams]);
   function selectTab(value: string) {
     setTab(value);
     const url = new URL(window.location.href);
     if (value === 'operations') url.searchParams.set('tab', 'operacao');
     else if (value === 'pipelines') url.searchParams.set('tab', 'funis');
     else if (value === 'projects') url.searchParams.set('tab', 'projetos');
+    else if (value === 'booking') url.searchParams.set('tab', 'agendamento');
     else if (value === 'connections') url.searchParams.set('tab', 'conexoes');
     else if (value === 'domains') url.searchParams.set('tab', 'dominios');
+    else if (value === 'clients') url.searchParams.set('tab', 'clientes');
+    else if (value === 'notifications') url.searchParams.set('tab', 'notificacoes');
     else url.searchParams.delete('tab');
     window.history.replaceState(null, '', url.pathname + url.search + url.hash);
   }
   const [editUser, setEditUser] = useState<Row | null | false>(false);
   const [passwordUser, setPasswordUser] = useState<Row | null>(null);
+  const [inviting, setInviting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState('');
   const userFields: Field[] = [
@@ -89,21 +104,27 @@ export default function SettingsPage() {
           onChange={selectTab}
           items={[
             { value: 'profile', label: 'Perfil', icon: <UserCircle size={14} /> },
+            { value: 'notifications', label: 'Notificações', icon: <Bell size={14} /> },
             { value: 'workspace', label: 'Conta', icon: <Building2 size={14} /> },
             { value: 'team', label: 'Equipe', icon: <Users size={14} /> },
             { value: 'pipelines', label: 'Funis', icon: <KanbanSquare size={14} /> },
             { value: 'projects', label: 'Projetos', icon: <FolderKanban size={14} /> },
+            { value: 'booking', label: 'Agendamento', icon: <CalendarClock size={14} /> },
             ...(canManage ? [{ value: 'connections', label: 'Conexões', icon: <Plug size={14} /> }] : []),
             ...(canManage ? [{ value: 'domains', label: 'Domínios', icon: <Globe size={14} /> }] : []),
             ...(canManage ? [{ value: 'operations', label: 'Operação', icon: <Activity size={14} /> }] : []),
+            ...(canChooseAccount ? [{ value: 'clients', label: 'Clientes', icon: <Briefcase size={14} /> }] : []),
           ]}
         />
         {tab === 'operations' && canManage && <Button variant="secondary" onClick={() => refreshAll()}>Atualizar estado</Button>}
       </Toolbar>
       {tab === 'operations' && canManage && <OperationsSettings />}
+      {tab === 'clients' && canChooseAccount && <ClientAccountsSettings />}
       {tab === 'profile' && <ProfileSettings />}
+      {tab === 'notifications' && <NotificationSettings />}
       {tab === 'pipelines' && <PipelineSettings />}
       {tab === 'projects' && <ProjectStageSettings />}
+      {tab === 'booking' && <BookingSettings />}
       {tab === 'connections' && canManage && <ConnectionsSettings />}
       {tab === 'domains' && canManage && <DomainsSettings />}
       {tab === 'workspace' && (
@@ -137,9 +158,9 @@ export default function SettingsPage() {
           <CardHeader
             title="Perfis da equipe"
             actions={
-              canManage ? <Button onClick={() => setEditUser(null)}>
+              canManage ? <div className="row-actions"><Button variant="secondary" onClick={() => setInviting(true)}>Convidar por e-mail</Button><Button onClick={() => setEditUser(null)}>
                 <Plus size={16} /> Novo perfil
-              </Button> : undefined
+              </Button></div> : undefined
             }
           />
           <DataState loading={isLoading} error={error}>
@@ -168,7 +189,7 @@ export default function SettingsPage() {
                   <td>{u.title || '—'}</td>
                   <td>{roles[u.role] || u.role}</td>
                   <td>
-                    <Badge value={u.active ? 'completed' : 'cancelled'} label={u.active ? 'Ativo' : 'Inativo'} />
+                    <Badge value={u.active ? 'completed' : 'cancelled'} label={u.invite_pending ? 'Convite pendente' : u.active ? 'Ativo' : 'Inativo'} />
                   </td>
                   <td>
                     {canManage && u.workspace_id === workspace?.id && <div className="row-actions">
@@ -186,6 +207,17 @@ export default function SettingsPage() {
           </DataState>
         </Card>
       )}
+      <FormDialog
+        open={inviting} onClose={() => setInviting(false)} title="Convidar para a equipe"
+        description="A pessoa receberá um link válido por 24 horas para definir sua própria senha. Para reenviar, informe o mesmo e-mail."
+        fields={[{ name: 'name', label: 'Nome', required: true }, { name: 'email', label: 'E-mail', type: 'email', required: true },
+          { name: 'role', label: 'Nível', type: 'select', required: true, defaultValue: 'member', options: opts({ member: 'Membro', admin: 'Administrador' }) }]}
+        onSubmit={async data => {
+          const result = await post<{ delivery_status: string }>('/users/invitations', data);
+          await refreshAll(); setInviting(false);
+          notify(result.delivery_status === 'sent' ? 'Convite enviado por e-mail.' : 'Convite criado, mas o envio está sem confirmação. Confira no Brevo antes de solicitar outro.', result.delivery_status === 'sent' ? undefined : 'error');
+        }}
+      />
       <FormDialog
         open={editUser !== false}
         onClose={() => setEditUser(false)}

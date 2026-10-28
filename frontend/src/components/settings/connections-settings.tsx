@@ -7,6 +7,9 @@ import { Badge, Button, ConfirmDialog, DataState } from '@/components/ui';
 import { Card, CardHeader, CardBody } from '@/components/blocks';
 import { useConnection } from '@/components/whatsapp/hooks';
 import { InstagramSettings } from '@/components/settings/instagram-settings';
+import { BrevoSettings } from '@/components/settings/brevo-settings';
+
+import { HistorySync } from '@/components/settings/history-sync';
 
 const DEFAULT_VARIABLES = ['EVOLUTION_API_URL', 'EVOLUTION_API_KEY', 'WHATSAPP_WEBHOOK_BASE_URL'];
 
@@ -23,7 +26,7 @@ function WhatsAppConnection() {
     setLoading(true);
     setError('');
     try {
-      const result = createInstance ? await post('/whatsapp/connection/connect', {}) : await api('/whatsapp/connection/qr');
+      const result = createInstance ? await post<{ qrcode?: string }>('/whatsapp/connection/connect', {}) : await api<{ qrcode?: string }>('/whatsapp/connection/qr');
       setQr(result.qrcode || null);
       if (createInstance) await connection.refresh();
     } catch (e) {
@@ -89,6 +92,7 @@ function WhatsAppConnection() {
               </div>
             </div>
           )}
+          {current?.configured && <HistorySync channel="whatsapp" connected={Boolean(current.connected)} />}
         </CardBody>
       </DataState>
       <ConfirmDialog
@@ -118,6 +122,7 @@ export function ConnectionsSettings() {
     <div className="stack" aria-label="Conexões">
       <WhatsAppConnection />
       <InstagramSettings />
+      <BrevoSettings />
       <Card as="section">
         <CardHeader title="E-mail e SMS" description="Novos canais de envio e recebimento para a Caixa de entrada." />
         <CardBody>

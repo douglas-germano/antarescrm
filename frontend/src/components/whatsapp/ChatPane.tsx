@@ -5,6 +5,7 @@ import type { Row } from '@/lib/types';
 import { ChatHeader } from '@/components/whatsapp/ChatHeader';
 import { Composer } from '@/components/whatsapp/Composer';
 import { useMessages } from '@/components/whatsapp/hooks';
+import { useReadIncomingMessages } from '@/components/inbox/message-notifications';
 import { MessageList } from '@/components/whatsapp/MessageList';
 
 /** One open conversation. Mount it with `key={conversation.id}` so per-conversation state resets on switch. */
@@ -16,6 +17,7 @@ export function ChatPane({
   onUpdate,
   onRefresh,
   onRead,
+  onCreateOpportunity,
 }: {
   conversation: Row;
   connection?: Row;
@@ -25,9 +27,11 @@ export function ChatPane({
   /** Reloads connection and conversation list. */
   onRefresh: () => Promise<void>;
   onRead: () => void;
+  onCreateOpportunity?: () => void;
 }) {
   const { notify } = useNotify();
   const messages = useMessages(conversation.id);
+  useReadIncomingMessages('whatsapp', conversation.id, messages.messages);
   const [syncing, setSyncing] = useState(false);
   const closed = conversation.status === 'closed';
   const connected = Boolean(connection?.connected);
@@ -43,7 +47,7 @@ export function ChatPane({
   async function sync() {
     setSyncing(true);
     try {
-      const result = await post(`/whatsapp/conversations/${conversation.id}/sync`, {});
+      const result = await post<{ synced?: number; imported?: number; qr?: string; pairingCode?: string }>(`/whatsapp/conversations/${conversation.id}/sync`, {});
       notify(`${result.imported} mensagens importadas.`);
       messages.clearOlder();
       await refresh();
@@ -63,6 +67,7 @@ export function ChatPane({
         onDetails={onDetails}
         onToggleStatus={() => onUpdate({ status: closed ? 'open' : 'closed' })}
         onSync={sync}
+        onCreateOpportunity={onCreateOpportunity}
       />
       {!connected && (
         <div className="wa-banner wa-banner-warning" role="status">

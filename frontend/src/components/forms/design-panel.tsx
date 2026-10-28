@@ -12,7 +12,7 @@ export function DesignPanel({ design, accent, onChange, onAccent }: {
       <ColorInput label="Fundo da página" value={design.background} onChange={(background) => onChange({ background })} />
       <ColorInput label="Cor do cartão" value={design.card_color} onChange={(card_color) => onChange({ card_color })} />
       <ColorInput label="Cor do texto" value={design.text_color} onChange={(text_color) => onChange({ text_color })} />
-      <ColorInput label="Cor de destaque (botão)" value={accent} onChange={onAccent} fallback="#e60000" />
+      <ColorInput label="Cor de destaque (botão)" value={accent} onChange={onAccent} fallback="#ef2f70" />
     </Section>
     <Section title="Tipografia e forma">
       <SelectInput label="Fonte" value={design.font} onChange={(font) => onChange({ font })} options={Object.entries(FONT_LABELS).map(([value, label]) => ({ value: value as FormDesign['font'], label }))} />

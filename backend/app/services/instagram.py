@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import requests
 from cryptography.fernet import Fernet, InvalidToken
 from flask import current_app
+from sqlalchemy.orm.attributes import flag_modified
 
 from ..common import APIError
 from ..extensions import db
@@ -254,68 +255,95 @@ def process_event(connection, item, kind):
         return
     if kind != 'messaging':
         return  # Other subscribed events retained, never silently discarded.
+    ingest_message(connection, item, key)
+
+
+def ingest_message(connection, item, key, historical=False):
+    """Materialize inbound DMs and owner echoes; recording an echo never sends or starts an automation."""
     message = item.get('message') or {}
-    if not mid or message.get('is_echo') or message.get('is_deleted'):
-        return
+    mid = message.get('mid')
+    if not mid or message.get('is_deleted'):
+        return False
     sender = str((item.get('sender') or {}).get('id', ''))
     recipient = str((item.get('recipient') or {}).get('id', ''))
-    if recipient != connection.instagram_id or not sender.isdigit() or sender == recipient:
-        return
+    outgoing = sender == connection.instagram_id
+    if outgoing:
+        peer = recipient
+    else:
+        if recipient != connection.instagram_id or message.get('is_echo'):
+            return False
+        peer = sender
+    if not peer.isdigit() or peer == connection.instagram_id:
+        return False
     content = message.get('text') or (
-        '[Anexo recebido no Instagram]' if message.get('attachments') else '[Mensagem do Instagram]'
+        ('[Anexo enviado no Instagram]' if outgoing else '[Anexo recebido no Instagram]')
+        if message.get('attachments')
+        else '[Mensagem do Instagram]'
     )
-    timestamp = item.get('timestamp')
     try:
-        occurred = datetime.fromtimestamp(float(timestamp) / 1000, timezone.utc)
+        occurred = datetime.fromtimestamp(float(item.get('timestamp')) / 1000, timezone.utc)
         if occurred > now() + timedelta(minutes=5):
             raise ValueError()
     except (ValueError, TypeError, OSError, OverflowError):
         raise APIError('Data de evento inválida.', 422) from None
-    address = connection.instagram_id + ':' + sender
-    thread = InboxThread.query.filter_by(
-        workspace_id=connection.workspace_id, channel='instagram', address=address
-    ).first()
-    if not thread:
-        # Someone who commented first already has a contact: keep one person, one contact.
-        earlier = (
-            InstagramComment.query.filter(
-                InstagramComment.connection_id == connection.id,
-                InstagramComment.from_id == sender,
-                InstagramComment.contact_id.isnot(None),
-            )
-            .order_by(InstagramComment.created_at)
-            .first()
+    thread = (
+        InboxThread.query.filter_by(
+            workspace_id=connection.workspace_id, channel='instagram', address=connection.instagram_id + ':' + peer
         )
-        contact = db.session.get(Contact, earlier.contact_id) if earlier else None
-        if contact and contact.archived:
-            contact = None
-        if not contact:
-            contact = Contact(
-                workspace_id=connection.workspace_id,
-                name='Instagram ' + sender,
-                source='Instagram',
-                custom_fields={'instagram_scoped_id': sender, 'instagram_account_id': connection.instagram_id},
-            )
-            apply_profile(contact, sender, fetch_profile(connection, sender))
-            db.session.add(contact)
-            db.session.flush()
-        elif contact.name.startswith('@') or contact.name == 'Instagram ' + sender:
-            apply_profile(contact, sender, fetch_profile(connection, sender))
+        .with_for_update()
+        .first()
+    )
+    if not thread:
         thread = InboxThread(
-            workspace_id=connection.workspace_id, channel='instagram', address=address, contact_id=contact.id
+            workspace_id=connection.workspace_id,
+            channel='instagram',
+            address=connection.instagram_id + ':' + peer,
+            updated_at=occurred,
         )
         db.session.add(thread)
         db.session.flush()
-    thread.updated_at = now()
-    existing = db.session.get(Contact, thread.contact_id) if thread.contact_id else None
-    if existing and existing.name == 'Instagram ' + sender:  # Placeholder from before names were fetched.
-        apply_profile(existing, sender, fetch_profile(connection, sender))
+    previous_updated = thread.updated_at
+    # The provider MID, not the origin of the send, identifies the same message.
+    existing = InboxMessage.query.filter_by(
+        workspace_id=connection.workspace_id, thread_id=thread.id, provider_id=str(mid)[:180]
+    ).first()
+    if existing:
+        if outgoing and existing.direction == 'out' and existing.status in ('sending', 'unknown'):
+            existing.status, existing.error = 'sent', None
+        return False
+    if not outgoing:
+        contact = db.session.get(Contact, thread.contact_id) if thread.contact_id else None
+        if not contact:
+            earlier = (
+                InstagramComment.query.filter(
+                    InstagramComment.connection_id == connection.id,
+                    InstagramComment.from_id == peer,
+                    InstagramComment.contact_id.isnot(None),
+                )
+                .order_by(InstagramComment.created_at)
+                .first()
+            )
+            contact = db.session.get(Contact, earlier.contact_id) if earlier else None
+            if contact and (contact.archived or contact.workspace_id != connection.workspace_id):
+                contact = None
+            if not contact:
+                contact = Contact(
+                    workspace_id=connection.workspace_id,
+                    name='Instagram ' + peer,
+                    source='Instagram',
+                    custom_fields={'instagram_scoped_id': peer, 'instagram_account_id': connection.instagram_id},
+                )
+                db.session.add(contact)
+                db.session.flush()
+            thread.contact_id = contact.id
+        if not historical and (contact.name.startswith('@') or contact.name == 'Instagram ' + peer):
+            apply_profile(contact, peer, fetch_profile(connection, peer))
     row = InboxMessage(
         workspace_id=connection.workspace_id,
         thread_id=thread.id,
-        direction='in',
+        direction='out' if outgoing else 'in',
         content=str(content)[:20000],
-        status='received',
+        status='sent' if outgoing else 'received',
         provider_id=str(mid)[:180],
         idempotency_key='instagram:' + key,
         created_at=occurred,
@@ -323,11 +351,55 @@ def process_event(connection, item, kind):
     )
     db.session.add(row)
     db.session.flush()
-    contact = db.session.get(Contact, thread.contact_id)
-    if contact and not contact.archived:
-        from .automations import received_reply
+    # Backfilled history must not move an old conversation ahead of newer messages.
+    thread.updated_at = max(previous_updated, occurred)
+    flag_modified(thread, 'updated_at')  # Override Base.onupdate, even when the date is unchanged.
+    if not outgoing and not historical:
+        from .notifications import record
 
-        received_reply(connection.workspace_id, contact, row.id)
+        record(thread, row, 'inbox')
+        contact = db.session.get(Contact, thread.contact_id)
+        if contact and not contact.archived:
+            from .automations import received_reply
+
+            received_reply(connection.workspace_id, contact, row.id)
+    return True
+
+
+def recover_outgoing_events(connection):
+    """Replay preserved outbound events only; caller commits, no provider calls or automations."""
+    workspace = db.session.get(Workspace, connection.workspace_id)
+    if not connection.active or not workspace or not workspace.active:
+        return 0
+    restored = 0
+    events = (
+        InstagramEvent.query.filter_by(
+            connection_id=connection.id, workspace_id=connection.workspace_id, kind='messaging'
+        )
+        .order_by(InstagramEvent.created_at)
+        .all()
+    )
+    for event in events:
+        item = event.payload or {}
+        if str((item.get('sender') or {}).get('id', '')) == connection.instagram_id:
+            restored += int(ingest_message(connection, item, event.event_key))
+    return restored
+
+
+def confirm_reply(row, provider_id):
+    """An echo can arrive while the send HTTP call is still running. Keep the original platform claim."""
+    InboxThread.query.filter_by(id=row.thread_id, workspace_id=row.workspace_id).with_for_update().one()
+    echoes = (
+        InboxMessage.query.filter_by(
+            workspace_id=row.workspace_id, thread_id=row.thread_id, direction='out', provider_id=str(provider_id)[:180]
+        )
+        .filter(InboxMessage.id != row.id)
+        .all()
+    )
+    for echo in echoes:
+        if echo.idempotency_key.startswith('instagram:') and echo.sent_by_id is None:
+            db.session.delete(echo)
+    row.provider_id, row.status, row.error = str(provider_id)[:180], 'sent', None
 
 
 COMMENT_REPLIES_PER_HOUR = 60
@@ -447,18 +519,21 @@ def comment_action(kind, comment, contact, content, workspace):
         )
         db.session.add(thread)
         db.session.flush()
+    elif not thread.contact_id:
+        thread.contact_id = contact.id
     message_id = str(result.get('message_id') or 'private-' + comment.comment_id)[:180]
-    db.session.add(
-        InboxMessage(
-            workspace_id=workspace.id,
-            thread_id=thread.id,
-            direction='out',
-            content=text,
-            status='sent',
-            provider_id=message_id,
-            idempotency_key='instagram-private:' + comment.comment_id,
-        )
+    message = InboxMessage(
+        workspace_id=workspace.id,
+        thread_id=thread.id,
+        direction='out',
+        content=text,
+        status='sent',
+        provider_id=message_id,
+        idempotency_key='instagram-private:' + comment.comment_id,
     )
+    db.session.add(message)
+    db.session.flush()
+    confirm_reply(message, message_id)
     thread.updated_at = now()
     return comment.id
 
@@ -531,7 +606,7 @@ def send_reply(thread, content, key, user_id):
         )
         if not result.get('message_id'):
             raise APIError('Sem confirmação.', 502)
-        row.provider_id, row.status = result['message_id'], 'sent'
+        confirm_reply(row, result['message_id'])
     except Exception as error:  # delivery boundary: any failure after the call leaves the message 'unknown'
         current_app.logger.warning('Falha ao enviar resposta no Instagram: %s', type(error).__name__)
         row.status, row.error = 'unknown', 'Envio sem confirmação. Confira no Instagram antes de reenviar.'

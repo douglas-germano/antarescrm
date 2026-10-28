@@ -524,3 +524,142 @@ def test_connection_card_survives_an_instagram_outage(env, monkeypatch):
         and result.json['connection']['username'] == 'testprofile'
         and result.json['connection']['name'] is None
     )
+
+
+def echo_event(mid='app-out', recipient='5678', text='Enviado pelo aplicativo'):
+    body = event(mid)
+    item = body['entry'][0]['messaging'][0]
+    item['sender']['id'] = '1234'
+    item['recipient']['id'] = recipient
+    item['message'].update(is_echo=True, text=text)
+    return body
+
+
+def test_native_app_echo_is_outgoing_in_same_thread_without_automations(env, monkeypatch):
+    client, d = env
+    configure_instagram(client, d)
+    receive(client, event())
+    thread = InboxThread.query.one()
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Recording an outgoing event must not send or trigger an automation')
+
+    from app.services import automations
+
+    monkeypatch.setattr(service, 'graph', forbidden)
+    monkeypatch.setattr(automations, 'received_reply', forbidden)
+    body = echo_event()
+    assert receive(client, body).status_code == 200
+    assert receive(client, body).status_code == 200
+    rows = client.get(f'/api/v1/inbox/inbox/{thread.id}/messages', headers=d['headers']()).json['items']
+    sent = next(row for row in rows if row['provider_id'] == 'app-out')
+    assert sent['direction'] == 'out' and sent['status'] == 'sent'
+    assert sent['content'] == 'Enviado pelo aplicativo' and len(rows) == 2
+    assert Contact.query.count() == 1 and InboxThread.query.count() == 1
+    assert (
+        client.get(f'/api/v1/inbox/inbox/{thread.id}/messages', headers=d['headers'](d['outsider'])).status_code == 404
+    )
+
+
+def test_echo_for_new_peer_does_not_create_lead_or_open_reply_window(env):
+    client, d = env
+    configure_instagram(client, d)
+    assert receive(client, echo_event()).status_code == 200
+    thread = InboxThread.query.one()
+    assert thread.contact_id is None and Contact.query.count() == 0
+    response = client.post(
+        f'/api/v1/inbox/inbox/{thread.id}/messages',
+        headers=d['headers'](),
+        json={'content': 'Reply', 'idempotency_key': str(uuid4())},
+    )
+    assert response.status_code == 409
+    assert receive(client, event()).status_code == 200
+    assert InboxThread.query.count() == 1 and Contact.query.count() == 1
+    assert InboxThread.query.one().contact_id == Contact.query.one().id
+
+
+def test_echo_of_platform_reply_is_not_duplicated(env, monkeypatch):
+    client, d = env
+    configure_instagram(client, d)
+    receive(client, event())
+    thread = InboxThread.query.one()
+    monkeypatch.setattr(service, 'graph', lambda *args, **kwargs: {'message_id': 'platform-mid'})
+    response = client.post(
+        f'/api/v1/inbox/inbox/{thread.id}/messages',
+        headers=d['headers'](),
+        json={'content': 'Reply', 'idempotency_key': str(uuid4())},
+    )
+    assert response.status_code == 200
+    original_id = response.json['id']
+    assert receive(client, echo_event('platform-mid', text='Reply')).status_code == 200
+    assert InboxMessage.query.filter_by(direction='out').count() == 1
+    assert InboxMessage.query.filter_by(direction='out').one().id == original_id
+
+
+def test_echo_arriving_before_send_response_preserves_platform_idempotency(env, monkeypatch):
+    client, d = env
+    configure_instagram(client, d)
+    receive(client, event())
+    thread = InboxThread.query.one()
+
+    def send(*args, **kwargs):
+        service.receive(echo_event('fast-echo', text='Reply'))
+        db.session.commit()
+        return {'message_id': 'fast-echo'}
+
+    monkeypatch.setattr(service, 'graph', send)
+    key = str(uuid4())
+    response = client.post(
+        f'/api/v1/inbox/inbox/{thread.id}/messages',
+        headers=d['headers'](),
+        json={'content': 'Reply', 'idempotency_key': key},
+    )
+    assert response.status_code == 200
+    row = InboxMessage.query.filter_by(direction='out').one()
+    assert row.idempotency_key == key and row.sent_by_id == d['owner'].id
+
+
+def test_echo_recovery_replays_preserved_events_once_without_sending(env, monkeypatch):
+    client, d = env
+    connection = configure_instagram(client, d)
+    receive(client, event())
+    # Simulate events recorded by the old code, before echoes were materialized.
+    for mid in ['old-1', 'old-2']:
+        item = echo_event(mid)['entry'][0]['messaging'][0]
+        key = hashlib.sha256((connection.id + ':' + mid).encode()).hexdigest()
+        db.session.add(
+            InstagramEvent(
+                workspace_id=d['ws'].id, connection_id=connection.id, event_key=key, kind='messaging', payload=item
+            )
+        )
+    db.session.commit()
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Recovery must not make provider calls or fetch profiles')
+
+    monkeypatch.setattr(service, 'graph', forbidden)
+    monkeypatch.setattr(service, 'fetch_profile', forbidden)
+    from app.services import automations
+
+    monkeypatch.setattr(automations, 'received_reply', forbidden)
+    assert service.recover_outgoing_events(connection) == 2
+    db.session.commit()
+    assert service.recover_outgoing_events(connection) == 0
+    assert InboxMessage.query.filter_by(direction='out').count() == 2
+    assert InstagramEvent.query.count() == 3 and Contact.query.count() == 1
+
+
+def test_native_attachments_are_visible_as_outgoing_events_and_cannot_cross_accounts(env):
+    client, d = env
+    configure_instagram(client, d)
+    body = echo_event()
+    item = body['entry'][0]['messaging'][0]
+    item['message'].pop('text')
+    item['message']['attachments'] = [{'type': 'image', 'payload': {'url': 'https://cdn.example/image.jpg'}}]
+    assert receive(client, body).status_code == 200
+    row = InboxMessage.query.one()
+    assert row.direction == 'out' and row.content == '[Anexo enviado no Instagram]'
+    bad = echo_event('wrong-owner')
+    bad['entry'][0]['messaging'][0]['sender']['id'] = '9999'
+    assert receive(client, bad).status_code == 200
+    assert InboxMessage.query.count() == 1

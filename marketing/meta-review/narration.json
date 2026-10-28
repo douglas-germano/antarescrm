@@ -1,0 +1,15 @@
+{
+ "b1": "This is Antares CRM, a customer relationship management web app for small businesses. In Settings, under Connections, a business connects its Instagram professional account.",
+ "b2": "Clicking Connect Instagram starts the Instagram Business Login.",
+ "b3": "Instagram shows the permissions Antares requests: view profile and access media, manage comments, and manage messages. The account owner reviews them and clicks Allow.",
+ "b4": "Back in Antares, the account is connected. We use instagram_business_basic to show the account's name, username and profile picture, and to identify which account receives the messages and comments.",
+ "m1": "In the Inbox, filtered to the Instagram channel, Antares lists the business account's Instagram conversations. Other customers' names are blurred for privacy.",
+ "m2": "A customer sends a direct message to the business account. It arrives in Antares in real time, through the Instagram messaging webhook. The agent opens the conversation.",
+ "m3": "The agent writes a reply in Antares and sends it. Antares delivers it with the Instagram messaging API, using instagram_business_manage_messages, inside the 24-hour messaging window.",
+ "m4": "On Instagram, the same conversation shows the reply that was sent from Antares.",
+ "c1": "Antares can reply automatically to comments on the business account's Instagram posts. We create a new automation.",
+ "c2": "The trigger is a new Instagram comment, with the condition that the comment text contains 'antares test'. The action replies publicly to the comment with this message.",
+ "c3": "The automation is saved and active. Now a user comments 'antares test' on one of the account's posts.",
+ "c4": "Antares receives the comment through the Instagram comments webhook, and the automation runs successfully.",
+ "c5": "On Instagram, the reply is posted under the user's comment. Antares published it using instagram_business_manage_comments."
+}

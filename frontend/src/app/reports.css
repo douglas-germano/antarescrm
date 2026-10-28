@@ -7,7 +7,7 @@
 .rep-kpis .stat-value { font-size: 22px; }
 .delta { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 700; }
 .delta.up { color: #2e7d52; }
-.delta.down { color: #b80000; }
+.delta.down { color: var(--primary-hover); }
 .delta.flat { color: var(--muted); }
 .rep-grid { display: grid; gap: var(--gap-section); min-width: 0; }
 .rep-main { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }

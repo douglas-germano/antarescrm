@@ -2,56 +2,39 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Pencil, CalendarDays, CalendarPlus, MessageCircle, Phone, Mail, Check, Handshake, X, ChevronsUpDown, ArrowUp, ArrowDown, LayoutGrid, List } from 'lucide-react';
-import { useList, useData, post, patch, refreshAll } from '@/lib/api';
-import { brl, day, hour, rowOptions, opts, kinds, toLocalInput, today, searchMatch } from '@/lib/format';
-import type { Field, Row } from '@/lib/types';
+import { Plus, Pencil, CalendarPlus, MessageCircle, Phone, Mail, Check, Handshake, X, LayoutGrid, List, SlidersHorizontal, ArrowRightLeft } from 'lucide-react';
+import { useList, usePage, useData, post, patch, refreshAll } from '@/lib/api';
+import { brl, day, hour, rowOptions, opts, kinds, toLocalInput, today } from '@/lib/format';
+import type { Field, Opportunity, OpportunityPage, Pipeline, PipelineStage, User, Activity } from '@/lib/types';
 import { RecordActivityDialog, type ActivityRecord } from '@/components/contacts/record-activity-dialog';
 import { SendWhatsAppDialog, type WhatsAppTarget } from '@/components/whatsapp/send-whatsapp-dialog';
-import { followUpReasons } from '@/components/contacts/follow-up-queue';
 import { useSession, useNotify } from '@/components/providers';
-import { Button, Badge, PageHeader, EmptyState, DataState, SearchInput, FormDialog, Modal } from '@/components/ui';
+import { Button, Badge, PageHeader, EmptyState, DataState, SearchInput, FormDialog, Modal, Popover } from '@/components/ui';
+import { DealViews } from '@/components/crm/deal-views';
+import type { SortKey } from '@/components/crm/model';
+import { Pager } from '@/components/fit';
 import {
   Card,
-  KanbanBoard,
-  KanbanColumn,
-  KanbanCard,
-  KanbanCardTitle,
-  KanbanCardText,
-  KanbanCardMeta,
   Tabs,
   Toolbar,
   ToolbarEnd,
 } from '@/components/blocks';
 
-const DAY = 86400000;
 const PERIODS = [
-  { value: '', label: 'Qualquer previsão' },
-  { value: 'overdue', label: 'Previsão vencida' },
-  { value: 'week', label: 'Próximos 7 dias' },
-  { value: 'month', label: 'Neste mês' },
-  { value: 'none', label: 'Sem previsão' },
+  { value: '', label: 'Qualquer previsão' }, { value: 'overdue', label: 'Previsão vencida' },
+  { value: 'week', label: 'Próximos 7 dias' }, { value: 'month', label: 'Neste mês' }, { value: 'none', label: 'Sem previsão' },
 ];
-const addDays = (iso: string, n: number) => new Date(Date.parse(iso + 'T12:00:00Z') + n * DAY).toISOString().slice(0, 10);
-/** Days since the last sign of life on a deal: its latest completed activity or stage move. */
-const staleDays = (row: Row) => {
-  const times = [row.last_contact_at, row.stage_changed_at].filter(Boolean).map((v: string) => Date.parse(v));
-  return times.length ? Math.max(0, Math.floor((Date.now() - Math.max(...times)) / DAY)) : null;
-};
-const inStageDays = (row: Row) => (row.stage_changed_at ? Math.max(0, Math.floor((Date.now() - Date.parse(row.stage_changed_at)) / DAY)) : null);
-type SortKey = 'title' | 'stage' | 'amount' | 'close' | 'owner' | 'stale';
-
 export default function CRMPage() {
   const { user } = useSession();
   const { notify } = useNotify();
   const router = useRouter();
   const [pipelineId, setPipelineId] = useState('default');
-  const pipelines = useData<{ items: Row[] }>('/pipelines');
+  const pipelines = useData<{ items: Pipeline[] }>('/pipelines');
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('open');
+  const [status, setStatus] = useState<Opportunity['status']>('open');
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [requestedDeal, setRequestedDeal] = useState<string | null>(null);
-  const followups = useData<{ items: Row[]; total: number }>('/reports/follow-ups');
+  const followups = useData<{ items: (Opportunity & { reason: string })[]; total: number }>('/reports/follow-ups');
   const attention = new Map((followups.data?.items || []).map(row => [row.id, row]));
   useEffect(() => {
     try { if (localStorage.getItem('antares.crm.view') === 'list') setView('list'); } catch { /* optional preference */ }
@@ -64,15 +47,13 @@ export default function CRMPage() {
     const params = new URLSearchParams(window.location.search);
     setAttentionOnly(params.get('attention') === 'true');
     setRequestedDeal(params.get('opportunity'));
+    if (params.get('new') === 'true') setEditing(null);
   }, []);
-  const opportunities = useList('/opportunities?status=' + status + '&pipeline_id=' + pipelineId);
-  const contacts = useList('/contacts');
-  const companies = useList('/companies');
-  const users = useList('/users');
-  const stages = useData<{ items: Row[] }>('/pipeline/stages?pipeline_id=' + pipelineId);
-  const connection = useData<Row>('/whatsapp/connection');
+  const users = useList<User>('/users');
+  const stages = useData<{ items: PipelineStage[] }>('/pipeline/stages?pipeline_id=' + pipelineId);
+  const connection = useData<{ connected: boolean }>('/whatsapp/connection');
   const [whatsapp, setWhatsapp] = useState<WhatsAppTarget | null>(null);
-  const [editing, setEditing] = useState<Row | null | undefined>();
+  const [editing, setEditing] = useState<Opportunity | null | undefined>();
   const [newStage, setNewStage] = useState<string | null>(null);
   const [view, setView] = useState<'board' | 'list'>('board');
   const [owner, setOwner] = useState('');
@@ -82,11 +63,11 @@ export default function CRMPage() {
   const [maxValue, setMaxValue] = useState('');
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'stale', dir: -1 });
   const [followup, setFollowup] = useState<ActivityRecord | null>(null);
-  const [closeRow, setCloseRow] = useState<Row | null>(null);
+  const [closeRow, setCloseRow] = useState<Opportunity | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overZone, setOverZone] = useState<'won' | 'lost' | null>(null);
-  const [selected, setSelected] = useState<Row | null>(null);
-  const requestedRecord = useData<Row>(requestedDeal ? '/opportunities/' + requestedDeal : null);
+  const [selected, setSelected] = useState<Opportunity | null>(null);
+  const requestedRecord = useData<Opportunity>(requestedDeal ? '/opportunities/' + requestedDeal : null);
   useEffect(() => {
     if (!requestedDeal) return;
     if (requestedRecord.data) {
@@ -103,52 +84,31 @@ export default function CRMPage() {
   const [loss, setLoss] = useState('');
   const [busy, setBusy] = useState(false);
   const [closeError, setCloseError] = useState('');
-  const [activityEdit, setActivityEdit] = useState<Row | null | undefined>();
-  const activities = useList(selected ? '/activities?opportunity_id=' + selected.id : null);
-  const detail = useData<Row>(selected ? '/opportunities/' + selected.id : null);
-  const linkedProject = useData<{ items: Row[] }>(selected?.status === 'won' ? '/projects?opportunity_id=' + selected.id : null);
+  const [activityEdit, setActivityEdit] = useState<Activity | null | undefined>();
+  const activities = useList<Activity>(selected ? '/activities?opportunity_id=' + selected.id : null);
+  const detail = useData<Opportunity>(selected ? '/opportunities/' + selected.id : null);
+  const linkedProject = useData<{ items: { id: string }[] }>(selected?.status === 'won' ? '/projects?opportunity_id=' + selected.id : null);
   const projectOf = linkedProject.data?.items?.[0];
   const stagesList = stages.data?.items || [];
-  const contactList = contacts.data || [];
-  const companyList = companies.data || [];
   const userList = (users.data || []).filter((r) => r.active);
-  const contactName = (id?: string) => contactList.find((c) => c.id === id)?.name;
-  const companyName = (id?: string) => companyList.find((c) => c.id === id)?.name;
-  const waTarget = (r: Row): WhatsAppTarget | null => {
-    const contact = contactList.find((c) => c.id === r.contact_id);
-    return contact?.phone ? { name: contact.name, phone: contact.phone, contact_id: contact.id, deal: r.title } : null;
-  };
-  const who = (r: Row) => [companyName(r.company_id), contactName(r.contact_id)].filter(Boolean).join(' · ') || 'Sem contato';
-  const allRows = opportunities.data || [];
-  const sources = [...new Set<string>(contactList.map((c) => c.source).filter(Boolean))].sort();
+  const params = new URLSearchParams({ status, pipeline_id: pipelineId, search, owner_id: owner,
+    source: origin, period, min_amount: minValue, max_amount: maxValue,
+    attention: String(attentionOnly), sort: sort.key, direction: sort.dir === 1 ? 'asc' : 'desc' });
+  const opportunities = usePage<Opportunity, OpportunityPage>('/opportunities?' + params);
+  const rows = opportunities.data?.items || [];
+  const sources = opportunities.data?.sources || [];
+  const records = [...rows, ...(selected ? [detail.data || selected] : [])];
+  const contactName = (id?: string | null) => records.find(r => r.contact_id === id)?.contact_name;
+  const companyName = (id?: string | null) => records.find(r => r.company_id === id)?.company_name;
+  const waTarget = (r: Opportunity): WhatsAppTarget | null => r.contact_phone
+    ? { name: r.contact_name || r.title, phone: r.contact_phone, contact_id: r.contact_id || undefined, deal: r.title } : null;
+  const who = (r: Opportunity) => [r.company_name, r.contact_name].filter(Boolean).join(' · ') || 'Sem contato';
   const t0 = today();
-  const matchesPeriod = (r: Row) => {
-    const d: string | null = r.expected_close_date;
-    if (period === 'overdue') return !!d && d < t0;
-    if (period === 'week') return !!d && d >= t0 && d <= addDays(t0, 7);
-    if (period === 'month') return !!d && d.slice(0, 7) === t0.slice(0, 7);
-    if (period === 'none') return !d;
-    return true;
-  };
-  const filtered = allRows
-    .filter(row => !attentionOnly || status !== 'open' || !followups.data || attention.has(row.id))
-    .filter((r) => searchMatch(search, [r.title, who(r), contactList.find((c) => c.id === r.contact_id)?.phone, contactList.find((c) => c.id === r.contact_id)?.email]))
-    .filter((r) => !owner || (owner === 'none' ? !r.owner_id : r.owner_id === owner))
-    .filter((r) => !origin || contactList.find((c) => c.id === r.contact_id)?.source === origin)
-    .filter((r) => (minValue === '' || Number(r.amount) >= Number(minValue)) && (maxValue === '' || Number(r.amount) <= Number(maxValue)))
-    .filter(matchesPeriod);
-  const rows = filtered;
   const hasFilters = !!(owner || origin || period || minValue || maxValue || search);
+  const activeFilters = [owner, origin, period, minValue || maxValue, attentionOnly].filter(Boolean).length;
   const stageName = (id: string) => stagesList.find((s) => s.id === id)?.name || '';
-  const ownerName = (id?: string) => userList.find((u) => u.id === id)?.name || '';
-  const probability = new Map(stagesList.map((s) => [s.id, s.probability as number | null]));
+  const ownerName = (id?: string | null) => userList.find((u) => u.id === id)?.name || '';
   const anyProbability = stagesList.some((s) => s.probability !== null && s.probability !== undefined);
-  const weighted = (items: Row[]) => items.reduce((sum, r) => sum + Number(r.amount) * ((probability.get(r.stage_id) ?? 0) / 100), 0);
-  const sortValue = (r: Row): string | number => ({
-    title: r.title.toLowerCase(), stage: stagesList.findIndex((s) => s.id === r.stage_id), amount: Number(r.amount),
-    close: r.expected_close_date || '9999', owner: ownerName(r.owner_id).toLowerCase(), stale: staleDays(r) ?? -1,
-  })[sort.key];
-  const sortedRows = [...rows].sort((a, b) => (sortValue(a) < sortValue(b) ? -1 : sortValue(a) > sortValue(b) ? 1 : 0) * sort.dir);
   function sortBy(key: SortKey) { setSort((c) => (c.key === key ? { key, dir: (c.dir * -1) as 1 | -1 } : { key, dir: key === 'amount' || key === 'stale' ? -1 : 1 })); }
   const closeTarget = closeRow || selected;
   const fields: Field[] = [
@@ -168,7 +128,7 @@ export default function CRMPage() {
     { name: 'owner_id', label: 'Responsável', type: 'select', options: rowOptions(userList) },
     { name: 'notes', label: 'Observações', type: 'textarea', wide: true },
   ];
-  async function move(row: Row, stage_id: string) {
+  async function move(row: Opportunity, stage_id: string) {
     try {
       await patch('/opportunities/' + row.id, { stage_id });
       await refreshAll();
@@ -177,32 +137,39 @@ export default function CRMPage() {
       notify((e as Error).message, 'error');
     }
   }
-  function moveBy(row: Row, direction: -1 | 1) {
+  function moveBy(row: Opportunity, direction: -1 | 1) {
     if (row.status !== 'open') return;
     const next = stagesList[stagesList.findIndex((s) => s.id === row.stage_id) + direction];
     if (next) void move(row, next.id);
   }
-  function startClose(row: Row, kind: 'won' | 'lost') {
+  function startClose(row: Opportunity, kind: 'won' | 'lost') {
     setCloseError('');
     setLoss('');
     setCloseRow(row);
     setClosing(kind);
   }
-  function renderActions(row: Row, stop = false) {
-    const contact = contactList.find((c) => c.id === row.contact_id);
+  function renderActions(row: Opportunity, stop = false) {
+    const contact = { name: row.contact_name, phone: row.contact_phone, email: row.contact_email };
     const wa = waTarget(row);
     const open = row.status === 'open';
     const click = (fn: () => void) => (e: React.MouseEvent) => { if (stop) e.stopPropagation(); fn(); };
     return (
       <div className="deal-actions" onClick={stop ? (e) => e.stopPropagation() : undefined}>
-        {wa && <button type="button" className="icon-btn wa" title="Enviar WhatsApp" aria-label={'Enviar WhatsApp para ' + contact?.name} onClick={click(() => setWhatsapp(wa))}><MessageCircle size={15} /></button>}
-        {contact?.phone && <a className="icon-btn" href={'tel:' + contact.phone} title="Ligar" aria-label={'Ligar para ' + contact.name}><Phone size={15} /></a>}
-        {contact?.email && <a className="icon-btn" href={'mailto:' + contact.email} title="Enviar e-mail" aria-label={'Enviar e-mail para ' + contact.name}><Mail size={15} /></a>}
-        {open && <button type="button" className="icon-btn" title="Agendar retorno" aria-label={'Agendar retorno de ' + row.title}
+        {wa && <button type="button" className="icon-btn wa" data-tip="Enviar WhatsApp" aria-label={'Enviar WhatsApp para ' + contact?.name} onClick={click(() => setWhatsapp(wa))}><MessageCircle size={15} /></button>}
+        {contact?.phone && <a className="icon-btn" href={'tel:' + contact.phone} data-tip="Ligar" aria-label={'Ligar para ' + contact.name}><Phone size={15} /></a>}
+        {contact?.email && <a className="icon-btn" href={'mailto:' + contact.email} data-tip="Enviar e-mail" aria-label={'Enviar e-mail para ' + contact.name}><Mail size={15} /></a>}
+        {open && <button type="button" className="icon-btn" data-tip="Agendar retorno" aria-label={'Agendar retorno de ' + row.title}
           onClick={click(() => setFollowup({ label: row.title, opportunity_id: row.id, contact_id: row.contact_id, company_id: row.company_id, owner_id: row.owner_id }))}><CalendarPlus size={15} /></button>}
+        {open && !stop && <label className="stage-menu" data-tip="Mover para outra etapa">
+          <ArrowRightLeft size={14} />
+          <select aria-label={'Mover ' + row.title + ' para outra etapa'} value={row.stage_id} onChange={(e) => void move(row, e.target.value)}>
+            <option disabled value="">Mover para…</option>
+            {stagesList.map((s) => <option value={s.id} key={s.id}>{s.name}</option>)}
+          </select>
+        </label>}
         <span className="spacer" />
-        {open && <button type="button" className="icon-btn win" title="Fechar venda" aria-label={'Fechar venda de ' + row.title} onClick={click(() => startClose(row, 'won'))}><Check size={15} /></button>}
-        {open && <button type="button" className="icon-btn lose" title="Marcar como perdido" aria-label={'Marcar ' + row.title + ' como perdido'} onClick={click(() => startClose(row, 'lost'))}><X size={15} /></button>}
+        {open && <button type="button" className="icon-btn win" data-tip="Fechar venda" aria-label={'Fechar venda de ' + row.title} onClick={click(() => startClose(row, 'won'))}><Check size={15} /></button>}
+        {open && <button type="button" className="icon-btn lose" data-tip="Marcar como perdido" aria-label={'Marcar ' + row.title + ' como perdido'} onClick={click(() => startClose(row, 'lost'))}><X size={15} /></button>}
       </div>
     );
   }
@@ -211,7 +178,7 @@ export default function CRMPage() {
     setBusy(true);
     setCloseError('');
     try {
-      const result = await post(
+      const result = await post<Opportunity>(
         '/opportunities/' + closeTarget.id + '/close',
         closing === 'won' ? { status: 'won' } : { status: 'lost', loss_reason: loss.trim() },
       );
@@ -227,8 +194,10 @@ export default function CRMPage() {
   }
   return (
     <div className="page">
-      <PageHeader compact title="Funil de vendas">
-        <select aria-label="Funil de vendas" value={pipelineId} onChange={e => { setPipelineId(e.target.value); setSelected(null); }}>{pipelines.data?.items.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select>
+      <PageHeader compact title="Funil de vendas"
+        aside={(pipelines.data?.items.length || 0) > 1
+          ? <select className="pipeline-select" aria-label="Funil de vendas" value={pipelineId} onChange={e => { setPipelineId(e.target.value); setSelected(null); }}>{pipelines.data?.items.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select>
+          : pipelines.data?.items[0] && <span className="pipeline-name">{pipelines.data.items[0].name}</span>}>
         <Button disabled={!stagesList.length} onClick={() => { setNewStage(null); setEditing(null); }}>
           <Plus size={17} /> Novo negócio
         </Button>
@@ -237,7 +206,7 @@ export default function CRMPage() {
         <Tabs
           label="Situação dos negócios"
           value={status}
-          onChange={setStatus}
+          onChange={value => setStatus(value as Opportunity['status'])}
           items={[
             { value: 'open', label: 'Em aberto' },
             { value: 'won', label: 'Ganhos' },
@@ -245,6 +214,35 @@ export default function CRMPage() {
           ]}
         />
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar negócio, contato ou empresa" />
+        <Popover label="Filtros" icon={<SlidersHorizontal size={15} />} variant="soft" panelClassName="filter-panel"
+          badge={activeFilters ? <span className="popover-badge">{activeFilters}</span> : undefined}>{() => <>
+          <label className="field"><span>Responsável</span>
+            <select value={owner} onChange={(e) => setOwner(e.target.value)}>
+              <option value="">Todos os responsáveis</option>
+              <option value="none">Sem responsável</option>
+              {userList.map((u) => <option value={u.id} key={u.id}>{u.name}</option>)}
+            </select></label>
+          <label className="field"><span>Origem</span>
+            <select value={origin} onChange={(e) => setOrigin(e.target.value)}>
+              <option value="">Todas as origens</option>
+              {sources.map((o) => <option value={o} key={o}>{o}</option>)}
+            </select></label>
+          <label className="field"><span>Previsão de fechamento</span>
+            <select value={period} onChange={(e) => setPeriod(e.target.value)}>
+              {PERIODS.map((p) => <option value={p.value} key={p.value}>{p.label}</option>)}
+            </select></label>
+          <div className="field"><span>Valor</span>
+            <span className="money-range">
+              <input type="number" inputMode="decimal" min={0} aria-label="Valor mínimo" placeholder="Mínimo" value={minValue} onChange={(e) => setMinValue(e.target.value)} />
+              <input type="number" inputMode="decimal" min={0} aria-label="Valor máximo" placeholder="Máximo" value={maxValue} onChange={(e) => setMaxValue(e.target.value)} />
+            </span></div>
+          {status === 'open' && (
+            <label className="checkbox-label"><input type="checkbox" checked={attentionOnly} disabled={!followups.data || !!followups.error} onChange={e => setAttentionOnly(e.target.checked)} />Precisam de acompanhamento{followups.data ? ` (${followups.data.total})` : ''}</label>
+          )}
+        </>}</Popover>
+        {(hasFilters || attentionOnly) && (
+          <Button variant="ghost" onClick={() => { setOwner(''); setOrigin(''); setPeriod(''); setMinValue(''); setMaxValue(''); setSearch(''); setAttentionOnly(false); }}><X size={14} />Limpar</Button>
+        )}
         <Tabs
           label="Visualização"
           value={view}
@@ -257,49 +255,27 @@ export default function CRMPage() {
         <ToolbarEnd>
           <div className="summary-inline">
             <span>
-              <strong>{rows.length}</strong> {rows.length === 1 ? 'negócio' : 'negócios'}
+              <strong>{opportunities.data?.total || 0}</strong> {opportunities.data?.total === 1 ? 'negócio' : 'negócios'}
             </span>
             <span>
               {status === 'open' ? 'Em negociação' : status === 'won' ? 'Vendido' : 'Perdido'}{' '}
-              <strong>{brl(rows.reduce((s, r) => s + Number(r.amount), 0))}</strong>
+              <strong>{brl(opportunities.data?.summary.amount)}</strong>
             </span>
             {status === 'open' && anyProbability && (
               <span title="Valor de cada etapa multiplicado pela sua probabilidade de ganho">
-                Previsão ponderada <strong>{brl(weighted(rows))}</strong>
+                Previsão ponderada <strong>{brl(opportunities.data?.summary.weighted)}</strong>
               </span>
             )}
           </div>
         </ToolbarEnd>
       </Toolbar>
-      <div className="crm-filters">
-        <select aria-label="Responsável" value={owner} onChange={(e) => setOwner(e.target.value)}>
-          <option value="">Todos os responsáveis</option>
-          <option value="none">Sem responsável</option>
-          {userList.map((u) => <option value={u.id} key={u.id}>{u.name}</option>)}
-        </select>
-        <select aria-label="Origem" value={origin} onChange={(e) => setOrigin(e.target.value)}>
-          <option value="">Todas as origens</option>
-          {sources.map((o) => <option value={o} key={o}>{o}</option>)}
-        </select>
-        <select aria-label="Previsão de fechamento" value={period} onChange={(e) => setPeriod(e.target.value)}>
-          {PERIODS.map((p) => <option value={p.value} key={p.value}>{p.label}</option>)}
-        </select>
-        <span className="money-range">
-          <input type="number" inputMode="decimal" min={0} aria-label="Valor mínimo" placeholder="Valor mín." value={minValue} onChange={(e) => setMinValue(e.target.value)} />
-          <input type="number" inputMode="decimal" min={0} aria-label="Valor máximo" placeholder="Valor máx." value={maxValue} onChange={(e) => setMaxValue(e.target.value)} />
-        </span>
-        {status === 'open' && (
-          <label className="checkbox-label"><input type="checkbox" checked={attentionOnly} disabled={!followups.data || !!followups.error} onChange={e => setAttentionOnly(e.target.checked)} />Precisam de acompanhamento{followups.data ? ` (${followups.data.total})` : ''}</label>
-        )}
-        {(hasFilters || attentionOnly) && (
-          <button type="button" className="link-btn" onClick={() => { setOwner(''); setOrigin(''); setPeriod(''); setMinValue(''); setMaxValue(''); setSearch(''); setAttentionOnly(false); }}>Limpar filtros</button>
-        )}
+      {(followups.error || opportunities.data?.total === 0) && <div className="crm-filters">
         {followups.error && <span role="status" className="crm-hint">Não foi possível carregar os alertas de acompanhamento.</span>}
-        {!contactList.length && !contacts.isLoading && <span className="crm-hint">Cadastre o primeiro contato em <Link href="/contatos">Contatos</Link> para iniciar uma negociação.</span>}
-      </div>
+        {opportunities.data?.total === 0 && <span className="crm-hint">Cadastre o primeiro contato em <Link href="/contatos">Contatos</Link> para iniciar uma negociação.</span>}
+      </div>}
       <DataState
-        loading={opportunities.isLoading || stages.isLoading || contacts.isLoading}
-        error={opportunities.error || stages.error || contacts.error}
+        loading={opportunities.isLoading || stages.isLoading}
+        error={opportunities.error || stages.error}
       >
         {!stagesList.length ? (
           <EmptyState
@@ -307,110 +283,10 @@ export default function CRMPage() {
             title="Configure seu funil"
             action={<Link className="btn btn-primary" href="/configuracoes?tab=funis">Configurar etapas</Link>}
           />
-        ) : view === 'list' ? (
-          <Card as="section" className="card-fill">
-            <div className="table-wrap fill">
-              <table className="data-table deal-table">
-                <thead>
-                  <tr>
-                    {([['title', 'Negócio'], ['stage', 'Etapa'], ['amount', 'Valor'], ['close', 'Previsão'], ['owner', 'Responsável'], ['stale', 'Parado há']] as [SortKey, string][]).map(([key, label]) => (
-                      <th key={key} aria-sort={sort.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
-                        <button type="button" onClick={() => sortBy(key)}>{label}{sort.key === key && (sort.dir === 1 ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}</button>
-                      </th>
-                    ))}
-                    <th className="text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedRows.map((r) => {
-                    const stale = r.status === 'open' ? staleDays(r) : null;
-                    const overdue = r.status === 'open' && r.expected_close_date && r.expected_close_date < t0;
-                    return (
-                      <tr key={r.id} onClick={() => setSelected(r)}>
-                        <td><strong>{r.title}</strong><small>{who(r)}</small></td>
-                        <td>{stageName(r.stage_id)}</td>
-                        <td>{brl(r.amount)}</td>
-                        <td className={overdue ? 'text-danger' : ''}>{overdue ? 'Vencida · ' : ''}{day(r.expected_close_date)}</td>
-                        <td>{ownerName(r.owner_id) || 'Sem responsável'}</td>
-                        <td className={stale !== null && stale >= 14 ? 'text-danger' : ''}>{stale === null ? '—' : stale === 0 ? 'Hoje' : `${stale} ${stale === 1 ? 'dia' : 'dias'}`}</td>
-                        <td>{renderActions(r, true)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              {!rows.length && <EmptyState icon={<Handshake />} title="Nenhum negócio encontrado" description={hasFilters ? 'Ajuste ou limpe os filtros.' : undefined} />}
-            </div>
-          </Card>
-        ) : (
-          <KanbanBoard>
-            {stagesList.map((stage) => {
-              const cards = rows.filter((r) => r.stage_id === stage.id);
-              const total = cards.reduce((s, r) => s + Number(r.amount), 0);
-              const chance = stage.probability as number | null | undefined;
-              return (
-                <KanbanColumn
-                  key={stage.id}
-                  title={stage.name}
-                  dot={stage.color}
-                  count={cards.length}
-                  meta={<>
-                    <span>{brl(total)}</span>
-                    {status === 'open' && chance !== null && chance !== undefined && <small>{chance}% · ponderado {brl(total * chance / 100)}</small>}
-                  </>}
-                  items={cards}
-                  empty="Nenhum negócio"
-                  onAdd={status === 'open' ? () => { setNewStage(stage.id); setEditing(null); } : undefined}
-                  addLabel={'Novo negócio em ' + stage.name}
-                  onDropId={
-                    status === 'open'
-                      ? (id) => {
-                          const row = rows.find((r) => r.id === id);
-                          if (row && row.stage_id !== stage.id && row.status === 'open') void move(row, stage.id);
-                        }
-                      : undefined
-                  }
-                  render={(row) => {
-                    const open = row.status === 'open';
-                    const stale = open ? staleDays(row) : null;
-                    const inStage = open ? inStageDays(row) : null;
-                    const overdue = open && row.expected_close_date && row.expected_close_date < t0;
-                    const reason = open ? attention.get(row.id)?.reason : undefined;
-                    return (
-                      <KanbanCard key={row.id} id={row.id} draggable={open} onOpen={() => setSelected(row)} onMove={(d) => moveBy(row, d)} onDragState={(d) => setDragId(d ? row.id : null)}>
-                        <KanbanCardTitle title={row.title} onClick={() => setSelected(row)} />
-                        <KanbanCardText>{who(row)}</KanbanCardText>
-                        {(reason || stale !== null) && (
-                          <div className="deal-chips">
-                            {reason && <span className={'deal-attention ' + reason} title={followUpReasons[reason]}>{followUpReasons[reason]}</span>}
-                            {stale !== null && stale >= 7
-                              ? <span className={'deal-chip ' + (stale >= 14 ? 'danger' : 'warn')} title="Dias desde a última atividade ou mudança de etapa">Parado há {stale} dias</span>
-                              : inStage !== null && <span className="deal-chip" title="Tempo nesta etapa">{inStage === 0 ? 'Na etapa hoje' : `${inStage} ${inStage === 1 ? 'dia' : 'dias'} na etapa`}</span>}
-                          </div>
-                        )}
-                        <KanbanCardMeta>
-                          <strong>{brl(row.amount)}</strong>
-                          <small title="Previsão de fechamento" className={'deal-date' + (overdue ? ' overdue' : '')}>
-                            <CalendarDays size={13} /> {overdue ? 'Vencida · ' : ''}{day(row.expected_close_date)}
-                          </small>
-                          {open && (
-                            <label className="stage-menu" title="Mover para outra etapa">
-                              <ChevronsUpDown size={15} />
-                              <select aria-label={'Etapa de ' + row.title} value={row.stage_id} onChange={(e) => void move(row, e.target.value)}>
-                                {stagesList.map((s) => <option value={s.id} key={s.id}>{s.name}</option>)}
-                              </select>
-                            </label>
-                          )}
-                        </KanbanCardMeta>
-                        {renderActions(row)}
-                      </KanbanCard>
-                    );
-                  }}
-                />
-              );
-            })}
-          </KanbanBoard>
-        )}
+        ) : <DealViews view={view} rows={rows} stagesList={stagesList} sort={sort} sortBy={sortBy}
+          onSelect={setSelected} onAdd={stage => { setNewStage(stage); setEditing(null); }} onDrag={setDragId}
+          move={move} moveBy={moveBy} renderActions={renderActions} who={who} stageName={stageName} ownerName={ownerName}
+          t0={t0} hasFilters={hasFilters} summary={opportunities.data?.summary} status={status} attention={attention} dragging={!!dragId} /> }
       </DataState>
       {dragId && status === 'open' && view === 'board' && (
         <div className="drop-zones" aria-hidden="true">
@@ -429,6 +305,10 @@ export default function CRMPage() {
           ))}
         </div>
       )}
+      {opportunities.data && opportunities.data.pages > 1 && <Pager page={opportunities.page - 1} pages={Math.max(1, opportunities.data.pages)}
+        onChange={page => opportunities.setPage(page + 1)} total={opportunities.data.total}
+        from={opportunities.data.total ? (opportunities.page - 1) * opportunities.size + 1 : 0}
+        to={Math.min(opportunities.data.total, opportunities.page * opportunities.size)} />}
       <RecordActivityDialog record={followup} onClose={() => setFollowup(null)} />
       <SendWhatsAppDialog target={whatsapp} connected={!!connection.data?.connected} onClose={() => setWhatsapp(null)} />
       <FormDialog
@@ -448,7 +328,7 @@ export default function CRMPage() {
           };
           await (editing ? patch('/opportunities/' + editing.id, body) : post('/opportunities', body));
           await refreshAll();
-          if (editing && selected?.id === editing.id) setSelected({ ...selected, ...body } as Row);
+          if (editing && selected?.id === editing.id) setSelected({ ...selected, ...body } as Opportunity);
           setEditing(undefined);
           notify('Negócio salvo.');
         }}
@@ -460,7 +340,7 @@ export default function CRMPage() {
             <strong className="crm-detail-value">{brl(selected?.amount)}</strong>
             {selected?.status === 'won' && (projectOf
               ? <Link className="btn btn-secondary" href={'/projetos/' + projectOf.id}>Abrir projeto</Link>
-              : <Button variant="secondary" onClick={async () => { try { const created = await post('/projects', { opportunity_id: selected.id }); await refreshAll(); router.push('/projetos/' + created.id); } catch (e) { notify((e as Error).message, 'error'); } }}>Criar projeto</Button>)}
+              : <Button variant="secondary" onClick={async () => { try { const created = await post<{ id: string }>('/projects', { opportunity_id: selected.id }); await refreshAll(); router.push('/projetos/' + created.id); } catch (e) { notify((e as Error).message, 'error'); } }}>Criar projeto</Button>)}
             {selected && waTarget(selected) && (
               <Button variant="secondary" onClick={() => setWhatsapp(waTarget(selected))}>
                 <MessageCircle size={15} /> WhatsApp
@@ -572,7 +452,7 @@ export default function CRMPage() {
           <section className="record-section">
             <h3>Histórico de etapas</h3>
             <DataState loading={detail.isLoading} error={detail.error}>
-              {(detail.data?.history || []).map((h: Row) => (
+              {(detail.data?.history || []).map((h) => (
                 <p key={h.id} className="muted">
                   {day(h.created_at)} · {stagesList.find((s) => s.id === h.to_stage_id)?.name || 'Etapa'}
                 </p>

@@ -72,7 +72,7 @@ export function ContactImportDialog({ open, onClose }: { open: boolean; onClose:
   async function run() {
     setRunning(true); setError('');
     try {
-      const data = await post('/contacts/import/run', body());
+      const data = await post<Row>('/contacts/import/run', body());
       setResult(data);
       await refreshAll();
       notify(`${data.imported} contato(s) importado(s).`);

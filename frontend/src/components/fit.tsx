@@ -144,6 +144,7 @@ export function PagedTable<T>({
   rowHeight = TABLE_ROW,
   fallback = 8,
   className = '',
+  pagination,
 }: {
   rows: T[];
   header: ReactNode;
@@ -151,9 +152,15 @@ export function PagedTable<T>({
   rowHeight?: number;
   fallback?: number;
   className?: string;
+  pagination?: { page: number; per_page: number; pages: number; total: number; onChange: (page: number) => void };
 }) {
   const { ref, count } = useFitCount(rowHeight, { head: TABLE_HEAD, fallback });
-  const pager = usePager(rows, count);
+  const local = usePager(rows, count);
+  const pager = pagination ? { ...pagination, page: pagination.page - 1, pages: Math.max(1, pagination.pages),
+    from: pagination.total ? (pagination.page - 1) * pagination.per_page + 1 : 0,
+    to: Math.min(pagination.total, pagination.page * pagination.per_page), rows,
+    setPage: (page: number) => pagination.onChange(page + 1),
+  } : local;
   return (
     <>
       <div ref={ref} className={'fit-area ' + className}>

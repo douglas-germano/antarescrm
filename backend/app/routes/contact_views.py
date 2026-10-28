@@ -17,6 +17,8 @@ class Filters(StrictSchema):
     owner = f.String(validate=validate.Length(max=36), load_default='')
     company = f.String(validate=validate.Length(max=36), load_default='')
     source = f.String(validate=validate.Length(max=100), load_default='')
+    tag = f.String(validate=validate.Length(max=80), load_default='')
+    email = f.String(validate=validate.OneOf(['', 'true', 'false']), load_default='')
 
 
 class ViewSchema(StrictSchema):

@@ -63,6 +63,7 @@ export function AuthForm() {
             {busy ? <><Loader2 size={18} className="spin" />Entrando…</> : <>Entrar<ArrowRight size={18} /></>}
           </button>
         </form>
+        <nav className="login-legal" aria-label="Recuperação de acesso"><Link href="/recuperar-acesso">Esqueci minha senha</Link></nav>
         <nav className="login-legal" aria-label="Informações legais"><Link href="/privacidade">Privacidade</Link><Link href="/termos">Termos</Link><Link href="/exclusao-de-dados">Exclusão de dados</Link></nav>
       </section>
     </main>

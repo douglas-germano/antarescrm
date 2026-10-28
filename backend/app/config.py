@@ -5,7 +5,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(os.getenv('ANTARES_ENV_FILE') or None)
 
 
 def normalize_database_url(value):
@@ -32,6 +32,12 @@ class Config:
     RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
     JSON_SORT_KEYS = False
     COMMUNICATION_ACCOUNTS = json.loads(os.getenv('COMMUNICATION_ACCOUNTS', '{}'))
+    APP_URL = os.getenv('APP_URL', 'https://antares.douglasgermano.com').rstrip('/')
+    BREVO_ENCRYPTION_KEY = os.getenv('BREVO_ENCRYPTION_KEY')
+    # Optional platform sender for access links only. Campaigns always use their own workspace connection.
+    BREVO_SYSTEM_API_KEY = os.getenv('BREVO_SYSTEM_API_KEY')
+    BREVO_SYSTEM_SENDER_EMAIL = os.getenv('BREVO_SYSTEM_SENDER_EMAIL')
+    BREVO_SYSTEM_SENDER_NAME = os.getenv('BREVO_SYSTEM_SENDER_NAME', 'Antares CRM')
     # WhatsApp — Evolution API (one instance per workspace, one server for all)
     EVOLUTION_API_URL = os.getenv('EVOLUTION_API_URL')
     EVOLUTION_API_KEY = os.getenv('EVOLUTION_API_KEY')

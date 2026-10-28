@@ -194,6 +194,7 @@ def calendar():
                 'id': row.id,
                 'title': row.title,
                 'date': row.due_date.isoformat(),
+                'owner_id': row.assignee_id,
                 'contact_id': row.contact_id,
                 'opportunity_id': row.opportunity_id,
             }
@@ -219,6 +220,7 @@ def calendar():
                 'id': row.id,
                 'title': row.title,
                 'date': row.scheduled_at.isoformat(),
+                'owner_id': row.owner_id,
                 'contact_id': row.contact_id,
                 'contact_name': contacts.get(row.contact_id),
                 'opportunity_id': row.opportunity_id,

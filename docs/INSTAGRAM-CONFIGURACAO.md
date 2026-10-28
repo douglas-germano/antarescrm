@@ -32,3 +32,16 @@ Renovação é manual nesta entrega; não há serviço de renovação periódica
 Build `_X7iGgbQ9vlH-eYNFsP0z`. Migração PostgreSQL aplicada com contagens de registros preexistentes e formulários ativos preservados. Backend: 105 testes aprovados e 7 ignorados por requisitos de ambiente. Gateway/Instagram: 16 testes aprovados. Build e tipos aprovados. Perfil confirmado pela API v25.0. API autenticada e gateway público retornaram conexão configurada, sem expor token. Evento vazio assinado retornou 200; requisição sem assinatura retornou 401. Nenhuma DM de teste foi enviada e nenhum lead sintético foi criado em produção.
 
 Tela Conexões conferida com perfil e controles reais; em largura de 390 px, documento mede 390 px, sem overflow horizontal. Captura local: output/playwright/instagram-connections.png. Sessão temporária de inspeção encerrada e arquivo de autenticação removido. OAuth real e conversa real continuam pendentes de ação do titular no Instagram.
+
+## Mensagens enviadas pelo aplicativo Instagram
+
+O recebimento distingue a mensagem do cliente da mensagem enviada pelo próprio perfil conectado.
+Eventos de saída (`sender.id` igual ao perfil da conta, incluindo `is_echo`) são gravados na mesma conversa,
+com direção `out`, sem criar leads, iniciar automações ou abrir a janela de resposta de 24 horas.
+O identificador da mensagem do Instagram evita duplicar os envios já registrados pelo Antares, inclusive
+quando o webhook chega antes de a API confirmar o envio.
+
+A função `recover_outgoing_events(connection)` permite materializar eventos de saída que a versão antiga
+preservou em `instagram_events` sem exibir nas conversas. A execução é transacional, não chama a API de envio
+e pode ser repetida: mensagens existentes são ignoradas. Anexos preservados sem texto aparecem como
+`[Anexo enviado no Instagram]`; isso não equivale a armazenar o arquivo binário original.

@@ -12,22 +12,25 @@ daquele domínio (projetos, financeiro, cobrança, assistente de IA).
 ## Primeira execução
 
 ```bash
-createdb antarescrm
-cd backend
-python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-cp .env.example .env            # defina SECRET_KEY e JWT_SECRET_KEY
-.venv/bin/flask --app run db upgrade
-DEMO_PASSWORD='uma-senha-longa' .venv/bin/flask --app run seed-demo   # opcional: workspace "demo"
-cd ../frontend && npm install
+createdb antares_test_dev
+python3 -m venv backend/.venv
+backend/.venv/bin/pip install -r backend/requirements-dev.txt
+cp backend/.env.development.example backend/.env.development
+cd frontend && npm ci
 ```
 
-## Rodar
+Na raiz, execute `./scripts/dev.sh`. A interface abre em http://127.0.0.1:3003 e a API em :5003.
+O script aplica migrações apenas ao banco local `antares_test_*` ou terminado em `_dev`, usa `.next-dev`
+e ignora as credenciais de produção. Portas 3002/5002 são recusadas. Ctrl+C encerra somente os processos iniciados pelo script.
+
+Para criar dados de demonstração no banco isolado (opcional):
 
 ```bash
-./scripts/dev.sh        # API em :5002, web em :3002 (ajustável com API_PORT / WEB_PORT)
+cd backend
+ANTARES_ENV_FILE=.env.development DATABASE_URL=postgresql+psycopg:///antares_test_dev DEMO_PASSWORD='uma-senha-longa' .venv/bin/flask --app run seed-demo
 ```
 
-Acesse http://localhost:3002 — workspace `demo`, e-mail `admin@antarescrm.local`.
+Login de demonstração: workspace `demo`, e-mail `admin@antarescrm.local`.
 
 ## Estrutura do código
 
@@ -127,26 +130,30 @@ e nas variáveis do LaunchAgent. Logs em `.local-services/`.
 O Mac precisa permanecer ligado, conectado e com a sessão do usuário iniciada.
 Não execute `scripts/dev.sh` nas mesmas portas enquanto estes serviços estiverem ativos.
 
-Recompilar o frontend após alterações:
+Preparar uma versão para publicação, sem modificar os serviços ativos:
 
 ```bash
-cd frontend
-NEXT_DIST_DIR=.next-public npm run build
-launchctl kickstart -k gui/$(id -u)/com.antarescrm.frontend
+./scripts/deploy-prod.sh prepare
 ```
 
-Reiniciar um serviço (substitua `frontend` por `backend` ou `tunnel`, se necessário):
+A preparação cria uma pasta privada em `~/.antarescrm-releases/`, instala dependências próprias e compila
+`.next-public` nessa pasta. O comando imprime o caminho da versão. Para publicar a versão preparada:
 
 ```bash
-launchctl kickstart -k gui/$(id -u)/com.antarescrm.frontend
+./scripts/deploy-prod.sh activate /caminho/absoluto/da/release
 ```
 
-Parar ou iniciar o túnel manualmente:
+A ativação faz backup com restauração de prova, para os serviços durante a migração e muda os LaunchAgents
+para a nova versão. Código, ambiente Python, dependências Node e build anteriores permanecem na pasta anterior.
+O worker só retorna após os testes de saúde. O túnel não é alterado.
+Se uma migração falhar ou a versão com mudança de schema não passar na verificação, os serviços permanecem
+parados para recuperação controlada. **O banco nunca é restaurado automaticamente**, para preservar dados recentes.
+Sem mudança de schema, uma falha retoma a versão anterior completa.
 
-```bash
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.antarescrm.tunnel.plist
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.antarescrm.tunnel.plist
-```
+Os comandos acima são operações de publicação; executar os testes ou editar o checkout não publica uma versão.
+Detalhes em [docs/ESTRUTURA-E-OPERACAO.md](docs/ESTRUTURA-E-OPERACAO.md).
+
+A Caixa de entrada reúne pendências de WhatsApp, Instagram, e-mail e SMS, com contador na navegação, leitura por usuário e avisos opcionais do navegador. Consulte [docs/NOTIFICACOES.md](docs/NOTIFICACOES.md).
 
 ## Acompanhamento comercial
 

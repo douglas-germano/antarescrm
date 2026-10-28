@@ -4,7 +4,7 @@ const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 const failure = (message: string, status: number) => json({ error: { message } }, status);
 function base(env: GatewayEnv) {
-  const value = env.FLASK_API_URL || 'http://127.0.0.1:5001/api/v1';
+  const value = env.FLASK_API_URL || 'http://127.0.0.1:5003/api/v1';
   const url = new URL(value);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash)
     throw new Error('FLASK_API_URL inválida.');
@@ -104,6 +104,32 @@ export async function handleSession(request: Request, action: string, env: Gatew
     return failure('O servidor está indisponível. Verifique a configuração do backend.', 502);
   }
 }
+/** Public access-link actions never forward cookies or expose authentication tokens. */
+export async function handleAccess(request: Request, action: string, env: GatewayEnv): Promise<Response> {
+  if (request.method !== 'POST') return failure('Método não permitido.', 405);
+  if (!sameOrigin(request, env)) return failure('Origem inválida.', 403);
+  if (!['forgot-password', 'accept-access'].includes(action)) return failure('Rota não encontrada.', 404);
+  const body = await request.text();
+  if (body.length > 4096) return failure('Solicitação muito grande.', 413);
+  try {
+    const response = await fetch(`${base(env)}/auth/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body, cache: 'no-store', signal: AbortSignal.timeout(20000) });
+    return json(await response.json(), response.status);
+  } catch { return failure('Serviço indisponível. Tente novamente.', 502); }
+}
+
+export async function handleBrevoWebhook(request: Request, connectionId: string, env: GatewayEnv): Promise<Response> {
+  if (request.method !== 'POST') return failure('Método não permitido.', 405);
+  if (!/^[a-f0-9-]{36}$/i.test(connectionId)) return failure('Caminho inválido.', 400);
+  const body = await request.arrayBuffer();
+  if (body.byteLength > 262144) return failure('Evento muito grande.', 413);
+  try {
+    const response = await fetch(`${base(env)}/brevo/webhook/${connectionId}`, { method: 'POST', body,
+      headers: { 'Content-Type': 'application/json', 'X-Brevo-Secret': request.headers.get('X-Brevo-Secret') || '' },
+      cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    return json(await response.json(), response.status);
+  } catch { return failure('Serviço indisponível.', 502); }
+}
 export async function handleBackend(request: Request, path: string[], env: GatewayEnv, sessionSwitch = false): Promise<Response> {
   if (!['GET', 'HEAD', 'POST', 'PATCH', 'DELETE'].includes(request.method)) return failure('Método não permitido.', 405);
   if (!sameOrigin(request, env)) return failure('Origem inválida.', 403);
@@ -124,7 +150,7 @@ export async function handleBackend(request: Request, path: string[], env: Gatew
         ...(request.headers.get('range') ? { Range: request.headers.get('range')! } : {}),
       },
       body, cache: 'no-store',
-      signal: AbortSignal.timeout(['whatsapp', 'instagram'].includes(path[0]) || path[0] === 'inbox' ? 60000 : 20000),
+      signal: AbortSignal.timeout(['whatsapp', 'instagram', 'campaigns'].includes(path[0]) || path[0] === 'inbox' ? 60000 : 20000),
     });
     let upstream = await call(access);
     let renewed: any = null;

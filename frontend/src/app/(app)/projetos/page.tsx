@@ -1,11 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CalendarDays, CheckCircle2, FileText, FolderKanban, LayoutGrid, List, Plus } from 'lucide-react';
+import { AlertCircle, ArrowRightLeft, CalendarDays, CheckCircle2, ExternalLink, FileText, FolderKanban, LayoutGrid, List, Plus, SlidersHorizontal, X } from 'lucide-react';
 import { useData, useList, post, patch, refreshAll } from '@/lib/api';
-import { brl, day, rowOptions, searchMatch, today } from '@/lib/format';
+import { brl, day, initials, rowOptions, searchMatch, today } from '@/lib/format';
 import { useNotify, useSession } from '@/components/providers';
-import { Badge, Button, DataState, EmptyState, FormDialog, PageHeader, SearchInput } from '@/components/ui';
+import { Badge, Button, DataState, EmptyState, FormDialog, PageHeader, Popover, SearchInput } from '@/components/ui';
 import { Card, KanbanBoard, KanbanCard, KanbanCardMeta, KanbanCardText, KanbanCardTitle, KanbanColumn, Tabs, Toolbar, ToolbarEnd } from '@/components/blocks';
 import { STATUS } from '@/components/projects/model';
 import type { Field, Row } from '@/lib/types';
@@ -17,6 +17,7 @@ export default function ProjectsPage() {
   const [status, setStatus] = useState('active');
   const [search, setSearch] = useState('');
   const [owner, setOwner] = useState('');
+  const [lateOnly, setLateOnly] = useState(false);
   const [view, setView] = useState<'board' | 'list'>('board');
   const [creating, setCreating] = useState(false);
   const stages = useData<{ items: Row[] }>('/project-stages');
@@ -26,9 +27,12 @@ export default function ProjectsPage() {
   useEffect(() => { try { if (localStorage.getItem('antares.projects.view') === 'list') setView('list'); } catch { /* optional */ } }, []);
   const changeView = (next: 'board' | 'list') => { setView(next); try { localStorage.setItem('antares.projects.view', next); } catch { /* optional */ } };
   const t0 = today();
+  const overdue = (p: Row) => p.status === 'active' && p.due_date && p.due_date < t0;
+  const activeFilters = [owner, lateOnly].filter(Boolean).length;
   const rows = (projects.data || [])
     .filter((p) => status === 'all' || p.status === status)
     .filter((p) => !owner || p.owner_id === owner)
+    .filter((p) => !lateOnly || overdue(p))
     .filter((p) => searchMatch(search, [p.title, p.contact_name, p.company_name]));
   const stageList = stages.data?.items || [];
   const dealsWithoutProject = (wonDeals.data || []).filter((d) => !(projects.data || []).some((p) => p.opportunity_id === d.id));
@@ -49,20 +53,27 @@ export default function ProjectsPage() {
     try { await patch('/projects/' + project.id, { stage_id: stageId }); await refreshAll(); }
     catch (e) { notify((e as Error).message, 'error'); }
   }
-  const overdue = (p: Row) => p.status === 'active' && p.due_date && p.due_date < t0;
+  const shortDay = (value: string) => value.slice(8, 10) + '/' + value.slice(5, 7);
+  const open = (p: Row) => router.push('/projetos/' + p.id);
 
   return (
     <div className="page projects-page">
-      <PageHeader compact title="Projetos de clientes">
+      <PageHeader compact title="Projetos">
         <Button onClick={() => setCreating(true)}><Plus size={17} /> Novo projeto</Button>
       </PageHeader>
       <Toolbar>
         <Tabs label="Situação" value={status} onChange={setStatus} items={[{ value: 'active', label: 'Em andamento' }, { value: 'done', label: 'Concluídos' }, { value: 'all', label: 'Todos' }]} />
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar projeto ou cliente" />
-        <select aria-label="Responsável" value={owner} onChange={(e) => setOwner(e.target.value)}>
-          <option value="">Todos os responsáveis</option>
-          {(users.data || []).filter((u) => u.active).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-        </select>
+        <Popover label="Filtros" icon={<SlidersHorizontal size={15} />} variant="soft" panelClassName="filter-panel"
+          badge={activeFilters ? <span className="popover-badge">{activeFilters}</span> : undefined}>{() => <>
+          <label className="field"><span>Responsável</span>
+            <select value={owner} onChange={(e) => setOwner(e.target.value)}>
+              <option value="">Todos os responsáveis</option>
+              {(users.data || []).filter((u) => u.active).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select></label>
+          <label className="checkbox-label"><input type="checkbox" checked={lateOnly} onChange={(e) => setLateOnly(e.target.checked)} />Só atrasados</label>
+        </>}</Popover>
+        {(search || activeFilters > 0) && <Button variant="ghost" onClick={() => { setSearch(''); setOwner(''); setLateOnly(false); }}><X size={14} />Limpar</Button>}
         <Tabs label="Visualização" value={view} onChange={changeView} items={[{ value: 'board', label: 'Quadro', icon: <LayoutGrid size={14} /> }, { value: 'list', label: 'Lista', icon: <List size={14} /> }]} />
         <ToolbarEnd>
           <div className="summary-inline">
@@ -84,7 +95,7 @@ export default function ProjectsPage() {
                 <tbody>
                   {rows.map((p) => (
                     <tr key={p.id} className="clickable" onClick={() => router.push('/projetos/' + p.id)}>
-                      <td><strong>{p.title}</strong>{p.pending_approvals > 0 && <small className="text-danger">{p.pending_approvals} aprovação(ões) aguardando</small>}</td>
+                      <td><strong>{p.title}</strong>{p.pending_approvals > 0 && <small className="text-danger">{p.pending_approvals} {p.pending_approvals === 1 ? 'aprovação aguardando' : 'aprovações aguardando'}</small>}</td>
                       <td>{p.contact_name || p.company_name || '—'}</td>
                       <td><span className="stage-pill"><i style={{ background: p.stage?.color }} />{p.stage?.name}</span></td>
                       <td>{brl(p.amount)}</td>
@@ -104,25 +115,39 @@ export default function ProjectsPage() {
               const cards = rows.filter((p) => p.stage?.id === stage.id);
               return (
                 <KanbanColumn key={stage.id} title={stage.name} dot={stage.color} count={cards.length}
-                  meta={<span>{brl(cards.reduce((s, p) => s + Number(p.amount), 0))}</span>} items={cards} empty="Nenhum projeto"
+                  total={brl(cards.reduce((s, p) => s + Number(p.amount), 0))} items={cards} empty="Nenhum projeto"
                   onDropId={(id) => { const project = rows.find((p) => p.id === id); if (project) void move(project, stage.id); }}
-                  render={(p) => (
-                    <KanbanCard key={p.id} id={p.id} draggable onOpen={() => router.push('/projetos/' + p.id)}>
-                      <KanbanCardTitle title={p.title} onClick={() => router.push('/projetos/' + p.id)} />
-                      <KanbanCardText>{p.contact_name || p.company_name || 'Sem cliente'}</KanbanCardText>
-                      {(p.pending_approvals > 0 || p.status !== 'active') && (
-                        <div className="deal-chips">
-                          {p.pending_approvals > 0 && <span className="deal-chip warn">Aguardando aprovação</span>}
-                          {p.status === 'done' && <span className="deal-chip"><CheckCircle2 size={11} /> Concluído</span>}
+                  render={(p) => {
+                    const flag = p.pending_approvals > 0 ? 'awaiting_approval' : overdue(p) ? 'overdue_action' : undefined;
+                    const flagLabel = p.pending_approvals > 0
+                      ? (p.pending_approvals === 1 ? '1 aprovação aguardando o cliente' : `${p.pending_approvals} aprovações aguardando o cliente`)
+                      : 'Prazo de entrega atrasado';
+                    return (
+                      <KanbanCard key={p.id} id={p.id} draggable={p.status === 'active'} attention={flag} done={p.status === 'done'} onOpen={() => open(p)}>
+                        <div className="project-card-title">
+                          <KanbanCardTitle title={p.title} onClick={() => open(p)} />
+                          {p.status === 'done' && <span className="project-done" data-tip="Concluído" data-tip-align="end" aria-label="Concluído"><CheckCircle2 size={14} /></span>}
                         </div>
-                      )}
-                      <KanbanCardMeta>
-                        <strong>{brl(p.amount)}</strong>
-                        {p.due_date && <small className={'deal-date' + (overdue(p) ? ' overdue' : '')} title="Prazo de entrega"><CalendarDays size={13} /> {overdue(p) ? 'Atrasado · ' : ''}{day(p.due_date)}</small>}
-                        {p.files_count > 0 && <small title="Arquivos"><FileText size={13} /> {p.files_count}</small>}
-                      </KanbanCardMeta>
-                    </KanbanCard>
-                  )} />
+                        <KanbanCardText>{p.contact_name || p.company_name || 'Sem cliente'}</KanbanCardText>
+                        <KanbanCardMeta>
+                          <strong>{brl(p.amount)}</strong>
+                          {p.due_date && <small className={'deal-date' + (overdue(p) ? ' overdue' : '')} data-tip={(overdue(p) ? 'Prazo atrasado: ' : 'Prazo de entrega: ') + day(p.due_date)}><CalendarDays size={12} />{shortDay(p.due_date)}</small>}
+                          {p.files_count > 0 && <small data-tip={p.files_count === 1 ? '1 arquivo' : `${p.files_count} arquivos`}><FileText size={12} />{p.files_count}</small>}
+                          {flag && <span className={'deal-flag ' + flag} data-tip={flagLabel} aria-label={flagLabel}><AlertCircle size={13} /></span>}
+                          {p.owner_name && <span className="owner-avatar" data-tip={p.owner_name} aria-label={'Responsável: ' + p.owner_name}>{initials(p.owner_name)}</span>}
+                        </KanbanCardMeta>
+                        <div className="deal-actions">
+                          <button type="button" className="icon-btn" data-tip="Abrir projeto" aria-label={'Abrir ' + p.title} onClick={() => open(p)}><ExternalLink size={15} /></button>
+                          {p.status === 'active' && <label className="stage-menu" data-tip="Mover para outra etapa">
+                            <ArrowRightLeft size={14} />
+                            <select aria-label={'Mover ' + p.title + ' para outra etapa'} value={p.stage?.id || ''} onChange={(e) => void move(p, e.target.value)}>
+                              {stageList.map((s) => <option value={s.id} key={s.id}>{s.name}</option>)}
+                            </select>
+                          </label>}
+                        </div>
+                      </KanbanCard>
+                    );
+                  }} />
               );
             })}
           </KanbanBoard>
@@ -134,7 +159,7 @@ export default function ProjectsPage() {
           if (!data.title && !data.opportunity_id) throw new Error('Informe o título ou escolha um negócio ganho.');
           const body: Record<string, any> = { ...data };
           for (const key of ['opportunity_id', 'contact_id', 'stage_id', 'owner_id', 'due_date', 'description', 'title']) if (!body[key]) delete body[key];
-          const created = await post('/projects', body);
+          const created = await post<{ id: string }>('/projects', body);
           await refreshAll();
           router.push('/projetos/' + created.id);
         }} />

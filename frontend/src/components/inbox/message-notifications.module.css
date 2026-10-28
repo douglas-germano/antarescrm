@@ -1,0 +1,13 @@
+.trigger { position: relative; }
+.badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 12px; background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; }
+.controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.list { list-style: none; padding: 0; margin: 0; }
+.list li { display: flex; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.list a { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; color: inherit; border-radius: 6px; }
+.list a:hover { background: var(--background); }
+.list a > svg { flex-shrink: 0; color: var(--primary); }
+.list a > div { display: grid; gap: 4px; min-width: 0; flex: 1; }
+.list strong { display: flex; align-items: center; justify-content: space-between; gap: 8px; overflow-wrap: anywhere; }
+.list strong span { font-size: 11px; color: var(--primary); }
+.list small { color: var(--muted); }
+.list p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

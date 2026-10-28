@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "test:gateway": "node --experimental-strip-types --test tests/*.test.mjs"
+    "test:gateway": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:browser": "node --test browser-tests/*.test.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
@@ -23,9 +24,15 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "playwright": "^1.64.1",
     "typescript": "^5.9.0"
   },
   "engines": {
     "node": ">=22.18.0"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.31"
+    }
   }
 }

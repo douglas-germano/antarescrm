@@ -1,4 +1,5 @@
 import type { Conditions } from '@/components/automations/conditions-editor';
+import { emptyConditions } from '@/components/automations/conditions-editor';
 
 export const EVENTS: Record<string, { label: string; hint: string }> = {
   'contact.created': { label: 'Contato criado', hint: 'Um novo contato entra na conta.' },
@@ -91,3 +92,25 @@ export const RECIPES = [
     { kind: 'reply_comment', content: 'Oi, {{name}}! Te enviei os detalhes no direct.', delay_minutes: 0, due_days: 0 },
     { kind: 'private_reply', content: 'Olá! Obrigado pelo interesse. Como posso te ajudar?', delay_minutes: 0, due_days: 0 }] },
 ] as { name: string; event: string; steps: Step[]; conditions?: Conditions }[];
+
+/** Fields each action needs before the rule can be saved; returns the first problem or null. */
+export function stepProblem(step: Step): string | null {
+  if (step.kind === 'send_message' && !step.template_id) return 'Escolha o modelo de mensagem.';
+  if ((step.kind === 'reply_comment' || step.kind === 'private_reply') && !step.content?.trim()) return 'Escreva o texto da resposta.';
+  if (step.kind === 'add_tag' && !step.tag?.trim()) return 'Informe a tag.';
+  if (step.kind === 'move_stage' && !step.stage_id) return 'Escolha a etapa de destino.';
+  if ((step.kind === 'create_task' || step.kind === 'follow_up') && !step.title?.trim()) return 'Informe o título.';
+  return null;
+}
+
+/** The API payload for one step: only the fields its action uses. */
+export function stepPayload(step: Step) {
+  return {
+    conditions: step.conditions || emptyConditions(), kind: step.kind, delay_minutes: step.delay_minutes, due_days: step.due_days,
+    ...(step.kind === 'send_message' ? { template_id: step.template_id }
+      : step.kind === 'reply_comment' || step.kind === 'private_reply' ? { content: step.content }
+      : step.kind === 'add_tag' ? { tag: step.tag }
+      : step.kind === 'move_stage' ? { stage_id: step.stage_id }
+      : { title: step.title }),
+  };
+}

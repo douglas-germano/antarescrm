@@ -22,14 +22,29 @@ export const toLocalInput = (value: string) => {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
+/** First letter of the first two words that have letters: "Bianca - Rio Turbo" → "BR", "Agro 2 Irmãos" → "AI". */
 export const initials = (name = '') =>
   name
-    .split(' ')
+    .split(/\s+/)
+    .map((word) => word.match(/\p{L}/u)?.[0])
     .filter(Boolean)
     .slice(0, 2)
-    .map((n) => n[0])
     .join('')
     .toUpperCase();
+/** CNPJ as 12.345.678/0001-90; anything that is not 14 digits is returned unchanged. */
+export const formatCnpj = (value?: string | null) => {
+  const digits = (value || '').replace(/\D/g, '');
+  return digits.length === 14 ? digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : value || '';
+};
+/** Imported contacts often carry the phone number as their name; those have no letters at all. */
+export const hasRealName = (name = '') => /\p{L}/u.test(name);
+/** Brazilian numbers as +55 11 97074-7755; anything else is returned unchanged. */
+export const formatPhone = (value?: string | null) => {
+  if (!value) return '';
+  const digits = value.replace(/\D/g, '');
+  const match = digits.match(/^55(\d{2})(\d{4,5})(\d{4})$/);
+  return match ? `+55 ${match[1]} ${match[2]}-${match[3]}` : value;
+};
 export const roles: Record<string, string> = {
   owner: 'Proprietário',
   admin: 'Administrador',

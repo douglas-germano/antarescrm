@@ -21,8 +21,10 @@ from ..models import (
     AutomationJob,
     AutomationRule,
     AutomationRun,
+    CampaignRecipient,
     CommunicationSuppression,
     Contact,
+    EmailCampaign,
     InboxMessage,
     InboxThread,
     User,
@@ -168,7 +170,7 @@ def deliver(thread, message):
     return result.provider_id
 
 
-def dispatch(workspace_id=None, limit=20):
+def dispatch(workspace_id=None, limit=20, message_ids=None):
     processed = []
     for _ in range(limit):
         q = InboxMessage.query.filter(
@@ -176,6 +178,8 @@ def dispatch(workspace_id=None, limit=20):
         )
         if workspace_id:
             q = q.filter_by(workspace_id=workspace_id)
+        if message_ids is not None:
+            q = q.filter(InboxMessage.id.in_(message_ids))
         message = q.order_by(InboxMessage.scheduled_at).with_for_update(skip_locked=True).first()
         if not message:
             break
@@ -184,6 +188,30 @@ def dispatch(workspace_id=None, limit=20):
         contact = db.session.get(Contact, thread.contact_id) if thread.contact_id else None
 
         user = db.session.get(User, message.sent_by_id) if message.sent_by_id else None
+        campaign_allowed = True
+        if message.idempotency_key.startswith('campaign:'):
+            from .campaigns_whatsapp import audience
+
+            recipient = CampaignRecipient.query.filter_by(
+                workspace_id=message.workspace_id, message_id=message.id
+            ).first()
+            campaign = db.session.get(EmailCampaign, recipient.campaign_id) if recipient else None
+            connection = WhatsAppConnection.query.filter_by(workspace_id=message.workspace_id, state='open').first()
+            eligible, _ = audience(message.workspace_id, campaign.audience) if campaign else ([], {})
+            campaign_allowed = bool(
+                campaign
+                and campaign.channel == 'whatsapp'
+                and campaign.sent_at
+                and connection
+                and connection.id == campaign.whatsapp_connection_id
+                and user
+                and workspace
+                and workspace_role(user, workspace) in ('owner', 'admin')
+                and contact
+                and contact.id == recipient.contact_id
+                and (recipient.contact_id, recipient.phone) in {(r['contact_id'], r['phone']) for r in eligible}
+                and thread.address == recipient.phone
+            )
         automation_active = True
         if message.idempotency_key.startswith('automation:'):
             job = db.session.get(AutomationJob, message.idempotency_key.split(':', 1)[1])
@@ -191,7 +219,8 @@ def dispatch(workspace_id=None, limit=20):
             rule = db.session.get(AutomationRule, run.rule_id) if run else None
             automation_active = bool(rule and rule.active and rule.workspace_id == message.workspace_id)
         if (
-            not automation_active
+            not campaign_allowed
+            or not automation_active
             or not workspace
             or not workspace.active
             or not contact

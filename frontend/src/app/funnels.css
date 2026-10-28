@@ -12,8 +12,8 @@
 .fp-pad-md { padding-block: var(--space-4); }
 .fp-pad-lg { padding-block: var(--space-6); }
 .fp-block[data-selected] { cursor: pointer; outline: 2px solid transparent; outline-offset: -2px; }
-.fp-block[data-selected]:hover { outline-color: #e6000066; }
-.fp-block[data-selected='true'] { outline-color: #e60000; }
+.fp-block[data-selected]:hover { outline-color: var(--primary-outline); }
+.fp-block[data-selected='true'] { outline-color: var(--primary); }
 .fp-empty { padding: var(--space-6); text-align: center; opacity: .6; }
 .fp-heading { margin: 0; line-height: 1.2; text-transform: none; letter-spacing: -.02em; font-weight: 800; }
 .fp-h1 { font-size: clamp(30px, 6vw, 44px); }

@@ -1,4 +1,4 @@
-import { ArrowLeft, Link2, MessageCircle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Handshake, Link2, MessageCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { initials } from '@/lib/format';
 import type { Row } from '@/lib/types';
@@ -12,6 +12,7 @@ export function ChatHeader({
   onDetails,
   onToggleStatus,
   onSync,
+  onCreateOpportunity,
 }: {
   conversation: Row;
   canSync: boolean;
@@ -20,6 +21,7 @@ export function ChatHeader({
   onDetails: () => void;
   onToggleStatus: () => void;
   onSync: () => void;
+  onCreateOpportunity?: () => void;
 }) {
   const name = contactName(conversation);
   return (
@@ -43,6 +45,7 @@ export function ChatHeader({
         </div>
       </div>
       <div className="wa-chat-actions">
+        {onCreateOpportunity && <Button onClick={onCreateOpportunity}><Handshake size={14} />Criar negócio</Button>}
         <Button variant="secondary" onClick={onDetails}>
           <Link2 size={14} />
           Detalhes

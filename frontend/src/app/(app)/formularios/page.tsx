@@ -38,7 +38,7 @@ export default function FormsPage() {
         </div></CardBody></Card>)}</div>}
     </DataState>
     <FormDialog open={creating} onClose={() => setCreating(false)} title="Novo formulário" fields={fields} initial={{}} onSubmit={async (data) => {
-      const created = await post('/forms', { ...data, description: '' }); await refreshAll(); notify('Formulário criado. Personalize as perguntas e a aparência.'); router.push('/formularios/' + created.id);
+      const created = await post<{ id: string }>('/forms', { ...data, description: '' }); await refreshAll(); notify('Formulário criado. Personalize as perguntas e a aparência.'); router.push('/formularios/' + created.id);
     }} />
     <ConfirmDialog open={!!deleting} onClose={() => setDeleting(null)} title="Excluir formulário"
       description={`O formulário "${deleting?.name}" e o link público dele serão removidos. Formulários que já receberam solicitações ou que estão em uso em um funil não podem ser excluídos.`}

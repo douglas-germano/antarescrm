@@ -3,19 +3,19 @@ from flask import g, request
 from ...common import active, add, commit, get, page, payload, query, require, update, user_ref
 from ...models import Activity, Company, Contact, Opportunity, Task, WhatsAppConversation
 from ...schemas import ContactSchema
+from ...services import crm_lists as lists
 from ...services.automations import emit
 from . import bp
-from ._search import search
 
 
 @bp.get('/contacts')
 @require()
 def contacts():
-    q = query(Contact).filter_by(archived=request.args.get('archived') == 'true')
-    for field in ('company_id', 'owner_id'):
-        if request.args.get(field):
-            q = q.filter(getattr(Contact, field) == request.args[field])
-    return page(search(q, Contact, 'name', 'phone', 'email').order_by(Contact.name))
+    result = page(lists.contact_query(request.args))
+    lists.enrich_people(result['items'])
+    result['sources'] = lists.contact_sources()
+    result['tags'] = lists.contact_tags()
+    return result
 
 
 def validate_contact(data):

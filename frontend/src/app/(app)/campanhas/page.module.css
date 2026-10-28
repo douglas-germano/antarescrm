@@ -1,0 +1,11 @@
+.review { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, .8fr); gap: 32px; }
+.review section { min-width: 0; }
+.message { white-space: pre-wrap; overflow-wrap: anywhere; margin: 20px 0; line-height: 1.7; }
+.metrics { display: flex; flex-wrap: wrap; gap: 24px; padding: 24px 0; margin: 24px 0; border-top: 1px solid var(--border, #e8e7ed); }
+.metrics div { display: grid; gap: 6px; }
+.metrics strong { font-size: 24px; }
+.metrics small { color: var(--muted, #777380); }
+.recipients { max-height: 260px; overflow: auto; padding: 0; list-style: none; margin: 16px 0; }
+.recipients li { display: grid; gap: 4px; padding: 10px 0; overflow-wrap: anywhere; }
+.recipients small { color: var(--muted, #777380); }
+@media (max-width: 900px) { .review { grid-template-columns: minmax(0, 1fr); gap: 24px; } }

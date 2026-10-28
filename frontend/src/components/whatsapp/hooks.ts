@@ -81,7 +81,7 @@ export function useMessages(conversationId: string) {
     a.occurred_at.localeCompare(b.occurred_at),
   );
   async function loadOlder() {
-    const next = await api(
+    const next = await api<{ items: Row[]; page: number; pages: number; total: number }>(
       `/whatsapp/conversations/${conversationId}/messages?per_page=${MESSAGES_PER_PAGE}&page=${older.length / MESSAGES_PER_PAGE + 2}`,
     );
     setOlder((rows) => [...rows, ...next.items]);

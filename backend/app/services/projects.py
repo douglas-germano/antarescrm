@@ -5,11 +5,12 @@ import hashlib
 import secrets
 import uuid
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from flask import current_app
 
-from ..common import APIError, get, user_ref
+from ..common import APIError, add, get, query, update, user_ref
 from ..extensions import db
 from ..models import Company, Contact, Opportunity, Project, ProjectApproval, ProjectEvent, ProjectStage, now
 from .domains import ensure_scope
@@ -215,4 +216,50 @@ def by_token(token):
     if not row or row.status == 'cancelled':
         raise APIError('Link inválido ou expirado.', 404)
     ensure_scope(row.workspace_id)
+    return row
+
+
+def create_project(data, workspace_id, user_id):
+    validate_links(data)
+    ensure_stages(workspace_id)
+    deal = get(Opportunity, data['opportunity_id']) if data.get('opportunity_id') else None
+    if deal:
+        existing = query(Project).filter_by(opportunity_id=deal.id).first()
+        if existing:
+            raise APIError('Este negócio já tem um projeto.', 409, details={'project_id': existing.id})
+        data.setdefault('title', deal.title)
+        data.setdefault('contact_id', deal.contact_id)
+        data.setdefault('company_id', deal.company_id)
+        data.setdefault('owner_id', deal.owner_id)
+        if not data.get('amount') or Decimal(str(data['amount'])) == 0:
+            data['amount'] = deal.amount  # an untouched 0,00 in the form should not hide the negotiated value
+        data.setdefault('description', deal.description)
+    if not data.get('title'):
+        raise APIError('Informe o título do projeto.', 422)
+    stage = get(ProjectStage, data['stage_id']) if data.get('stage_id') else first_stage(workspace_id)
+    data['stage_id'] = stage.id
+    data.setdefault('start_date', now().date())
+    data.pop('status', None)
+    row = add(Project, data)
+    log_event(row, 'created', 'Projeto criado' + (f' a partir do negócio “{deal.title}”.' if deal else '.'), user_id)
+    return row
+
+
+def modify_project(row, data, user_id):
+    validate_links(data)
+    data.pop('opportunity_id', None)
+    stage_id = data.pop('stage_id', None)
+    if stage_id:
+        apply_stage(row, get(ProjectStage, stage_id), user_id)
+    status = data.pop('status', None)
+    if status and status != row.status:
+        row.status = status
+        row.completed_at = now() if status == 'done' else None
+        log_event(
+            row,
+            'status',
+            {'active': 'Projeto reaberto.', 'done': 'Projeto concluído.', 'cancelled': 'Projeto cancelado.'}[status],
+            user_id,
+        )
+    update(row, data)
     return row

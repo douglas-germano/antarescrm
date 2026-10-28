@@ -1,6 +1,6 @@
 # Antares CRM — sistema visual
 
-Identidade: ícone de órbita em vermelho `#e60000`.
+Identidade: ícone de órbita em rosa Antares `#ef2f70`.
 
 A interface tem uma base única e contínua: sidebar tinta (`#25282b`) e área de trabalho
 neutra, sem topbar nem uma moldura externa envolvendo toda a página.
@@ -14,23 +14,24 @@ compartilhados. `frontend/src/app/modules.css` contém os layouts específicos d
 funil, tabelas com paginação, agenda, diálogos e conversas. Não adicionar uma
 camada de tema para sobrescrever o sistema: alterar o componente na sua origem.
 
-Referência: `vodafone-DESIGN.md` (vermelho de marca, tinta e escala de cinzas), adaptada
+Referência: `vodafone-DESIGN.md` (tinta e escala de cinzas), adaptada à marca rosa Antares e
 a uma ferramenta densa de trabalho. Os tamanhos de fonte do app não mudam.
 
 | Uso | Valor |
 |---|---|
-| Ação principal / marca | `#e60000` (hover `#b80000`) |
+| Ação principal / marca | `#ef2f70` (hover `#d91c5b`) |
 | Tinta: sidebar, bordas de campos, botões secundários | `#25282b` |
 | Área de trabalho | `#f2f2f2` |
 | Superfícies | `#ffffff` |
 | Texto secundário | `#6b6e71` |
 | Divisórias | `#e1e1e1` |
-| Seleção discreta | `#fdecec` |
+| Seleção discreta | `#fff0f5` |
+| Texto sobre o destaque | `#141417` (branco no hover escuro) |
 
 Sem segunda cor de destaque. Inter (substituta da Vodafone), títulos em caixa alta peso 800.
-Botões em pílula (60px): primário vermelho, secundário contorno tinta. Abas e selos em pílula.
+Botões em pílula (60px): primário rosa Antares, secundário contorno tinta. Abas e selos em pílula.
 Cartões planos, raio de 6px, sem sombras; profundidade vem do contraste entre a sidebar
-tinta e a área clara. Campos com borda tinta de 1px, raio 6px e foco vermelho.
+tinta e a área clara. Campos com borda tinta de 1px, raio 6px e foco rosa Antares.
 A cor das etapas do funil é dado do usuário e não faz parte do tema.
 
 Login apenas com formulário e cadastro público desativado. Em telas pequenas,

@@ -1,16 +1,24 @@
 'use client';
 import { useState } from 'react';
-import { Play, Plus, Workflow } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Copy, MoreVertical, Pencil, Play, Plus, SlidersHorizontal, Trash2, Workflow, X } from 'lucide-react';
 import { useSession, useNotify } from '@/components/providers';
 import { useList, useData, post, patch, remove, refreshAll } from '@/lib/api';
-import { PageHeader, Button, DataState, EmptyState, Badge, ConfirmDialog, StatCard } from '@/components/ui';
-import { Card, Tabs } from '@/components/blocks';
-import { RuleCard } from '@/components/automations/RuleCard';
-import { RuleEditor, type RuleDraft } from '@/components/automations/RuleEditor';
-import { ACTIONS, RECIPES, RUN_STATUS, stepsOf } from '@/components/automations/model';
+import { PageHeader, Button, DataState, EmptyState, Badge, ConfirmDialog, Popover, SearchInput } from '@/components/ui';
+import { Card, Tabs, Toolbar, ToolbarEnd } from '@/components/blocks';
+import { ACTIONS, EVENTS, RECIPES, RUN_STATUS, stepsOf } from '@/components/automations/model';
+import { eventIcon, isInstagram } from '@/components/automations/icons';
+import { searchMatch } from '@/lib/format';
 import type { Row } from '@/lib/types';
 
 const dateTime = (iso: string) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+const shortDate = (iso?: string | null) => iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }).replace('.', '') : '—';
+const SORTS: Record<string, { label: string; compare: (a: Row, b: Row) => number }> = {
+  recent: { label: 'Mais recentes', compare: (a, b) => String(b.created_at).localeCompare(String(a.created_at)) },
+  name: { label: 'Nome', compare: (a, b) => a.name.localeCompare(b.name, 'pt-BR') },
+  runs: { label: 'Mais execuções', compare: (a, b) => (b.stats?.runs || 0) - (a.stats?.runs || 0) },
+};
 const statusBadge = (status: string) => <Badge value={RUN_STATUS[status]?.badge || 'skipped'} label={RUN_STATUS[status]?.label || status} />;
 
 export default function AutomationsPage() {
@@ -24,7 +32,11 @@ export default function AutomationsPage() {
   const templates = useList('/message-templates');
   const stages = useData<{ items: Row[] }>('/pipeline/stages');
   const [tab, setTab] = useState('rules');
-  const [draft, setDraft] = useState<RuleDraft | null>(null);
+  const router = useRouter();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [eventFilter, setEventFilter] = useState('');
+  const [sort, setSort] = useState('recent');
   const [deleting, setDeleting] = useState<Row | null>(null);
   const [busy, setBusy] = useState(false);
   const [runStatus, setRunStatus] = useState('');
@@ -53,8 +65,11 @@ export default function AutomationsPage() {
       setBusy(false);
     }
   }
-  const duplicate = (rule: Row) => setDraft({ ...rule, id: undefined, name: rule.name + ' (cópia)', active: false, steps: stepsOf(rule) });
-  const fromRecipe = (recipe: (typeof RECIPES)[number]) => setDraft({ name: recipe.name, event: recipe.event, steps: recipe.steps, conditions: recipe.conditions });
+  const activeFilters = [statusFilter, eventFilter].filter(Boolean).length;
+  const visibleRules = ruleList
+    .filter((r) => (!statusFilter || (statusFilter === 'active') === Boolean(r.active)) && (!eventFilter || r.event === eventFilter))
+    .filter((r) => searchMatch(search, [r.name, EVENTS[r.event]?.label, ...stepsOf(r).map((step) => step.title || step.content || step.tag)]))
+    .sort(SORTS[sort].compare);
 
   const visibleRuns = (runs.data || []).filter((r) => (!runStatus || r.status === runStatus) && (!runRule || r.rule_id === runRule));
   const visibleJobs = (jobs.data || []).filter((j) => !jobStatus || j.status === jobStatus);
@@ -64,26 +79,43 @@ export default function AutomationsPage() {
       <PageHeader title="Automações">
         {manage && (
           <>
-            <Button variant="secondary" disabled={busy} onClick={() => act(async () => { const result = await post('/automations/process', {}); notify(`${result.items.length} etapa(s) processada(s).`); })}>
-              <Play size={15} /> Processar pendentes
-            </Button>
-            <Button onClick={() => setDraft({})}><Plus size={17} /> Nova automação</Button>
+            <Link className="btn btn-primary" href="/automacoes/nova"><Plus size={17} /> Nova automação</Link>
           </>
         )}
       </PageHeader>
 
-      <div className="stat-grid">
-        <StatCard label="Automações ativas" value={activeCount} detail={`${ruleList.length} no total`} />
-        <StatCard label="Execuções" value={(runs.data || []).length} detail="Registradas na conta" />
-        <StatCard label="Etapas pendentes" value={pendingJobs} detail="Aguardando o horário" />
-        <StatCard label="Falhas" value={failures} detail={failures ? 'Veja em Execuções' : 'Nenhuma falha'} />
-      </div>
-
-      <Tabs variant="line" label="Automações" value={tab} onChange={setTab} items={[
-        { value: 'rules', label: 'Regras' },
-        { value: 'runs', label: <>Execuções{failures > 0 && <span className="tab-badge">{failures}</span>}</> },
-        { value: 'jobs', label: <>Etapas agendadas{pendingJobs > 0 && <span className="tab-count">{pendingJobs}</span>}</> },
-      ]} />
+      <Toolbar>
+        <Tabs label="Automações" value={tab} onChange={setTab} items={[
+          { value: 'rules', label: <>Automações <span className="tab-count">{ruleList.length}</span></> },
+          { value: 'runs', label: <>Execuções{failures > 0 && <span className="tab-badge">{failures}</span>}</> },
+          { value: 'jobs', label: <>Etapas agendadas{pendingJobs > 0 && <span className="tab-count">{pendingJobs}</span>}</> },
+        ]} />
+        {tab === 'rules' && <>
+          <SearchInput value={search} onChange={setSearch} placeholder="Buscar automações" />
+          <Popover label="Filtros" icon={<SlidersHorizontal size={15} />} variant="soft" panelClassName="filter-panel"
+            badge={activeFilters ? <span className="popover-badge">{activeFilters}</span> : undefined}>{() => <>
+            <label className="field"><span>Status</span>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="">Ativas e inativas</option><option value="active">Ativas</option><option value="inactive">Inativas</option>
+              </select></label>
+            <label className="field"><span>Gatilho</span>
+              <select value={eventFilter} onChange={(e) => setEventFilter(e.target.value)}>
+                <option value="">Todos os gatilhos</option>{Object.entries(EVENTS).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
+              </select></label>
+          </>}</Popover>
+          {(search || activeFilters > 0) && <Button variant="ghost" onClick={() => { setSearch(''); setStatusFilter(''); setEventFilter(''); }}><X size={14} />Limpar</Button>}
+          <ToolbarEnd>
+            <label className="sort-select"><span className="muted">Ordenar</span>
+              <select value={sort} onChange={(e) => setSort(e.target.value)}>{Object.entries(SORTS).map(([value, item]) => <option key={value} value={value}>{item.label}</option>)}</select>
+            </label>
+          </ToolbarEnd>
+        </>}
+        {tab === 'jobs' && manage && <ToolbarEnd>
+          <Button variant="soft" disabled={busy} onClick={() => act(async () => { const result = await post<{ items: unknown[] }>('/automations/process', {}); notify(result.items.length === 1 ? '1 etapa processada.' : `${result.items.length} etapas processadas.`); })}>
+            <Play size={15} /> Processar pendentes
+          </Button>
+        </ToolbarEnd>}
+      </Toolbar>
 
       {tab === 'rules' ? (
         <DataState loading={rules.isLoading} error={rules.error}>
@@ -92,18 +124,42 @@ export default function AutomationsPage() {
               <EmptyState icon={<Workflow />} title="Nenhuma automação" description="Automatize tarefas, retornos, mensagens e movimentações do funil a partir de eventos da conta. Comece por um modelo:" />
               {manage && (
                 <div className="recipe-list">
-                  {RECIPES.map((recipe) => <button type="button" key={recipe.name} className="recipe" onClick={() => fromRecipe(recipe)}><strong>{recipe.name}</strong><small>{ACTIONS[recipe.steps[0].kind]}</small></button>)}
+                  {RECIPES.map((recipe, index) => <button type="button" key={recipe.name} className="recipe" onClick={() => router.push('/automacoes/nova?modelo=' + index)}><strong>{recipe.name}</strong><small>{ACTIONS[recipe.steps[0].kind]}</small></button>)}
                 </div>
               )}
             </Card>
           ) : (
-            <div className="rule-grid">
-              {ruleList.map((rule) => (
-                <RuleCard key={rule.id} rule={rule} manage={manage} lookups={lookups} owner={staff.data?.find((u) => u.id === rule.assignee_id)?.name}
-                  onToggle={(active) => act(async () => { await patch('/automations/' + rule.id, { active }); }, active ? 'Automação ativada.' : 'Automação pausada.')}
-                  onEdit={() => setDraft(rule)} onDuplicate={() => duplicate(rule)} onDelete={() => setDeleting(rule)} />
-              ))}
-            </div>
+            <Card className="flow-list">
+              {visibleRules.map((rule) => {
+                const stats = rule.stats || { runs: 0, failed: 0, last_run_at: null };
+                const steps = stepsOf(rule);
+                return (
+                  <div key={rule.id} className={'flow-list-row' + (rule.active ? '' : ' paused')} onClick={() => manage && router.push('/automacoes/' + rule.id)}>
+                    <span className={'flow-row-icon' + (isInstagram(rule.event) ? ' ig' : '')}>{eventIcon(rule.event)}</span>
+                    <div className="flow-list-name">
+                      <strong>{rule.name}</strong>
+                      <span><span className="deal-chip">{EVENTS[rule.event]?.label || rule.event}</span><small>{steps.length} {steps.length === 1 ? 'passo' : 'passos'}</small></span>
+                    </div>
+                    <div className="flow-list-stat"><strong>{shortDate(rule.created_at)}</strong><small>Criada</small></div>
+                    <div className="flow-list-stat"><strong>{shortDate(stats.last_run_at)}</strong><small>Última execução</small></div>
+                    <div className="flow-list-stat"><strong>{stats.runs}{stats.failed > 0 && <em className="text-danger"> · {stats.failed} com falha</em>}</strong><small>Execuções</small></div>
+                    <label className="flow-active" onClick={(e) => e.stopPropagation()}>
+                      <button type="button" role="switch" aria-checked={rule.active} aria-label={(rule.active ? 'Desativar ' : 'Ativar ') + rule.name} className={'switch' + (rule.active ? ' on' : '')}
+                        disabled={!manage || busy} onClick={() => act(async () => { await patch('/automations/' + rule.id, { active: !rule.active }); }, rule.active ? 'Automação pausada.' : 'Automação ativada.')}><span /></button>
+                      {rule.active ? 'Ativa' : 'Inativa'}
+                    </label>
+                    {manage && <div onClick={(e) => e.stopPropagation()}>
+                      <Popover label="" ariaLabel={'Mais ações para ' + rule.name} icon={<MoreVertical size={16} />} variant="ghost" align="end" panelClassName="menu-panel row-menu">{(close) => <>
+                        <button type="button" onClick={() => { close(); router.push('/automacoes/' + rule.id); }}><Pencil size={15} />Editar</button>
+                        <button type="button" onClick={() => { close(); router.push('/automacoes/nova?copiar=' + rule.id); }}><Copy size={15} />Duplicar</button>
+                        <button type="button" className="danger" onClick={() => { close(); setDeleting(rule); }}><Trash2 size={15} />Excluir</button>
+                      </>}</Popover>
+                    </div>}
+                  </div>
+                );
+              })}
+              {!visibleRules.length && <EmptyState title="Nenhuma automação encontrada" description="Ajuste a busca ou os filtros." />}
+            </Card>
           )}
         </DataState>
       ) : tab === 'runs' ? (
@@ -175,7 +231,6 @@ export default function AutomationsPage() {
         </DataState>
       )}
 
-      <RuleEditor draft={draft} onClose={() => setDraft(null)} staff={staff.data || []} templates={templates.data || []} stages={stages.data?.items || []} />
       <ConfirmDialog open={!!deleting} onClose={() => setDeleting(null)} title="Excluir automação?"
         description={deleting?.stats?.runs ? 'Esta automação já foi executada e mantém histórico, então não pode ser excluída. Pause-a para interromper novos disparos.' : `A automação “${deleting?.name || ''}” será removida.`}
         onConfirm={async () => { if (deleting?.stats?.runs) throw new Error('Pause a automação em vez de excluir.'); await remove('/automations/' + deleting!.id); await refreshAll(); setDeleting(null); notify('Automação excluída.'); }} />

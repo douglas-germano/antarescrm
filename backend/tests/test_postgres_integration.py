@@ -208,3 +208,130 @@ def test_monthly_report_groups_sales_using_account_timezone(pg, monkeypatch):
         response = client.get('/api/v1/reports/won-by-month', headers={'Authorization': 'Bearer ' + token})
     assert response.status_code == 200, response.json
     assert response.json['items'] == [{'month': '2029-12', 'count': 1, 'amount': '100.00'}]
+
+
+def test_whatsapp_campaign_concurrent_confirmations_and_processing_do_not_duplicate(pg, monkeypatch):
+    from app.models import WhatsAppConnection, CampaignRecipient, InboxMessage
+    from app.services import communications
+    from unittest.mock import Mock
+
+    app, workspace_id, _, user_id = pg
+    db.session.add(
+        WhatsAppConnection(
+            workspace_id=workspace_id, instance_name='campaign-' + workspace_id, webhook_secret='fixture', state='open'
+        )
+    )
+    db.session.add(Contact(workspace_id=workspace_id, name='Campaign lead', phone='+5565999900001'))
+    db.session.commit()
+    headers = {'Authorization': 'Bearer ' + create_access_token(identity=user_id, additional_claims={'ver': 0})}
+    client = app.test_client()
+    row = client.post(
+        '/api/v1/campaigns',
+        headers=headers,
+        json={'channel': 'whatsapp', 'name': 'Campaign fixture', 'content': 'Hello {{name}}'},
+    ).json
+    result = client.post('/api/v1/campaigns/' + row['id'] + '/prepare', headers=headers, json={})
+    assert result.status_code == 200
+    row = result.json
+    deliver = Mock(return_value='campaign-provider-id')
+    monkeypatch.setattr(communications, 'deliver', deliver)
+    for verb, body in [('send', {'audience_hash': row['audience_hash'], 'consent_confirmed': True}), ('process', {})]:
+        barrier = Barrier(2)
+
+        def post_once(_, barrier=barrier, verb=verb, body=body):
+            with app.test_client() as worker_client:
+                barrier.wait(timeout=10)
+                return worker_client.post(
+                    f'/api/v1/campaigns/{row["id"]}/{verb}', headers=headers, json=body
+                ).status_code
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            assert list(pool.map(post_once, range(2))) == [200, 200]
+    db.session.expire_all()
+    assert CampaignRecipient.query.filter_by(workspace_id=workspace_id).count() == 1
+    assert InboxMessage.query.filter_by(workspace_id=workspace_id).one().status == 'sent'
+    assert deliver.call_count == 1
+
+
+def test_inbox_deal_retries_create_one_contact_one_deal_and_one_history(pg):
+    from app.models import WhatsAppConversation, StageHistory
+
+    app, workspace_id, _, user_id = pg
+    stage = PipelineStage.query.filter_by(workspace_id=workspace_id).one()
+    conversation = WhatsAppConversation(workspace_id=workspace_id, phone='5565999900001', contact_name='Inbox fixture')
+    db.session.add(conversation)
+    db.session.commit()
+    conversation_id = conversation.id
+    body = {
+        'idempotency_key': str(uuid4()),
+        'title': 'Inbox deal fixture',
+        'stage_id': stage.id,
+        'contact': {'name': 'New inbox contact', 'phone': '+5565999900001'},
+    }
+    headers = {'Authorization': 'Bearer ' + create_access_token(identity=user_id, additional_claims={'ver': 0})}
+    barrier = Barrier(2)
+
+    def create_once(_):
+        with app.test_client() as client:
+            barrier.wait(timeout=10)
+            response = client.post(
+                f'/api/v1/inbox/whatsapp/{conversation_id}/opportunities', headers=headers, json=body
+            )
+            return response.status_code, response.json
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(create_once, range(2)))
+    assert sorted(status for status, _ in results) == [200, 201], results
+    assert len({result['opportunity']['id'] for _, result in results}) == 1
+    db.session.expire_all()
+    assert Contact.query.filter_by(workspace_id=workspace_id).count() == 1
+    assert Opportunity.query.filter_by(workspace_id=workspace_id).count() == 1
+    assert StageHistory.query.filter_by(workspace_id=workspace_id).count() == 1
+    assert (
+        db.session.get(WhatsAppConversation, conversation_id).contact_id
+        == Contact.query.filter_by(workspace_id=workspace_id).one().id
+    )
+
+
+def test_notification_concurrent_reads_are_user_scoped_and_keep_latest_cursor(pg):
+    from app.models import InboxThread, InboxMessage, NotificationReadState
+    from app.services.notifications import record
+
+    app, workspace_id, _, user_id = pg
+    thread = InboxThread(workspace_id=workspace_id, channel='email', address='notify@example.test')
+    db.session.add(thread)
+    db.session.flush()
+    ids = []
+    for content in ['First', 'Second']:
+        message = InboxMessage(
+            workspace_id=workspace_id,
+            thread_id=thread.id,
+            direction='in',
+            content=content,
+            idempotency_key=str(uuid4()),
+        )
+        db.session.add(message)
+        db.session.flush()
+        record(thread, message, 'inbox')
+        db.session.flush()
+        ids.append(message.id)
+    db.session.commit()
+    thread_id = thread.id
+    headers = {'Authorization': 'Bearer ' + create_access_token(identity=user_id, additional_claims={'ver': 0})}
+    barrier = Barrier(2)
+
+    def read_message(message_id):
+        with app.test_client() as client:
+            barrier.wait(timeout=10)
+            return client.post(
+                '/api/v1/inbox/notifications/read',
+                headers=headers,
+                json={'source': 'inbox', 'thread_id': thread_id, 'message_id': message_id},
+            ).status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert list(pool.map(read_message, ids)) == [200, 200]
+    db.session.expire_all()
+    assert NotificationReadState.query.filter_by(workspace_id=workspace_id, user_id=user_id).count() == 1
+    result = app.test_client().get('/api/v1/inbox/notifications', headers=headers)
+    assert result.status_code == 200 and result.json['total_unread'] == 0

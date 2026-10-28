@@ -1,6 +1,6 @@
 from flask import g, request
 
-from ...common import APIError, add, audit, commit, get, page, payload, query, require, update
+from ...common import audit, commit, get, page, payload, query, require
 from ...extensions import db
 from ...models import (
     Contact,
@@ -9,8 +9,6 @@ from ...models import (
     ProjectApproval,
     ProjectEvent,
     ProjectFile,
-    ProjectStage,
-    now,
 )
 from ...schemas import NoteSchema, ProjectSchema
 from ...services import projects as service
@@ -46,31 +44,7 @@ def projects():
 @bp.post('/projects')
 @require()
 def project_create():
-    data = payload(ProjectSchema, partial=True)
-    service.validate_links(data)
-    service.ensure_stages(g.workspace_id)
-    deal = get(Opportunity, data['opportunity_id']) if data.get('opportunity_id') else None
-    if deal:
-        existing = query(Project).filter_by(opportunity_id=deal.id).first()
-        if existing:
-            raise APIError('Este negócio já tem um projeto.', 409, details={'project_id': existing.id})
-        data.setdefault('title', deal.title)
-        data.setdefault('contact_id', deal.contact_id)
-        data.setdefault('company_id', deal.company_id)
-        data.setdefault('owner_id', deal.owner_id)
-        if not data.get('amount') or float(data['amount']) == 0:
-            data['amount'] = deal.amount  # an untouched 0,00 in the form should not hide the negotiated value
-        data.setdefault('description', deal.description)
-    if not data.get('title'):
-        raise APIError('Informe o título do projeto.', 422)
-    stage = get(ProjectStage, data['stage_id']) if data.get('stage_id') else service.first_stage(g.workspace_id)
-    data['stage_id'] = stage.id
-    data.setdefault('start_date', now().date())
-    data.pop('status', None)
-    row = add(Project, data)
-    service.log_event(
-        row, 'created', 'Projeto criado' + (f' a partir do negócio “{deal.title}”.' if deal else '.'), g.user.id
-    )
+    row = service.create_project(payload(ProjectSchema, partial=True), g.workspace_id, g.user.id)
     return commit(row, 201)
 
 
@@ -127,23 +101,7 @@ def project_detail(project_id):
 def project_update(project_id):
     row = get(Project, project_id, lock=True)
     data = payload(ProjectSchema, partial=True)
-    service.validate_links(data)
-    data.pop('opportunity_id', None)
-    stage_id = data.pop('stage_id', None)
-    if stage_id:
-        service.apply_stage(row, get(ProjectStage, stage_id), g.user.id)
-    status = data.pop('status', None)
-    if status and status != row.status:
-        row.status = status
-        row.completed_at = now() if status == 'done' else None
-        service.log_event(
-            row,
-            'status',
-            {'active': 'Projeto reaberto.', 'done': 'Projeto concluído.', 'cancelled': 'Projeto cancelado.'}[status],
-            g.user.id,
-        )
-    update(row, data)
-    return commit(row)
+    return commit(service.modify_project(row, data, g.user.id))
 
 
 @bp.delete('/projects/<uuid:project_id>')

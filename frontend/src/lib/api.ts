@@ -1,7 +1,9 @@
 'use client';
 import useSWR from 'swr';
 import { fetchWithRetry } from './retry.ts';
-import type { Row } from './types';
+import { useState, useEffect } from 'react';
+import { collectPages, pagePath } from './pagination.ts';
+import type { Page, Row } from './types';
 
 let activeWorkspaceId: string | undefined;
 export function setActiveWorkspace(id?: string) { activeWorkspaceId = id; }
@@ -14,7 +16,7 @@ export class RequestError extends Error {
     super(message);
   }
 }
-export async function api<T = any>(path: string, init: RequestInit = {}): Promise<T> {
+export async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetchWithRetry('/api/backend' + path, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...(activeWorkspaceId ? { 'X-Workspace-ID': activeWorkspaceId } : {}), ...init.headers },
@@ -52,32 +54,36 @@ export async function api<T = any>(path: string, init: RequestInit = {}): Promis
   }
   return body;
 }
-export const post = <T = any>(path: string, data: unknown) =>
+export const post = <T = unknown>(path: string, data: unknown) =>
   api<T>(path, { method: 'POST', body: JSON.stringify(data) });
-export const patch = <T = any>(path: string, data: unknown) =>
+export const patch = <T = unknown>(path: string, data: unknown) =>
   api<T>(path, { method: 'PATCH', body: JSON.stringify(data) });
 export const remove = (path: string) => api(path, { method: 'DELETE' });
-export function useData<T = any>(path: string | null) {
+export function useData<T = unknown>(path: string | null) {
   return useSWR<T>(path, (url: string) => api<T>(url), {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });
 }
-export async function listAll(path: string): Promise<Row[]> {
-  const separator = path.includes('?') ? '&' : '?';
-  const first = await api(path + separator + 'per_page=100&page=1');
-  const rest = await Promise.all(
-    Array.from({ length: Math.max(0, (first.pages || 1) - 1) }, (_, i) =>
-      api(path + separator + 'per_page=100&page=' + (i + 2)),
-    ),
-  );
-  return [...first.items, ...rest.flatMap((p) => p.items)];
+export async function listAll<T = Row>(path: string): Promise<T[]> {
+  return collectPages<T>(path, (url) => api<Page<T>>(url));
 }
-export function useList(path: string | null) {
-  return useSWR<Row[]>(path ? ['list', path] : null, () => listAll(path!), {
-    revalidateOnFocus: false,
-    shouldRetryOnError: false,
+/** Complete lists for options/small resources. Main tables should use usePage. */
+export function useList<T = Row>(path: string | null) {
+  return useSWR<T[]>(path ? ['list', activeWorkspaceId, path] : null, () => listAll<T>(path!), {
+    revalidateOnFocus: false, shouldRetryOnError: false,
   });
+}
+export function usePage<T, Result extends Page<T> = Page<T>>(path: string, size = 25) {
+  const [position, setPosition] = useState({ path, page: 1 });
+  const page = position.path === path ? position.page : 1;
+  const response = useData<Result>(pagePath(path, page, size));
+  useEffect(() => {
+    if (response.data && page > Math.max(1, response.data.pages)) {
+      setPosition({ path, page: Math.max(1, response.data.pages) });
+    }
+  }, [path, page, response.data]);
+  return { ...response, page, size, setPage: (next: number) => setPosition({ path, page: next }) };
 }
 export async function refreshAll() {
   const { mutate } = await import('swr');

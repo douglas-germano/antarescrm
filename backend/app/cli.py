@@ -25,11 +25,14 @@ def register_commands(app):
         from .models import WorkerHeartbeat, now
         from .services.automations import process
         from .services.communications import dispatch as dispatch_messages
+        from .services.history import process as process_history
 
         while True:
             failed = False
+            history_batches = 0
             try:
                 actions, messages = process(limit=50), (dispatch_messages(limit=20) if dispatch else [])
+                history_batches = process_history(limit=2)
                 if actions or messages or once:
                     click.echo(f'{len(actions)} etapa(s), {len(messages)} mensagem(ns).')
             except Exception as error:  # worker boundary: keep the loop alive and report
@@ -54,7 +57,7 @@ def register_commands(app):
                 if failed:
                     raise click.ClickException('Falha no processamento.')
                 return
-            time.sleep(interval)
+            time.sleep(1 if history_batches else interval)
 
     @app.cli.command('process-automations')
     @click.option('--limit', default=50, type=click.IntRange(1, 100))

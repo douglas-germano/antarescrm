@@ -1,5 +1,6 @@
-import { ArrowLeft, Loader2, Send } from 'lucide-react';
+import { ArrowLeft, Handshake, Loader2, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useReadIncomingMessages } from '@/components/inbox/message-notifications';
 import { Button, DataState } from '@/components/ui';
 import type { Row } from '@/lib/types';
 import { ChannelIcon, ThreadAvatar, channelName } from '@/components/whatsapp/ThreadList';
@@ -21,6 +22,7 @@ export function OtherThread({
   onBack,
   onSend,
   onResume,
+  onCreateOpportunity,
 }: {
   thread: Row;
   name: string;
@@ -32,7 +34,9 @@ export function OtherThread({
   onBack: () => void;
   onSend: (content: string) => Promise<void>;
   onResume: (message: Row) => void;
+  onCreateOpportunity?: () => void;
 }) {
+  useReadIncomingMessages(thread.source, thread.id, messages);
   const [content, setContent] = useState('');
   const end = useRef<HTMLDivElement>(null);
   const ordered = [...messages].reverse();
@@ -55,6 +59,7 @@ export function OtherThread({
             <p><ChannelIcon channel={thread.channel} size={12} /> {channelName[thread.channel]} · {thread.display_address || thread.address}</p>
           </div>
         </div>
+        {onCreateOpportunity && <div className="wa-chat-actions"><Button onClick={onCreateOpportunity}><Handshake size={14} />Criar negócio</Button></div>}
       </header>
       <div className="wa-messages">
         <DataState loading={loading} error={error}>

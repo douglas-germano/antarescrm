@@ -1,9 +1,10 @@
 from flask import Blueprint, g, request
 
-from ..common import add, audit, commit, get, page, payload, query, require, update, user_ref
+from ..common import add, audit, commit, get, page, payload, require, update, user_ref
 from ..extensions import db
 from ..models import Company, Contact, Opportunity, Task, now
 from ..schemas import TaskSchema
+from ..services import crm_lists as lists
 
 bp = Blueprint('tasks', __name__)
 
@@ -24,15 +25,9 @@ def sync_completion(row, data):
 @bp.get('/tasks')
 @require()
 def tasks():
-    q = query(Task)
-    for field in ('status', 'assignee_id', 'contact_id', 'company_id', 'opportunity_id', 'priority'):
-        if request.args.get(field):
-            q = q.filter(getattr(Task, field) == request.args[field])
-    if request.args.get('mine') == 'true':
-        q = q.filter(Task.assignee_id == g.user.id)
-    if request.args.get('search'):
-        q = q.filter(Task.title.ilike('%' + request.args['search'] + '%'))
-    return page(q.order_by(Task.due_date.asc().nullslast(), Task.created_at.desc()))
+    result = page(lists.task_query(request.args))
+    lists.enrich_people(result['items'])
+    return result
 
 
 @bp.post('/tasks')

@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import { usePathname } from 'next/navigation';
-import { CheckCircle2, AlertCircle, X } from 'lucide-react';
+import Link from 'next/link';
+import { CheckCircle2, AlertCircle, MessageCircle, X } from 'lucide-react';
 import { useData, setActiveWorkspace } from '@/lib/api';
 import { setZone } from '@/lib/format';
 import type { User, Workspace } from '@/lib/types';
@@ -10,11 +10,12 @@ type Session = {
   workspace?: Workspace;
   loading: boolean;
   error?: Error;
-  reload: () => Promise<any>;
+  reload: () => Promise<unknown>;
 };
 const SessionContext = createContext<Session>({ loading: true, reload: async () => {} });
-const NoticeContext = createContext<{ notify: (message: string, type?: 'success' | 'error') => void }>({
-  notify: () => {},
+type NoticeAction = { href: string; label: string };
+const NoticeContext = createContext<{ notify: (message: string, type?: 'success' | 'error' | 'message', action?: NoticeAction) => void; clearMessageNotices: () => void }>({
+  notify: () => {}, clearMessageNotices: () => {},
 });
 export function useSession() {
   return useContext(SessionContext);
@@ -22,15 +23,22 @@ export function useSession() {
 export function useNotify() {
   return useContext(NoticeContext);
 }
-export function Providers({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const publicPage = ['/login', '/cadastro', '/privacidade', '/termos', '/exclusao-de-dados'].includes(pathname) || pathname.startsWith('/f/') || pathname.startsWith('/agendar/') || pathname.startsWith('/agendamento/') || pathname.startsWith('/aprovacao/');
+/** Mounted only by the authenticated route group. Public pages never request a session. */
+export function SessionProvider({ children }: { children: React.ReactNode }) {
   const { data, error, isLoading, mutate } = useData<{ user: User; workspace: Workspace }>(
-    publicPage ? null : '/auth/me',
+    '/auth/me',
   );
   setActiveWorkspace(data?.workspace?.id);
   setZone(data?.workspace?.timezone);
-  const [notices, setNotices] = useState<{ id: number; message: string; type: string }[]>([]);
+  useEffect(() => () => { setActiveWorkspace(undefined); }, []);
+  return <SessionContext.Provider value={{ user: data?.user, workspace: data?.workspace, loading: isLoading, error, reload: mutate }}>
+    {children}
+  </SessionContext.Provider>;
+}
+
+/** Notifications are also available to public forms, without authentication side effects. */
+export function Providers({ children }: { children: React.ReactNode }) {
+  const [notices, setNotices] = useState<{ id: number; message: string; type: string; action?: NoticeAction }[]>([]);
   const toasts = useRef<HTMLDivElement>(null);
   // Open dialogs live in the browser's top layer and would cover the toasts (including error messages), so the
   // stack is promoted to the top layer too, each time a notice is added so that it sits above any open dialog.
@@ -40,22 +48,20 @@ export function Providers({ children }: { children: React.ReactNode }) {
     if (el.matches(':popover-open')) el.hidePopover();
     if (notices.length) el.showPopover();
   }, [notices]);
-  const notify = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+  const notify = useCallback((message: string, type: 'success' | 'error' | 'message' = 'success', action?: NoticeAction) => {
     const id = Date.now() + Math.random();
-    setNotices((n) => [...n.slice(-2), { id, message, type }]);
+    setNotices((n) => [...n.slice(-2), { id, message, type, action }]);
     setTimeout(() => setNotices((n) => n.filter((x) => x.id !== id)), 6000);
   }, []);
+  const clearMessageNotices = useCallback(() => setNotices(current => current.filter(item => item.type !== 'message')), []);
   return (
-    <SessionContext.Provider
-      value={{ user: data?.user, workspace: data?.workspace, loading: isLoading, error, reload: mutate }}
-    >
-      <NoticeContext.Provider value={{ notify }}>
+      <NoticeContext.Provider value={{ notify, clearMessageNotices }}>
         {children}
-        <div className="toast-stack" aria-live="polite" popover="manual" ref={toasts}>
+        <div className="toast-stack" data-message-alerts={notices.some(notice => notice.type === 'message') || undefined} aria-live="polite" popover="manual" ref={toasts}>
           {notices.map((n) => (
             <div className={'toast ' + n.type} key={n.id}>
-              {n.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-              <span>{n.message}</span>
+              {n.type === 'message' ? <MessageCircle size={20} /> : n.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
+              <span>{n.message}{n.action && <Link className="toast-action" href={n.action.href} onClick={() => setNotices(current => current.filter(item => item.id !== n.id))}>{n.action.label}</Link>}</span>
               <button
                 aria-label="Fechar aviso"
                 onClick={() => setNotices((a) => a.filter((x) => x.id !== n.id))}
@@ -66,6 +72,5 @@ export function Providers({ children }: { children: React.ReactNode }) {
           ))}
         </div>
       </NoticeContext.Provider>
-    </SessionContext.Provider>
   );
 }

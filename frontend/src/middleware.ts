@@ -17,7 +17,7 @@ const text = (message: string, status: number) =>
 async function resolveHost(host: string): Promise<Resolved> {
   const hit = cache.get(host);
   if (hit && Date.now() - hit.at < (hit.value ? HIT_TTL : MISS_TTL)) return hit.value;
-  const api = (process.env.FLASK_API_URL || 'http://127.0.0.1:5001/api/v1').replace(/\/$/, '');
+  const api = (process.env.FLASK_API_URL || 'http://127.0.0.1:5003/api/v1').replace(/\/$/, '');
   const response = await fetch(`${api}/public/domains/resolve?host=${encodeURIComponent(host)}`, { cache: 'no-store', signal: AbortSignal.timeout(3000) });
   if (response.status !== 404 && !response.ok) throw new Error('resolver');
   const value: Resolved = response.ok ? await response.json() : null;

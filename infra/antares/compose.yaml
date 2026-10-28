@@ -1,0 +1,108 @@
+name: antares-crm
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: antarescrm
+      POSTGRES_USER: antares
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set private POSTGRES_PASSWORD}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U antares -d antarescrm"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: &logging
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  backend:
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE}
+    restart: unless-stopped
+    env_file: ["${ANTARES_RUNTIME_DIR:?Set ANTARES_RUNTIME_DIR}/backend.env"]
+    environment: &backend_environment
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set private DATABASE_URL}
+      EVOLUTION_API_URL: http://evolution-api:8080
+      PROJECT_FILES_DIR: /data/project-files
+      BACKUP_STATUS_PATH: /data/backup-status/latest.json
+    volumes:
+      - project-files:/data/project-files
+      - ${ANTARES_RUNTIME_DIR}/status:/data/backup-status:ro
+    ports: ["127.0.0.1:${BACKEND_PORT:-5102}:5002"]
+    networks: [default, integrations]
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5002/api/v1/health',timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging: *logging
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?Set FRONTEND_IMAGE}
+    restart: unless-stopped
+    env_file: ["${ANTARES_RUNTIME_DIR}/frontend.env"]
+    environment:
+      NODE_ENV: production
+      FLASK_API_URL: http://backend:5002/api/v1
+      APP_URL: https://antares.douglasgermano.com
+      COOKIE_SECURE: "true"
+    ports: ["127.0.0.1:${FRONTEND_PORT:-3102}:3000"]
+    depends_on:
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging: *logging
+
+  worker:
+    profiles: [live]
+    image: ${BACKEND_IMAGE}
+    restart: unless-stopped
+    command: ["flask", "--app", "run", "run-worker", "--no-dispatch"]
+    env_file: ["${ANTARES_RUNTIME_DIR}/backend.env"]
+    environment: *backend_environment
+    volumes:
+      - project-files:/data/project-files
+      - ${ANTARES_RUNTIME_DIR}/status:/data/backup-status:ro
+    networks: [default, integrations]
+    depends_on:
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "from datetime import timedelta; from app import create_app; from app.models import WorkerHeartbeat, now; app=create_app(); app.app_context().push(); row=WorkerHeartbeat.query.filter_by(name='default').first(); raise SystemExit(0 if row and row.last_seen_at and now()-row.last_seen_at < timedelta(seconds=60) and not row.error and not row.dispatch_enabled else 1)"]
+      interval: 30s
+      timeout: 15s
+      start_period: 30s
+      retries: 3
+    logging: *logging
+
+  tunnel:
+    profiles: [live]
+    image: ${CLOUDFLARED_IMAGE:?Set CLOUDFLARED_IMAGE}
+    user: "0:0"
+    restart: unless-stopped
+    command: ["tunnel", "--config", "/etc/cloudflared/config.yml", "--no-autoupdate", "--protocol", "http2", "--edge-ip-version", "4", "run"]
+    volumes:
+      - ${ANTARES_RUNTIME_DIR}/tunnel.yml:/etc/cloudflared/config.yml:ro
+      - ${ANTARES_RUNTIME_DIR}/tunnel.json:/etc/cloudflared/credentials.json:ro
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      frontend: {condition: service_healthy}
+    logging: *logging
+
+volumes:
+  postgres:
+  project-files:
+networks:
+  integrations:
+    name: antares-integrations
+    external: true

@@ -26,3 +26,8 @@ output/playwright/
 # Caches de ferramentas
 .coverage
 .ruff_cache/
+
+.env.development
+.next-dev/
+.next-check/
+.next-ci/

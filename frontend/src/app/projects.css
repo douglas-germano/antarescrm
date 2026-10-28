@@ -35,7 +35,7 @@
 .file-actions { display: flex; gap: 2px; padding: var(--space-1) var(--space-3) var(--space-3); }
 .file-actions .icon-btn { width: 32px; height: 32px; border-radius: 50%; color: var(--ink); display: inline-flex; align-items: center; justify-content: center; }
 .file-actions .icon-btn:hover { background: var(--ink); color: #fff; }
-.file-actions .icon-btn.danger:hover { background: #b80000; }
+.file-actions .icon-btn.danger:hover { background: var(--primary-hover); }
 .version-list { list-style: none; margin: 0; padding: var(--space-2) var(--space-4) var(--space-3); border-top: 1px solid #f0f0f0; display: flex; flex-direction: column; gap: var(--space-1); font-size: 12px; }
 .version-list li { display: flex; align-items: center; gap: var(--space-2); }
 .version-list a { color: var(--primary); font-weight: 600; margin-left: var(--space-2); }
@@ -47,7 +47,7 @@
 .approval-message { font-size: 13px; }
 .approval-decision { display: flex; flex-direction: column; gap: 2px; margin-top: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: 6px; background: #f2f2f2; font-size: 13px; }
 .approval-decision.approved { background: #e5f2e9; }
-.approval-decision.changes_requested { background: #fdecec; }
+.approval-decision.changes_requested { background: var(--mint); }
 .approval-decision span { font-style: italic; }
 .approval-actions { display: flex; align-items: flex-start; gap: var(--space-2); flex-wrap: wrap; }
 .copy-row { display: flex; gap: var(--space-2); }

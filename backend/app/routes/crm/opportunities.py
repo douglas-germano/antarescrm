@@ -1,29 +1,22 @@
 from flask import g, request
 
 from ...common import commit, get, page, payload, query, require
-from ...models import Opportunity, Pipeline, PipelineStage, StageHistory
+from ...models import Opportunity, PipelineStage, StageHistory
 from ...schemas import CloseSchema, OpportunitySchema
+from ...services import crm_lists as lists
 from ...services import opportunities as opportunity_service
 from . import bp
-from ._search import search
 
 
 @bp.get('/opportunities')
 @require()
 def opportunities():
-    q = query(Opportunity)
-    identifier = request.args.get('pipeline_id')
-    if identifier:
-        if identifier != 'default':
-            get(Pipeline, identifier)
-        q = q.join(PipelineStage, PipelineStage.id == Opportunity.stage_id).filter(
-            PipelineStage.pipeline_id.is_(None) if identifier == 'default' else PipelineStage.pipeline_id == identifier
-        )
-    for field in ('status', 'stage_id', 'contact_id', 'company_id', 'owner_id'):
-        if request.args.get(field):
-            q = q.filter(getattr(Opportunity, field) == request.args[field])
-    q = search(q, Opportunity, 'title')
-    result = page(q.order_by(Opportunity.updated_at.desc()))
+    q = lists.opportunity_query(request.args)
+    summary = lists.opportunity_summary(q)
+    result = page(lists.opportunity_order(q, request.args))
+    result['summary'] = summary
+    result['sources'] = lists.contact_sources()
+    lists.enrich_people(result['items'])
     opportunity_service.enrich(result['items'])
     return result
 
@@ -40,8 +33,10 @@ def opportunity_create():
 def opportunity_detail(opportunity_id):
     row = get(Opportunity, opportunity_id)
     history = query(StageHistory).filter_by(opportunity_id=row.id).order_by(StageHistory.created_at).all()
+    data = row.to_dict()
+    lists.enrich_people([data])
     return {
-        **row.to_dict(),
+        **data,
         'pipeline_id': get(PipelineStage, row.stage_id).pipeline_id,
         'history': [x.to_dict() for x in history],
     }

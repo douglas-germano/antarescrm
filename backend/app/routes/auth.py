@@ -1,16 +1,95 @@
+import secrets
+
 from flask import Blueprint, current_app, g
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt, get_jwt_identity, jwt_required
+from marshmallow import fields as f
+from marshmallow import validate
+from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..access import account_users
 from ..common import APIError, add, audit, commit, get, page, payload, require, update, validate_timezone
 from ..extensions import db, limiter
-from ..models import PipelineStage, User, Workspace
-from ..schemas import LoginSchema, ProfileSchema, RegisterSchema, UserSchema, UserUpdateSchema, WorkspaceSchema
+from ..models import PipelineStage, User, UserAccessToken, Workspace
+from ..schemas import (
+    LoginSchema,
+    ProfileSchema,
+    RegisterSchema,
+    StrictSchema,
+    UserSchema,
+    UserUpdateSchema,
+    WorkspaceSchema,
+    choice,
+    text,
+)
+from ..services import access_email, brevo
 
 bp = Blueprint('auth', __name__)
 
 DEFAULT_STAGES = ['Novo lead', 'Qualificação', 'Reunião', 'Proposta', 'Negociação']
+
+
+class ForgotSchema(StrictSchema):
+    slug = text(80, required=True)
+    email = f.Email(required=True, validate=validate.Length(max=254))
+
+
+class AccessSchema(StrictSchema):
+    token = f.String(required=True, load_only=True, validate=validate.Length(min=40, max=100))
+    password = f.String(required=True, load_only=True, validate=validate.Length(min=10, max=128))
+
+
+class InviteSchema(StrictSchema):
+    name = text(150, required=True)
+    email = f.Email(required=True, validate=validate.Length(max=254))
+    role = choice('admin member', load_default='member')
+    title = text(80, allow_none=True)
+
+
+@bp.post('/auth/forgot-password')
+@limiter.limit('5 per minute;20 per hour')
+def forgot_password():
+    data = payload(ForgotSchema)
+    return access_email.request_reset(data['slug'], data['email'])
+
+
+@bp.post('/auth/accept-access')
+@limiter.limit('10 per minute')
+def accept_access():
+    data = payload(AccessSchema)
+    return access_email.accept(data['token'], data['password'])
+
+
+@bp.post('/users/invitations')
+@require('owner', 'admin')
+@limiter.limit('10 per hour')
+def invite():
+    data = payload(InviteSchema)
+    brevo.access_sender(g.workspace_id)
+    email = data.pop('email').strip().lower()
+    user = (
+        User.query.filter(User.workspace_id == g.workspace_id, func.lower(User.email) == email)
+        .with_for_update()
+        .first()
+    )
+    if user:
+        pending = UserAccessToken.query.filter_by(user_id=user.id, purpose='invite').first()
+        if user.active or user.role == 'owner' or not pending:
+            raise APIError('Este e-mail já tem um perfil. Edite o acesso existente.', 409)
+    else:
+        user = add(
+            User,
+            {
+                **data,
+                'email': email,
+                'active': False,
+                'password_hash': generate_password_hash(secrets.token_urlsafe(32)),
+            },
+        )
+    result = access_email.issue(user, 'invite')
+    audit('user_invite', user)
+    db.session.commit()
+    return {'user': user.to_dict(), 'delivery_status': result.delivery_status}, 201
 
 
 def tokens(user, workspace_id=None):
@@ -127,7 +206,14 @@ def workspace_update():
 def users():
 
     rows = account_users(g.workspace_id)
-    return page(User.query.filter(User.id.in_([u.id for u in rows])).order_by(User.name))
+    result = page(User.query.filter(User.id.in_([u.id for u in rows])).order_by(User.name))
+    pending = {
+        row.user_id
+        for row in UserAccessToken.query.filter_by(workspace_id=g.workspace_id, purpose='invite', consumed_at=None)
+    }
+    for item in result['items']:
+        item['invite_pending'] = item['id'] in pending and not item['active']
+    return result
 
 
 @bp.post('/users')

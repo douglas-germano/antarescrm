@@ -7,12 +7,12 @@ import { Button, DataState, FormDialog, ConfirmDialog } from '@/components/ui';
 import { Card, CardHeader } from '@/components/blocks';
 import type { Row } from '@/lib/types';
 
-/** Stage colours come from the brand palette: red, ink and a neutral/warm range that stays legible on the light board. */
+/** Stage colours come from the brand palette: pink, ink and a neutral/warm range that stays legible on the light board. */
 const PALETTE = [
-  { value: '#e60000', label: 'Vermelho' },
+  { value: '#ef2f70', label: 'Rosa Antares' },
   { value: '#25282b', label: 'Grafite' },
   { value: '#6b6e71', label: 'Cinza' },
-  { value: '#b80000', label: 'Vinho' },
+  { value: '#d91c5b', label: 'Rosa escuro' },
   { value: '#c77d00', label: 'Âmbar' },
   { value: '#2e7d52', label: 'Verde' },
   { value: '#2f6f8f', label: 'Azul' },
@@ -76,7 +76,7 @@ export function PipelineSettings() {
           { name: 'color', label: 'Cor da etapa', type: 'select', required: true,
             options: [...PALETTE, ...(editing && !PALETTE.some((c) => c.value === editing.color) ? [{ value: editing.color, label: 'Personalizada (' + editing.color + ')' }] : [])] },
         ]}
-        initial={editing || { position: list.length, color: '#e60000', probability: '' }}
+        initial={editing || { position: list.length, color: '#ef2f70', probability: '' }}
         onSubmit={async (data) => {
           await (editing ? patch('/pipeline/stages/' + editing.id, data) : post('/pipeline/stages', { ...data, pipeline_id: pipelineId === 'default' ? null : pipelineId }));
           await refreshAll();
@@ -90,7 +90,7 @@ export function PipelineSettings() {
         onClose={() => setCreating(false)}
         fields={[{ name: 'name', label: 'Nome do funil', required: true }]}
         onSubmit={async (body) => {
-          const result = await post('/pipelines', body);
+          const result = await post<{ id: string }>('/pipelines', body);
           await refreshAll();
           setPipelineId(result.id);
           setCreating(false);

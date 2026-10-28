@@ -96,14 +96,15 @@ export function ToolbarEnd({ children }: { children: ReactNode }) {
 }
 
 /** The board scrolls horizontally; each column scrolls its own cards vertically. */
-export function KanbanBoard({ natural = false, children }: { natural?: boolean; children: ReactNode }) {
-  return <div className={cx('board', natural && 'board-natural')}>{children}</div>;
+export function KanbanBoard({ natural = false, dragging = false, children }: { natural?: boolean; dragging?: boolean; children: ReactNode }) {
+  return <div className={cx('board', natural && 'board-natural', dragging && 'board-dragging')}>{children}</div>;
 }
 
 export function KanbanColumn<T>({
   title,
   dot,
   count,
+  total,
   meta,
   items,
   render,
@@ -116,6 +117,8 @@ export function KanbanColumn<T>({
   title: string;
   dot?: string;
   count: number;
+  /** A short figure beside the count in the header, e.g. the column's value. */
+  total?: ReactNode;
   meta?: ReactNode;
   items: T[];
   render: (item: T) => ReactNode;
@@ -148,6 +151,7 @@ export function KanbanColumn<T>({
           {title}
         </strong>
         <span className="tab-count">{count}</span>
+        {total !== undefined && <span className="kanban-column-total">{total}</span>}
         {onAdd && (
           <button type="button" className="icon-btn kanban-add" aria-label={addLabel || 'Adicionar em ' + title} title={addLabel || 'Adicionar'} onClick={onAdd}>
             <Plus size={16} />
@@ -170,9 +174,15 @@ export function KanbanCard({
   onOpen,
   onMove,
   onDragState,
+  attention,
+  done = false,
   children,
 }: {
   id: string;
+  /** Finished items are dimmed. */
+  done?: boolean;
+  /** Follow-up reason; tints the card's left edge. */
+  attention?: string;
   draggable?: boolean;
   onOpen?: () => void;
   onMove?: (direction: -1 | 1) => void;
@@ -181,7 +191,7 @@ export function KanbanCard({
 }) {
   return (
     <article
-      className="kanban-card"
+      className={cx('kanban-card', attention && 'kanban-card-flag ' + attention, done && 'kanban-card-done')}
       tabIndex={0}
       draggable={draggable}
       onDragStart={(e) => {

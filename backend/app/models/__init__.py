@@ -3,16 +3,27 @@
 from .automation import AutomationJob, AutomationRule, AutomationRun, FormSubmission, LeadForm, WorkerHeartbeat
 from .base import Base, TenantBase, UTCDateTime, now, uid
 from .booking import Booking, BookingCalendar
+from .brevo import BrevoConnection, BrevoEvent, CampaignRecipient, EmailCampaign, UserAccessToken
 from .communications import CommunicationSuppression, InboxMessage, InboxThread, MessageTemplate
 from .crm import Activity, Company, Contact, Opportunity, Pipeline, PipelineStage, SavedContactView, StageHistory, Task
 from .domains import CustomDomain
 from .funnels import Funnel, FunnelEvent, FunnelStep
+from .history import HistorySync
 from .instagram import InstagramComment, InstagramConnection, InstagramEvent, InstagramOAuthState
+from .notifications import MessageNotification, NotificationReadState
 from .projects import Project, ProjectApproval, ProjectEvent, ProjectFile, ProjectStage
 from .tenancy import AuditLog, User, Workspace, WorkspaceAccess
 from .whatsapp import WhatsAppConnection, WhatsAppConversation, WhatsAppMedia, WhatsAppMessage
 
 __all__ = [
+    'HistorySync',
+    'MessageNotification',
+    'NotificationReadState',
+    'BrevoConnection',
+    'BrevoEvent',
+    'CampaignRecipient',
+    'EmailCampaign',
+    'UserAccessToken',
     'CustomDomain',
     'Funnel',
     'FunnelEvent',

@@ -24,7 +24,7 @@ export function BroadcastsPanel({ channels, templates, contacts, busy, act }: {
       <Card>
         <CardHeader title="Canais e fila de envio" description="Disparos entram na fila e saem pelos canais configurados."
           actions={<div className="header-actions">
-            <Button variant="secondary" disabled={busy} onClick={() => act(async () => { const result = await post('/communications/dispatch', {}); notify(`${result.items.length} envio(s) processado(s).`); })}><Play size={15} /> Processar fila</Button>
+            <Button variant="secondary" disabled={busy} onClick={() => act(async () => { const result = await post<{ items: unknown[] }>('/communications/dispatch', {}); notify(`${result.items.length} envio(s) processado(s).`); })}><Play size={15} /> Processar fila</Button>
             <Button onClick={() => setComposing(true)}><Plus size={16} /> Novo disparo</Button>
           </div>} />
         <CardBody>
@@ -47,7 +47,7 @@ export function BroadcastsPanel({ channels, templates, contacts, busy, act }: {
               e.preventDefault();
               if (busy) return;
               act(async () => {
-                const result = await post('/communications/broadcasts', { contact_ids: chosen, template_id: templateId, idempotency_key: crypto.randomUUID() });
+                const result = await post<{ total: number }>('/communications/broadcasts', { contact_ids: chosen, template_id: templateId, idempotency_key: crypto.randomUUID() });
                 notify(`${result.total} mensagem(ns) na fila.`);
                 setComposing(false);
                 setChosen([]);

@@ -72,7 +72,7 @@ def normalize_text(value):
     return ' '.join(str(value or '').split())
 
 
-def conversation_for(connection, phone, name=None):
+def conversation_for(connection, phone, name=None, historical=False):
     phone = normalize_phone(phone)
     variants = phone_variants(phone)
     row = (
@@ -93,9 +93,10 @@ def conversation_for(connection, phone, name=None):
                 contact = new(
                     Contact, connection.workspace_id, name=(name or phone)[:180], phone=phone, source='WhatsApp'
                 )
-                from .automations import emit
+                if not historical:
+                    from .automations import emit
 
-                emit(connection.workspace_id, 'contact.created', contact.id, contact)
+                    emit(connection.workspace_id, 'contact.created', contact.id, contact)
             row = new(
                 WhatsAppConversation,
                 connection.workspace_id,
@@ -122,7 +123,7 @@ def ingest(connection, raw, historical=False):
     existing = WhatsAppMessage.query.filter_by(workspace_id=connection.workspace_id, provider_id=provider_id).first()
     if existing:
         return existing, False
-    conversation = conversation_for(connection, normalized['phone'], raw.get('pushName'))
+    conversation = conversation_for(connection, normalized['phone'], raw.get('pushName'), historical=historical)
     conversation = WhatsAppConversation.query.filter_by(id=conversation.id).with_for_update().one()
     # Re-check after locking: retries may race between HTTP workers.
     existing = WhatsAppMessage.query.filter_by(workspace_id=connection.workspace_id, provider_id=provider_id).first()
@@ -178,6 +179,9 @@ def ingest(connection, raw, historical=False):
         conversation.last_message_at = timestamp
         conversation.last_message_preview = row.content[:255]
     if not historical and not outgoing:
+        from .notifications import record
+
+        record(conversation, row, 'whatsapp')
         conversation.unread_count += 1
         conversation.status = 'open'
         if conversation.contact_id:

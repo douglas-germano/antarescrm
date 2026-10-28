@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, useId, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { Loader2, Search, X, FolderOpen, ArrowUpRight, AlertCircle } from 'lucide-react';
+import { Loader2, Search, X, FolderOpen, ArrowUpRight, AlertCircle, ChevronDown } from 'lucide-react';
 import { statuses, priorities } from '@/lib/format';
 import type { Field, FormData } from '@/lib/types';
 import { EntitySelect } from '@/components/contacts/entity-select';
@@ -10,7 +10,7 @@ export function Button({
   className = '',
   children,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'danger' }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'soft' | 'danger' }) {
   return (
     <button type="button" {...props} className={`btn btn-${variant} ${className}`}>
       {children}
@@ -30,19 +30,22 @@ export function PageHeader({
   title,
   description,
   children,
+  aside,
   compact = false,
 }: {
   eyebrow?: string;
   title: string;
   description?: string;
   children?: ReactNode;
+  /** Sits right after the title, e.g. a selector for which board is shown. */
+  aside?: ReactNode;
   compact?: boolean;
 }) {
   return (
     <header className={'page-header' + (compact ? ' compact-header' : '')}>
       <div>
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-        <h1>{title}</h1>
+        {aside ? <div className="page-title-row"><h1>{title}</h1>{aside}</div> : <h1>{title}</h1>}
         {description && <p className="page-description">{description}</p>}
       </div>
       <div className="header-actions">{children}</div>
@@ -54,11 +57,13 @@ export function StatCard({
   value,
   detail,
   icon,
+  trend,
 }: {
   label: string;
   value: ReactNode;
   detail?: ReactNode;
   icon?: ReactNode;
+  trend?: { value: number; label: string };
 }) {
   return (
     <div className="stat-card">
@@ -68,6 +73,9 @@ export function StatCard({
       </div>
       <strong className="stat-value">{value}</strong>
       {detail && <span className="stat-detail">{detail}</span>}
+      {trend && <span className={'stat-trend ' + (trend.value > 0 ? 'up' : trend.value < 0 ? 'down' : '')}>
+        {trend.value > 0 ? '+' : ''}{trend.value}% <span>{trend.label}</span>
+      </span>}
     </div>
   );
 }
@@ -145,6 +153,48 @@ export function SearchInput({
           <X size={15} />
         </button>
       )}
+    </div>
+  );
+}
+/** A button that opens a small panel below it; closes on outside click and Escape. */
+export function Popover({
+  label,
+  icon,
+  badge,
+  align = 'start',
+  variant = 'secondary',
+  panelClassName = '',
+  ariaLabel,
+  children,
+}: {
+  label: string;
+  /** For icon-only triggers (no label), e.g. a row's ⋮ menu. */
+  ariaLabel?: string;
+  icon?: ReactNode;
+  badge?: ReactNode;
+  align?: 'start' | 'end';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'soft';
+  panelClassName?: string;
+  children: (close: () => void) => ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const id = useId();
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { setOpen(false); trigger.current?.focus(); } };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  return (
+    <div className="popover" ref={root}>
+      <button ref={trigger} type="button" className={`btn btn-${variant}` + (label ? '' : ' popover-icon')} aria-label={ariaLabel} aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+        {icon}{label}{badge}{label && <ChevronDown size={14} className="popover-caret" />}
+      </button>
+      {open && <div id={id} className={`popover-panel popover-${align} ${panelClassName}`}>{children(() => setOpen(false))}</div>}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
-  LayoutDashboard,
+  House,
   MessageCircle,
   Users,
   Building2,
@@ -15,23 +15,22 @@ import {
   Settings,
   Menu,
   X,
-  ChevronRight,
-  PanelLeftClose,
   FileInput,
   Workflow,
   Filter,
+  Mail,
 } from 'lucide-react';
 import { useSession } from '@/components/providers';
-import { useData } from '@/lib/api';
-import type { Workspace } from '@/lib/types';
+import { useMessageNotifications } from '@/components/inbox/message-notifications';
 import { DataState } from '@/components/ui';
 const links = [
-  { href: '/', label: 'Visão geral', icon: LayoutDashboard },
+  { href: '/', label: 'Visão geral', icon: House },
   { href: '/contatos', label: 'Contatos', icon: Users },
   { href: '/empresas', label: 'Empresas', icon: Building2 },
   { href: '/crm', label: 'Funil de vendas', icon: KanbanSquare },
   { href: '/projetos', label: 'Projetos', icon: FolderKanban },
   { href: '/mensagens', label: 'Caixa de entrada', icon: MessageCircle },
+  { href: '/campanhas', label: 'Campanhas', icon: Mail },
   { href: '/tarefas', label: 'Tarefas', icon: CheckSquare },
   { href: '/agenda', label: 'Atividades', icon: CalendarDays },
   { href: '/formularios', label: 'Formulários', icon: FileInput },
@@ -40,21 +39,25 @@ const links = [
   { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
 ];
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, workspace, loading, error } = useSession();
-  const agencyAdmin = workspace && !workspace.parent_workspace_id && user?.workspace_id === workspace.id && ['owner', 'admin'].includes(user?.role || '');
-  const { data: accessibleAccounts } = useData<{ items: Workspace[] }>(user ? '/auth/workspaces' : null);
-  const canChooseAccount = agencyAdmin || (workspace && user?.workspace_id !== workspace.id) || (accessibleAccounts?.items.length || 0) > 1;
-  const navigation = canChooseAccount ? [...links, { href: '/clientes', label: 'Contas de clientes', icon: Building2 }] : links;
+  const { user, loading, error } = useSession();
+  const { count: unreadMessages } = useMessageNotifications();
+  const inboxLabel = unreadMessages ? `Caixa de entrada: ${unreadMessages} ${unreadMessages === 1 ? 'mensagem não lida' : 'mensagens não lidas'}` : 'Caixa de entrada';
+  const visibleLinks = links.filter(link => link.href !== '/campanhas' || ['owner', 'admin'].includes(user?.role || ''));
+  const navigation = visibleLinks;
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => {
-    try { setCollapsed(localStorage.getItem('antares.sidebar.collapsed') === 'true'); } catch { /* Storage may be unavailable. */ }
-  }, []);
-  function toggleSidebar() {
-    const next = !collapsed;
-    setCollapsed(next);
-    try { localStorage.setItem('antares.sidebar.collapsed', String(next)); } catch { /* Keep the current session usable. */ }
+  // One floating label for the whole rail: the nav scrolls, so a per-item tooltip would be clipped.
+  const [tip, setTip] = useState<{ label: string; top: number } | null>(null);
+  const tipProps = (label: string) => ({
+    onMouseEnter: (event: React.MouseEvent<HTMLElement>) => showTip(event.currentTarget, label),
+    onFocus: (event: React.FocusEvent<HTMLElement>) => showTip(event.currentTarget, label),
+    onMouseLeave: () => setTip(null),
+    onBlur: () => setTip(null),
+  });
+  function showTip(target: HTMLElement, label: string) {
+    if (open) return;
+    const rect = target.getBoundingClientRect();
+    setTip({ label, top: rect.top + rect.height / 2 });
   }
   const menuRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -86,34 +89,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [open]);
   const active = navigation.find((l) => (l.href === '/' ? pathname === '/' : pathname === l.href || pathname.startsWith(l.href + '/')));
   return (
-    <div className={'app' + (collapsed ? ' sidebar-collapsed' : '')}>
+    <div className="app">
       <a href="#main-content" className="skip-link">
         Ir para o conteúdo
       </a>
       {open && <div className="sidebar-scrim" onClick={() => setOpen(false)} />}
       <aside id="app-sidebar" ref={sidebarRef} className={'sidebar ' + (open ? 'sidebar-open' : '')}>
-        <button className="sidebar-toggle" type="button" onClick={toggleSidebar}
-          aria-label={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
-          title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
-          aria-expanded={!collapsed} aria-controls="app-sidebar">
-          <PanelLeftClose size={16} strokeWidth={1.8} />
-        </button>
         <div className="sidebar-header">
           <Link href="/" className="brand" onClick={() => setOpen(false)} aria-label="Antares CRM — visão geral">
-            <img src="/mark.svg" width="40" height="40" alt="" />
+            <img src="/mark.svg" width="36" height="36" alt="" />
             <span>antares<strong>crm</strong></span>
           </Link>
           <button className="sidebar-close" aria-label="Fechar navegação" onClick={() => { setOpen(false); menuRef.current?.focus(); }}><X size={18} /></button>
         </div>
         <nav aria-label="Navegação principal">
           {navigation.map((l) => (
-            <Link key={l.href} href={l.href} aria-label={l.label} title={l.label}
+            <Link key={l.href} href={l.href}
+              aria-label={l.href === '/mensagens' ? inboxLabel : l.label}
+              {...tipProps(l.label)}
               className={active?.href === l.href ? 'active' : ''}
               aria-current={active?.href === l.href ? 'page' : undefined}
               onClick={() => setOpen(false)}>
               <l.icon size={20} strokeWidth={1.7} />
               <span>{l.label}</span>
-              {active?.href === l.href && <ChevronRight className="nav-active-arrow" size={14} />}
+              {l.href === '/mensagens' && unreadMessages > 0 && <strong className="nav-unread-count" aria-hidden="true">{unreadMessages > 99 ? '99+' : unreadMessages}</strong>}
             </Link>
           ))}
         </nav>
@@ -121,16 +120,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             className={'settings-link ' + (pathname === '/configuracoes' ? 'active' : '')}
             aria-label="Configurações"
-            title="Configurações"
+            {...tipProps('Configurações')}
             aria-current={pathname === '/configuracoes' ? 'page' : undefined}
             href="/configuracoes"
             onClick={() => setOpen(false)}
           >
-            <Settings size={20} />
+            <Settings size={20} strokeWidth={1.7} />
             <span>Configurações</span>
           </Link>
         </div>
       </aside>
+      {tip && <div className="sidebar-tooltip" role="tooltip" style={{ top: tip.top }}>{tip.label}</div>}
       <button
         ref={menuRef}
         aria-controls="app-sidebar"

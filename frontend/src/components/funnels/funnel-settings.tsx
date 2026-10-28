@@ -25,7 +25,7 @@ export function FunnelSettings({ funnel, onChange }: { funnel: Funnel; onChange:
     </CardBody></Card>
     <Card as="section"><CardHeader title="Aparência das páginas" /><CardBody>
       <div className="bld-fields">
-        <ColorInput label="Cor de destaque (botões e ícones)" value={funnel.theme.accent_color} fallback="#e60000" onChange={(accent_color) => theme({ accent_color })} />
+        <ColorInput label="Cor de destaque (botões e ícones)" value={funnel.theme.accent_color} fallback="#ef2f70" onChange={(accent_color) => theme({ accent_color })} />
         <ColorInput label="Fundo" value={funnel.theme.background} onChange={(background) => theme({ background })} />
         <ColorInput label="Cor do texto" value={funnel.theme.text_color} fallback="#25282b" onChange={(text_color) => theme({ text_color })} />
         <SelectInput label="Fonte" value={funnel.theme.font} onChange={(font) => theme({ font })} options={Object.entries(FONT_LABELS).map(([value, label]) => ({ value: value as Theme['font'], label }))} />

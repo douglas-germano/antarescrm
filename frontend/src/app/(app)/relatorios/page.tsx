@@ -118,13 +118,13 @@ export default function ReportsPage() {
                         <YAxis yAxisId="money" tick={{ fontSize: 11 }} tickFormatter={(v) => brl(v).replace(',00', '')} width={84} />
                         <YAxis yAxisId="count" orientation="right" allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
                         <Tooltip formatter={(v, name) => (name === 'Vendido' ? brl(v) : v)} />
-                        <Bar yAxisId="money" dataKey="won_amount" name="Vendido" fill="#e60000" radius={[4, 4, 0, 0]} />
+                        <Bar yAxisId="money" dataKey="won_amount" name="Vendido" fill="#ef2f70" radius={[4, 4, 0, 0]} />
                         <Line yAxisId="count" dataKey="new_deals" name="Novos negócios" stroke="#25282b" strokeWidth={2} dot={false} />
                         <Line yAxisId="count" dataKey="new_contacts" name="Novos contatos" stroke="#9a9c9e" strokeWidth={2} dot={false} strokeDasharray="4 3" />
                       </ComposedChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="rep-legend"><span><i style={{ background: '#e60000' }} /> Vendido</span><span><i style={{ background: '#25282b' }} /> Novos negócios</span><span><i style={{ background: '#9a9c9e' }} /> Novos contatos</span></div>
+                  <div className="rep-legend"><span><i style={{ background: '#ef2f70' }} /> Vendido</span><span><i style={{ background: '#25282b' }} /> Novos negócios</span><span><i style={{ background: '#9a9c9e' }} /> Novos contatos</span></div>
                 </CardBody>
               </Card>
 

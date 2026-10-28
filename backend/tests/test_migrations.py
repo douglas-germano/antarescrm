@@ -80,3 +80,43 @@ def test_operations_upgrade_preserves_existing_form_and_rule(tmp_path):
         assert rule.active and not rule.stop_on_reply and rule.conditions == {}
         db.session.remove()
         db.engine.dispose()
+
+
+def test_campaign_channel_upgrade_preserves_existing_email_campaign_and_recipients(tmp_path):
+    app = create_app(
+        {
+            'TESTING': True,
+            'SQLALCHEMY_DATABASE_URI': 'sqlite:///' + str(tmp_path / 'campaigns.sqlite'),
+            'SQLALCHEMY_ENGINE_OPTIONS': {},
+            'RATELIMIT_ENABLED': False,
+        }
+    )
+    directory = str(Path(__file__).resolve().parents[1] / 'migrations')
+    with app.app_context():
+        upgrade(directory=directory, revision='20261022_brevo')
+        for statement in [
+            "INSERT INTO workspaces (id,name,slug,timezone,active,created_at,updated_at) VALUES ('legacy','Legacy','legacy','America/Cuiaba',true,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+            "INSERT INTO contacts (id,workspace_id,name,email,archived,created_at,updated_at) VALUES ('contact','legacy','Preserved','person@example.test',false,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+            "INSERT INTO email_campaigns (id,workspace_id,name,subject,content,audience,status,recipient_count,created_at,updated_at) VALUES ('campaign','legacy','Preserved campaign','Subject','Content','{}','ready',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+            "INSERT INTO campaign_recipients (id,workspace_id,campaign_id,contact_id,email,status,events,created_at,updated_at) VALUES ('recipient','legacy','campaign','contact','person@example.test','prepared','{}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+        ]:
+            db.session.execute(db.text(statement))
+        db.session.commit()
+        for revision in ('head', '20261022_brevo', 'head'):
+            db.session.remove()
+            (upgrade if revision == 'head' else downgrade)(directory=directory, revision=revision)
+            assert (
+                db.session.execute(db.text("SELECT name FROM email_campaigns WHERE id='campaign'")).scalar()
+                == 'Preserved campaign'
+            )
+            assert (
+                db.session.execute(db.text("SELECT email FROM campaign_recipients WHERE id='recipient'")).scalar()
+                == 'person@example.test'
+            )
+            if revision == 'head':
+                assert (
+                    db.session.execute(db.text("SELECT channel FROM email_campaigns WHERE id='campaign'")).scalar()
+                    == 'email'
+                )
+        db.session.remove()
+        db.engine.dispose()

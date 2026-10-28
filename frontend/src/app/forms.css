@@ -33,9 +33,9 @@
 .fv-button:disabled { opacity: .6; cursor: progress; }
 .fv-button-full { width: 100%; }
 .fv-success { text-align: center; padding: var(--space-5) 0; }
-.fv-success svg { color: var(--f-accent, #e60000); margin-bottom: var(--space-5); }
+.fv-success svg { color: var(--f-accent, var(--primary)); margin-bottom: var(--space-5); }
 .fv-success p { opacity: .72; margin-top: var(--space-4); line-height: 1.6; }
 .fv-form [data-selected] { outline: 2px dashed transparent; outline-offset: 4px; border-radius: 4px; cursor: pointer; }
-.fv-form [data-selected]:hover { outline-color: #e6000066; }
-.fv-form [data-selected='true'] { outline: 2px solid #e60000; }
+.fv-form [data-selected]:hover { outline-color: var(--primary-outline); }
+.fv-form [data-selected='true'] { outline: 2px solid var(--primary); }
 @media (prefers-reduced-motion: no-preference) { .fv-button { transition: filter .15s; } }

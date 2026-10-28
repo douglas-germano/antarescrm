@@ -20,7 +20,8 @@ from ..models import (
     Workspace,
     now,
 )
-from ..schemas import StrictSchema, choice, ref, text
+from ..schemas import OpportunitySchema, StrictSchema, choice, ref, text
+from ..services import inbox_opportunities, notifications
 from ..services.automations import received_reply
 from ..services.communications import account_config, available, dispatch, enqueue, render
 from ..services.instagram import send_reply
@@ -52,6 +53,17 @@ class ReceiveSchema(StrictSchema):
 class ReplySchema(StrictSchema):
     content = text(20000, required=True)
     idempotency_key = ref(required=True)
+
+
+class InboxContactSchema(StrictSchema):
+    name = text(required=True)
+    email = f.Email(allow_none=True, validate=validate.Length(max=254))
+    phone = text(30, allow_none=True)
+
+
+class InboxOpportunitySchema(OpportunitySchema):
+    idempotency_key = ref(required=True)
+    contact = f.Nested(InboxContactSchema)
 
 
 @bp.get('/communications/channels')
@@ -158,8 +170,60 @@ def inbox():
                 'preview': thread.last_message_preview or '',
             }
         )
+    counts = notifications.thread_counts()
+    for item in items:
+        key = (item['source'], item['id'])
+        if key in counts:
+            item['unread_count'] = counts[key]
     items.sort(key=lambda row: row.get('last_message_at') or row.get('updated_at') or '', reverse=True)
     return {'items': items}
+
+
+class NotificationReadSchema(StrictSchema):
+    source = choice('whatsapp inbox', required=True)
+    thread_id = ref(required=True)
+    message_id = ref(required=True)
+
+
+@bp.get('/inbox/notifications')
+@require()
+def notification_feed():
+    return notifications.feed()
+
+
+@bp.post('/inbox/notifications/read')
+@require()
+@limiter.limit('120 per minute')
+def notification_read():
+    data = payload(NotificationReadSchema)
+    notifications.read_message(data['source'], data['thread_id'], data['message_id'])
+    db.session.commit()
+    return {'read': True}
+
+
+@bp.post('/inbox/notifications/read-all')
+@require()
+@limiter.limit('30 per minute')
+def notification_read_all():
+    notifications.read_all()
+    db.session.commit()
+    return {'read': True}
+
+
+@bp.get('/inbox/<source>/<uuid:thread_id>')
+@require()
+def inbox_thread(source, thread_id):
+    if source not in ('whatsapp', 'inbox'):
+        raise APIError('Conversa não encontrada.', 404)
+    thread = get(WhatsAppConversation if source == 'whatsapp' else InboxThread, thread_id)
+    contact = query(Contact).filter_by(id=thread.contact_id).first() if thread.contact_id else None
+    return {
+        **thread.to_dict(),
+        'source': source,
+        'channel': 'whatsapp' if source == 'whatsapp' else thread.channel,
+        'address': thread.phone if source == 'whatsapp' else thread.address,
+        'contact_name': contact.name if contact else getattr(thread, 'contact_name', None),
+    }
 
 
 @bp.get('/inbox/<source>/<uuid:thread_id>/messages')
@@ -174,6 +238,19 @@ def messages(source, thread_id):
         raise APIError('Conversa não encontrada.', 404)
     thread = get(InboxThread, thread_id)
     return page(query(InboxMessage).filter_by(thread_id=thread.id).order_by(InboxMessage.created_at.desc()))
+
+
+@bp.post('/inbox/<source>/<uuid:thread_id>/opportunities')
+@require()
+@limiter.limit('20 per minute')
+def create_inbox_opportunity(source, thread_id):
+    if source not in ('whatsapp', 'inbox'):
+        raise APIError('Conversa não encontrada.', 404)
+    data = payload(InboxOpportunitySchema)
+    thread = get(WhatsAppConversation if source == 'whatsapp' else InboxThread, thread_id, lock=True)
+    row, status = inbox_opportunities.create(thread, source, data)
+    db.session.commit()
+    return {'opportunity': row.to_dict(), 'conversation': thread.to_dict()}, status
 
 
 @bp.post('/inbox/<source>/<uuid:thread_id>/messages')
@@ -261,6 +338,7 @@ def receive(workspace_id, channel):
     )
     db.session.add(row)
     db.session.flush()
+    notifications.record(thread, row, 'inbox')
     if contact:
         received_reply(workspace_id, contact, row.id)
     db.session.add(
