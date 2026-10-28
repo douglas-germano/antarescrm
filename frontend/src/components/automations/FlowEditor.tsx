@@ -2,12 +2,15 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Clock, Copy, Filter, Maximize2, Pencil, Plus, Trash2, X, Zap, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Copy, Filter, GitBranch, Maximize2, Pencil, Plus, Trash2, X, Zap, ZoomIn, ZoomOut } from 'lucide-react';
 import { post, patch, refreshAll } from '@/lib/api';
 import { useNotify } from '@/components/providers';
-import { Button } from '@/components/ui';
+import { Button, ConfirmDialog } from '@/components/ui';
 import { ConditionsEditor, emptyConditions, type Conditions } from '@/components/automations/conditions-editor';
-import { ACTIONS, DELAY_UNITS, EVENTS, describeStep, formatDelay, newStep, splitDelay, stepPayload, stepProblem, type Step } from '@/components/automations/model';
+import {
+  ACTIONS, BRANCH_LABEL, DELAY_UNITS, EVENTS, MAX_DEPTH, MAX_PATH_STEPS, MAX_STEPS, countSteps, describeStep, editList, firstProblem,
+  formatDelay, listAt, newBranch, newStep, pathKey, splitDelay, stepAt, stepPayload, stepProblem, type Step, type StepPath,
+} from '@/components/automations/model';
 import { actionIcon, eventIcon, isInstagram } from '@/components/automations/icons';
 import type { Row } from '@/lib/types';
 
@@ -16,8 +19,7 @@ export type FlowDraft = {
   id?: string; name: string; event: string; source: string; required_tag: string; assignee_id: string;
   active: boolean; stop_on_reply: boolean; conditions: Conditions; steps: Step[];
 };
-type Selection = 'trigger' | number | null;
-const MAX_STEPS = 10;
+type Selection = 'trigger' | StepPath | null;
 const ZOOMS = [0.6, 0.75, 0.9, 1, 1.15, 1.3];
 
 function DelayField({ minutes, onChange }: { minutes: number; onChange: (minutes: number) => void }) {
@@ -49,11 +51,17 @@ function Connector({ delay, onInsert, disabled }: { delay?: number; onInsert: ()
   );
 }
 
-function NodeFooter({ onAdd, disabled }: { onAdd: () => void; disabled: boolean }) {
+/** "Próximo passo" adds an action after the card; "Ramificar" splits everything after it into Sim / Não. */
+function NodeFooter({ onAdd, onBranch, disabled, branchDisabled }: { onAdd: () => void; onBranch: () => void; disabled: boolean; branchDisabled: boolean }) {
   return (
-    <button type="button" className="flow-next" disabled={disabled} onClick={(e) => { e.stopPropagation(); onAdd(); }}>
-      Próximo passo <Plus size={12} />
-    </button>
+    <div className="flow-node-footer">
+      <button type="button" className="flow-next" disabled={branchDisabled} data-tip="Dividir o fluxo em dois caminhos por condição" onClick={(e) => { e.stopPropagation(); onBranch(); }}>
+        Ramificar <GitBranch size={12} />
+      </button>
+      <button type="button" className="flow-next" disabled={disabled} onClick={(e) => { e.stopPropagation(); onAdd(); }}>
+        Próximo passo <Plus size={12} />
+      </button>
+    </div>
   );
 }
 
@@ -67,38 +75,60 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState('');
   const [editingName, setEditingName] = useState(!initial.id && !initial.name);
+  const [removingBranch, setRemovingBranch] = useState<StepPath | null>(null);
   const lookups = {
     template: (id?: string) => templates.find((t) => t.id === id)?.name,
     stage: (id?: string) => stages.find((s) => s.id === id)?.name,
   };
   const update = (patchDraft: Partial<FlowDraft>) => { setDraft((d) => ({ ...d, ...patchDraft })); setDirty(true); setFailure(''); };
-  const updateStep = (index: number, patchStep: Partial<Step>) => update({ steps: draft.steps.map((s, i) => (i === index ? { ...s, ...patchStep } : s)) });
-  const insertStep = (at: number) => {
-    if (draft.steps.length >= MAX_STEPS) return;
-    update({ steps: [...draft.steps.slice(0, at), newStep(), ...draft.steps.slice(at)] });
-    setSelected(at);
+  const total = countSteps(draft.steps);
+  const setSteps = (listPath: StepPath, edit: (list: Step[]) => Step[]) => update({ steps: editList(draft.steps, listPath, edit) });
+  const updateStep = (path: StepPath, patchStep: Partial<Step>) => {
+    const index = path[path.length - 1] as number;
+    setSteps(path.slice(0, -1), (list) => list.map((s, i) => (i === index ? { ...s, ...patchStep } : s)));
   };
-  const moveStep = (index: number, direction: -1 | 1) => {
+  /** A path is full at 10 steps, the flow at 30 in all; a branch also needs room for its depth. */
+  const canInsert = (listPath: StepPath) => total < MAX_STEPS && listAt(draft.steps, listPath).length < MAX_PATH_STEPS;
+  const canBranch = (listPath: StepPath) => total < MAX_STEPS && listPath.length / 2 < MAX_DEPTH;
+  const insertStep = (listPath: StepPath, at: number) => {
+    if (!canInsert(listPath)) return;
+    setSteps(listPath, (list) => [...list.slice(0, at), newStep(), ...list.slice(at)]);
+    setSelected([...listPath, at]);
+  };
+  // The steps after the split point move into the "Sim" path, so nothing the user built is lost.
+  const insertBranch = (listPath: StepPath, at: number) => {
+    if (!canBranch(listPath)) return;
+    setSteps(listPath, (list) => [...list.slice(0, at), newBranch(list.slice(at))]);
+    setSelected([...listPath, at]);
+  };
+  const moveStep = (path: StepPath, direction: -1 | 1) => {
+    const index = path[path.length - 1] as number;
+    const listPath = path.slice(0, -1);
+    const list = listAt(draft.steps, listPath);
     const target = index + direction;
-    if (target < 0 || target >= draft.steps.length) return;
-    const steps = [...draft.steps];
-    [steps[index], steps[target]] = [steps[target], steps[index]];
-    update({ steps });
-    setSelected(target);
+    if (target < 0 || target >= list.length || list[target].kind === 'branch') return;
+    setSteps(listPath, (items) => { const next = [...items]; [next[index], next[target]] = [next[target], next[index]]; return next; });
+    setSelected([...listPath, target]);
   };
-  const removeStep = (index: number) => { update({ steps: draft.steps.filter((_, i) => i !== index) }); setSelected(null); };
-  const duplicateStep = (index: number) => {
-    if (draft.steps.length >= MAX_STEPS) return;
-    update({ steps: [...draft.steps.slice(0, index + 1), { ...draft.steps[index] }, ...draft.steps.slice(index + 1)] });
-    setSelected(index + 1);
+  const removeStep = (path: StepPath) => {
+    const index = path[path.length - 1] as number;
+    setSteps(path.slice(0, -1), (list) => list.filter((_, i) => i !== index));
+    setSelected(null);
+  };
+  const duplicateStep = (path: StepPath) => {
+    const index = path[path.length - 1] as number;
+    const listPath = path.slice(0, -1);
+    if (!canInsert(listPath)) return;
+    setSteps(listPath, (list) => [...list.slice(0, index + 1), { ...list[index] }, ...list.slice(index + 1)]);
+    setSelected([...listPath, index + 1]);
   };
 
   async function save() {
     if (busy) return;
     if (!draft.name.trim()) { setEditingName(true); setFailure('Dê um nome à automação.'); return; }
     if (!draft.steps.length) { setFailure('Adicione ao menos um passo depois do gatilho.'); return; }
-    const broken = draft.steps.findIndex((step) => stepProblem(step));
-    if (broken >= 0) { setSelected(broken); setFailure(`Passo ${broken + 1}: ${stepProblem(draft.steps[broken])}`); return; }
+    const broken = firstProblem(draft.steps);
+    if (broken) { setSelected(broken.path); setFailure(broken.problem); return; }
     setBusy(true);
     setFailure('');
     const body = {
@@ -134,8 +164,8 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
     draft.source && `Origem: ${draft.source}`,
     draft.required_tag && `Tag: ${draft.required_tag}`,
   ].filter(Boolean).join(' · ');
-  const full = draft.steps.length >= MAX_STEPS;
-  const step = typeof selected === 'number' ? draft.steps[selected] : null;
+  const stepPath = Array.isArray(selected) ? selected : null;
+  const step = stepPath ? stepAt(draft.steps, stepPath) : null;
 
   let panel: ReactNode = null;
   if (selected === 'trigger') {
@@ -154,51 +184,133 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
           <option value="">Sem responsável</option>{staff.filter((u) => u.active).map((u) => <option value={u.id} key={u.id}>{u.name}</option>)}
         </select></div>
     </>;
-  } else if (step && typeof selected === 'number') {
-    const index = selected;
+  } else if (step && stepPath && step.kind === 'branch') {
+    const path = stepPath;
+    panel = <>
+      <p className="muted">Quando o fluxo chegar aqui, o contato é avaliado. Se atender às condições, segue pelo caminho <b>Sim</b>; senão, pelo <b>Não</b>.</p>
+      <DelayField key={pathKey(path)} minutes={step.delay_minutes} onChange={(minutes) => updateStep(path, { delay_minutes: minutes })} />
+      <ConditionsEditor label="Condições do caminho Sim" value={{ ...emptyConditions(), ...step.conditions }} onChange={(value) => updateStep(path, { conditions: value })} />
+      <div className="flow-panel-tools">
+        <span className="spacer" />
+        <Button variant="ghost" onClick={() => (countSteps([step]) > 1 ? setRemovingBranch(path) : removeStep(path))}><Trash2 size={15} />Excluir ramificação</Button>
+      </div>
+    </>;
+  } else if (step && stepPath) {
+    const path = stepPath;
+    const index = path[path.length - 1] as number;
+    const siblings = listAt(draft.steps, path.slice(0, -1));
     panel = <>
       <div className="field"><label htmlFor="flow-action">Ação</label>
-        <select id="flow-action" value={step.kind} onChange={(e) => updateStep(index, { kind: e.target.value })}>
+        <select id="flow-action" value={step.kind} onChange={(e) => updateStep(path, { kind: e.target.value })}>
           {Object.entries(ACTIONS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></div>
-      <DelayField key={index} minutes={step.delay_minutes} onChange={(minutes) => updateStep(index, { delay_minutes: minutes })} />
+      <DelayField key={pathKey(path)} minutes={step.delay_minutes} onChange={(minutes) => updateStep(path, { delay_minutes: minutes })} />
       {step.kind === 'send_message' && (
         <div className="field"><label>Modelo de mensagem</label>
-          <select aria-label="Modelo de mensagem" value={step.template_id || ''} onChange={(e) => updateStep(index, { template_id: e.target.value })}>
+          <select aria-label="Modelo de mensagem" value={step.template_id || ''} onChange={(e) => updateStep(path, { template_id: e.target.value })}>
             <option value="">Selecione um modelo</option>{templates.map((t) => <option key={t.id} value={t.id}>{t.name} · {t.channel}</option>)}
           </select></div>
       )}
       {(step.kind === 'reply_comment' || step.kind === 'private_reply') && (
         <div className="field"><label>{step.kind === 'reply_comment' ? 'Resposta pública ao comentário' : 'Mensagem privada (direct)'}</label>
-          <textarea rows={4} maxLength={1000} aria-label="Texto da resposta" value={step.content || ''} onChange={(e) => updateStep(index, { content: e.target.value })} placeholder="Ex.: Oi, {{name}}! Obrigado pelo comentário." />
+          <textarea rows={4} maxLength={1000} aria-label="Texto da resposta" value={step.content || ''} onChange={(e) => updateStep(path, { content: e.target.value })} placeholder="Ex.: Oi, {{name}}! Obrigado pelo comentário." />
           <small>Use {'{{name}}'} para o nome e {'{{username}}'} para o @. Cada comentário recebe no máximo uma resposta de cada tipo, com limite de 60 por hora. A mensagem privada só pode ser enviada até 7 dias após o comentário.</small></div>
       )}
       {step.kind === 'add_tag' && (
-        <div className="field"><label>Tag</label><input maxLength={80} aria-label="Tag" value={step.tag || ''} onChange={(e) => updateStep(index, { tag: e.target.value })} placeholder="Ex.: cliente" /></div>
+        <div className="field"><label>Tag</label><input maxLength={80} aria-label="Tag" value={step.tag || ''} onChange={(e) => updateStep(path, { tag: e.target.value })} placeholder="Ex.: cliente" /></div>
       )}
       {step.kind === 'move_stage' && (
         <div className="field"><label>Etapa de destino</label>
-          <select aria-label="Etapa de destino" value={step.stage_id || ''} onChange={(e) => updateStep(index, { stage_id: e.target.value })}>
+          <select aria-label="Etapa de destino" value={step.stage_id || ''} onChange={(e) => updateStep(path, { stage_id: e.target.value })}>
             <option value="">Selecione…</option>{stages.map((s) => <option key={s.id} value={s.id}>{s.pipeline_name} · {s.name}</option>)}
           </select>
           <small>Só atua em negócios em aberto ligados ao evento.</small></div>
       )}
       {(step.kind === 'create_task' || step.kind === 'follow_up') && <>
-        <div className="field"><label>Título</label><input maxLength={180} aria-label="Título" value={step.title || ''} onChange={(e) => updateStep(index, { title: e.target.value })} /></div>
-        <div className="field"><label>{step.kind === 'follow_up' ? 'Retorno em (dias)' : 'Prazo da tarefa (dias)'}</label><input type="number" min={0} max={365} aria-label="Dias" value={step.due_days} onChange={(e) => updateStep(index, { due_days: Number(e.target.value) })} /></div>
+        <div className="field"><label>Título</label><input maxLength={180} aria-label="Título" value={step.title || ''} onChange={(e) => updateStep(path, { title: e.target.value })} /></div>
+        <div className="field"><label>{step.kind === 'follow_up' ? 'Retorno em (dias)' : 'Prazo da tarefa (dias)'}</label><input type="number" min={0} max={365} aria-label="Dias" value={step.due_days} onChange={(e) => updateStep(path, { due_days: Number(e.target.value) })} /></div>
       </>}
       <details className="auto-step-conditions" open={!!step.conditions?.items?.length}>
         <summary>Executar somente se…{step.conditions?.items?.length ? ` (${step.conditions.items.length})` : ''}</summary>
-        <ConditionsEditor label="Condições deste passo" value={{ ...emptyConditions(), ...step.conditions }} onChange={(value) => updateStep(index, { conditions: value })} />
+        <ConditionsEditor label="Condições deste passo" value={{ ...emptyConditions(), ...step.conditions }} onChange={(value) => updateStep(path, { conditions: value })} />
       </details>
       <div className="flow-panel-tools">
-        <button type="button" className="icon-btn" aria-label="Mover para antes" data-tip="Mover para antes" data-tip-align="start" disabled={index === 0} onClick={() => moveStep(index, -1)}><ArrowLeft size={15} /></button>
-        <button type="button" className="icon-btn" aria-label="Mover para depois" data-tip="Mover para depois" disabled={index === draft.steps.length - 1} onClick={() => moveStep(index, 1)}><ArrowRight size={15} /></button>
-        <button type="button" className="icon-btn" aria-label="Duplicar passo" data-tip="Duplicar" disabled={full} onClick={() => duplicateStep(index)}><Copy size={15} /></button>
+        <button type="button" className="icon-btn" aria-label="Mover para antes" data-tip="Mover para antes" data-tip-align="start" disabled={index === 0} onClick={() => moveStep(path, -1)}><ArrowLeft size={15} /></button>
+        <button type="button" className="icon-btn" aria-label="Mover para depois" data-tip="Mover para depois" disabled={index === siblings.length - 1 || siblings[index + 1]?.kind === 'branch'} onClick={() => moveStep(path, 1)}><ArrowRight size={15} /></button>
+        <button type="button" className="icon-btn" aria-label="Duplicar passo" data-tip="Duplicar" disabled={!canInsert(path.slice(0, -1))} onClick={() => duplicateStep(path)}><Copy size={15} /></button>
         <span className="spacer" />
-        <Button variant="ghost" onClick={() => removeStep(index)}><Trash2 size={15} />Excluir passo</Button>
+        <Button variant="ghost" onClick={() => removeStep(path)}><Trash2 size={15} />Excluir passo</Button>
       </div>
     </>;
+  }
+
+  const isSelected = (path: StepPath) => Array.isArray(selected) && pathKey(selected) === pathKey(path);
+  const select = (path: StepPath) => (e: { stopPropagation: () => void }) => { e.stopPropagation(); setSelected(path); };
+
+  /** Draws one path of the flow; a branch at its end splits into a "Sim" row above a "Não" row. */
+  function renderPath(list: Step[], listPath: StepPath): ReactNode {
+    return list.map((s, index) => {
+      const path = [...listPath, index];
+      const problem = stepProblem(s);
+      const last = index === list.length - 1;
+      if (s.kind === 'branch') {
+        return (
+          <div className="flow-step-wrap" key={pathKey(path)}>
+            <Connector delay={s.delay_minutes} disabled={!canInsert(listPath)} onInsert={() => insertStep(listPath, index)} />
+            <article className={'flow-node flow-step flow-branch-node' + (isSelected(path) ? ' selected' : '') + (problem ? ' incomplete' : '')} onClick={select(path)}>
+              <span className="flow-port in" />
+              <header>
+                <span className="flow-row-icon branch"><GitBranch size={15} /></span>
+                <strong>Ramificação</strong>
+              </header>
+              <div className="flow-node-body">
+                {problem ? <span className="flow-missing">{problem}</span> : <p>{describeStep(s, lookups)}</p>}
+              </div>
+              <span className="flow-port out" />
+            </article>
+            <div className="flow-branches">
+              {(['yes', 'no'] as const).map((side) => {
+                const sub = s[side] || [];
+                const subPath = [...path, side];
+                return (
+                  <div className={'flow-branch-row ' + side} key={side}>
+                    <div className="flow-branch-lead">
+                      <span className="flow-line" />
+                      <span className={'flow-branch-label ' + side}>{side === 'yes' ? <><Check size={11} />Sim</> : <><X size={11} />Não</>}</span>
+                    </div>
+                    {sub.length ? renderPath(sub, subPath) : (
+                      <button type="button" className="flow-node flow-add flow-add-small" disabled={!canInsert(subPath)} onClick={(e) => { e.stopPropagation(); insertStep(subPath, 0); }}>
+                        <Plus size={15} />{side === 'yes' ? 'Passo se atender' : 'Passo se não atender'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+      return (
+        <div className="flow-step-wrap" key={pathKey(path)}>
+          <Connector delay={s.delay_minutes} disabled={!canInsert(listPath)} onInsert={() => insertStep(listPath, index)} />
+          <article className={'flow-node flow-step' + (isSelected(path) ? ' selected' : '') + (problem ? ' incomplete' : '')} onClick={select(path)}>
+            <span className="flow-port in" />
+            <header>
+              <span className={'flow-row-icon' + (isInstagram(s.kind) ? ' ig' : '')}>{actionIcon(s.kind)}</span>
+              <strong>{ACTIONS[s.kind] || s.kind}</strong>
+              <small className="flow-index">{index + 1}</small>
+            </header>
+            <div className="flow-node-body">
+              {problem ? <span className="flow-missing">{problem}</span> : <p>{describeStep(s, lookups)}</p>}
+              {!!s.conditions?.items?.length && <span className="deal-chip"><Filter size={10} />Se {s.conditions.items.length} {s.conditions.items.length === 1 ? 'condição' : 'condições'}</span>}
+            </div>
+            <NodeFooter disabled={!canInsert(listPath)} branchDisabled={!canBranch(listPath)}
+              onAdd={() => insertStep(listPath, index + 1)} onBranch={() => insertBranch(listPath, index + 1)} />
+            {!last && <span className="flow-port out" />}
+          </article>
+        </div>
+      );
+    });
   }
 
   return (
@@ -228,9 +340,9 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
 
       <div className="flow-body">
         {panel && (
-          <aside className="flow-panel" aria-label={selected === 'trigger' ? 'Gatilho' : 'Passo'}>
+          <aside className="flow-panel" aria-label={selected === 'trigger' ? 'Gatilho' : step?.kind === 'branch' ? 'Ramificação' : 'Passo'}>
             <header>
-              <h2>{selected === 'trigger' ? 'Gatilho' : `Passo ${(selected as number) + 1}`}</h2>
+              <h2>{selected === 'trigger' ? 'Gatilho' : step?.kind === 'branch' ? BRANCH_LABEL : 'Passo'}</h2>
               <button type="button" className="icon-btn" aria-label="Fechar painel" onClick={() => setSelected(null)}><X size={16} /></button>
             </header>
             <div className="flow-panel-body stack">{panel}</div>
@@ -254,36 +366,17 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
                   <span><b>Condições</b><small>{filters || 'Qualquer contato'}</small></span>
                   <ChevronRight size={14} />
                 </div>
-                <NodeFooter disabled={full} onAdd={() => insertStep(0)} />
+                <NodeFooter disabled={!canInsert([])} branchDisabled={!canBranch([])} onAdd={() => insertStep([], 0)} onBranch={() => insertBranch([], 0)} />
                 <span className="flow-port out" />
               </article>
             </div>
 
-            {draft.steps.map((s, index) => (
-              <div className="flow-step-wrap" key={index}>
-                <Connector delay={s.delay_minutes} disabled={full} onInsert={() => insertStep(index)} />
-                <article className={'flow-node flow-step' + (selected === index ? ' selected' : '') + (stepProblem(s) ? ' incomplete' : '')}
-                  onClick={(e) => { e.stopPropagation(); setSelected(index); }}>
-                  <span className="flow-port in" />
-                  <header>
-                    <span className={'flow-row-icon' + (isInstagram(s.kind) ? ' ig' : '')}>{actionIcon(s.kind)}</span>
-                    <strong>{ACTIONS[s.kind] || s.kind}</strong>
-                    <small className="flow-index">{index + 1}</small>
-                  </header>
-                  <div className="flow-node-body">
-                    {stepProblem(s) ? <span className="flow-missing">{stepProblem(s)}</span> : <p>{describeStep(s, lookups)}</p>}
-                    {!!s.conditions?.items?.length && <span className="deal-chip"><Filter size={10} />Se {s.conditions.items.length} {s.conditions.items.length === 1 ? 'condição' : 'condições'}</span>}
-                  </div>
-                  <NodeFooter disabled={full} onAdd={() => insertStep(index + 1)} />
-                  {index < draft.steps.length - 1 && <span className="flow-port out" />}
-                </article>
-              </div>
-            ))}
+            {renderPath(draft.steps, [])}
 
             {!draft.steps.length && (
               <div className="flow-step-wrap">
                 <div className="flow-connector"><span className="flow-line dashed" /></div>
-                <button type="button" className="flow-node flow-add" onClick={(e) => { e.stopPropagation(); insertStep(0); }}>
+                <button type="button" className="flow-node flow-add" onClick={(e) => { e.stopPropagation(); insertStep([], 0); }}>
                   <Plus size={18} />Adicionar o primeiro passo
                 </button>
               </div>
@@ -291,6 +384,9 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
           </div>
         </div>
 
+        <ConfirmDialog open={removingBranch !== null} onClose={() => setRemovingBranch(null)} title="Excluir ramificação?"
+          description="Os passos dos caminhos Sim e Não também serão excluídos."
+          onConfirm={async () => { if (removingBranch) removeStep(removingBranch); setRemovingBranch(null); }} />
         <div className="flow-tools" aria-label="Zoom">
           <button type="button" className="icon-btn" aria-label="Aproximar" data-tip="Aproximar" data-tip-align="end" disabled={zoom === ZOOMS.length - 1} onClick={() => setZoom((z) => z + 1)}><ZoomIn size={17} /></button>
           <button type="button" className="icon-btn" aria-label="Afastar" data-tip="Afastar" data-tip-align="end" disabled={zoom === 0} onClick={() => setZoom((z) => z - 1)}><ZoomOut size={17} /></button>

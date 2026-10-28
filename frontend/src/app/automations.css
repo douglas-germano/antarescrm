@@ -191,3 +191,20 @@
   .flow-panel { position: absolute; inset: 0 0 0 0; width: auto; }
   .flow-tools { top: auto; bottom: var(--space-4); transform: none; }
 }
+
+/* Branches: the "Sim" path runs on the upper row and "Não" below, joined by a vertical spine. */
+.flow-node-footer { display: flex; justify-content: space-between; gap: var(--space-2); }
+.flow-row-icon.branch { background: #fff4e5; color: #b45309; }
+.flow-branch-node { border-color: #f3d3a6; }
+.flow-branches { display: flex; flex-direction: column; gap: 32px; }
+.flow-branch-row { position: relative; display: flex; align-items: flex-start; }
+.flow-branch-row::before { content: ''; position: absolute; left: 0; width: 2px; background: #c3c3ca; }
+.flow-branch-row.yes::before { top: 50px; bottom: -32px; }
+.flow-branch-row.no::before { top: -1px; height: 52px; }
+.flow-branch-lead { position: relative; width: 72px; height: 92px; flex-shrink: 0; }
+.flow-branch-lead .flow-line { top: 50px; }
+.flow-branch-label { position: absolute; top: 18px; left: 14px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.flow-branch-label.yes { background: #e7f6ec; color: #15803d; }
+.flow-branch-label.no { background: #fdecec; color: #b91c1c; }
+.flow-add-small { width: 200px; min-height: 72px; margin-top: 14px; font-size: 12px; }
+.flow-add-small:disabled { opacity: .5; cursor: not-allowed; }

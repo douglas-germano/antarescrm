@@ -77,22 +77,11 @@ def emit(workspace_id, event, event_key, contact, opportunity_id=None, source=No
             run.status, run.detail = 'skipped', 'O responsável perdeu acesso à conta. Atualize a regra.'
             continue
         if rule.actions:
-            scheduled = now()
-            for position, action in enumerate(rule.actions):
-                scheduled += timedelta(minutes=action.get('delay_minutes', 0))
-                db.session.add(
-                    AutomationJob(
-                        workspace_id=workspace_id,
-                        run_id=run.id,
-                        position=position,
-                        action={
-                            **action,
-                            'opportunity_id': opportunity_id,
-                            **({'comment_id': context['comment_id']} if context and context.get('comment_id') else {}),
-                        },
-                        scheduled_at=scheduled,
-                    )
-                )
+            event_data = {
+                'opportunity_id': opportunity_id,
+                **({'comment_id': context['comment_id']} if context and context.get('comment_id') else {}),
+            }
+            schedule(run, rule.actions, 0, now(), event_data)
             run.status, run.detail = 'queued', 'Etapas agendadas.'
         else:  # Backwards-compatible rules: existing immediate task behavior is preserved.
             task = Task(
@@ -110,8 +99,24 @@ def emit(workspace_id, event, event_key, contact, opportunity_id=None, source=No
         log(workspace_id, 'automation_run', run, {'event': event})
 
 
-def execute(job, rule, run, contact, workspace):
-    action = job.action
+def schedule(run, actions, position, start, event_data):
+    """Queue one path of the flow. A branch is always its path's last step and carries both paths with it."""
+    scheduled = start
+    for offset, action in enumerate(actions):
+        scheduled += timedelta(minutes=action.get('delay_minutes', 0))
+        db.session.add(
+            AutomationJob(
+                workspace_id=run.workspace_id,
+                run_id=run.id,
+                position=position + offset,
+                action={**action, **event_data},
+                scheduled_at=scheduled,
+            )
+        )
+
+
+def subject(action, workspace):
+    """The deal and Instagram comment the event referred to, as conditions see them."""
     deal = (
         Opportunity.query.filter_by(id=action.get('opportunity_id'), workspace_id=workspace.id).first()
         if action.get('opportunity_id')
@@ -120,6 +125,24 @@ def execute(job, rule, run, contact, workspace):
     comment = None
     if action.get('comment_id'):
         comment = InstagramComment.query.filter_by(comment_id=action['comment_id'], workspace_id=workspace.id).first()
+    return deal, comment
+
+
+def follow_branch(job, run, contact, workspace):
+    """Evaluate the branch now, against the contact as it is, and queue only the chosen path."""
+    action = job.action
+    deal, comment = subject(action, workspace)
+    context = {'text': comment.text, 'media_id': comment.media_id} if comment else None
+    path = 'yes' if matches(action.get('conditions', {}), contact, deal, context) else 'no'
+    event_data = {key: action[key] for key in ('opportunity_id', 'comment_id') if key in action}
+    schedule(run, action.get(path) or [], job.position + 1, now(), event_data)
+    log(workspace.id, 'automation_branch', run, {'job_id': job.id, 'path': path})
+    return path
+
+
+def execute(job, rule, run, contact, workspace):
+    action = job.action
+    deal, comment = subject(action, workspace)
     if not matches(
         action.get('conditions', {}),
         contact,
@@ -248,11 +271,20 @@ def process(workspace_id=None, limit=50):
         else:
             try:
                 with db.session.begin_nested():
-                    job.result_id = execute(job, rule, run, contact, workspace)
-                    job.status, job.detail = (
-                        'completed',
-                        ('Ação concluída.' if job.result_id else 'Condição não atendida; etapa dispensada.'),
-                    )
+                    if job.action.get('kind') == 'branch':
+                        path = follow_branch(job, run, contact, workspace)
+                        job.status, job.detail = (
+                            'completed',
+                            'Condição atendida; seguiu pelo caminho Sim.'
+                            if path == 'yes'
+                            else 'Condição não atendida; seguiu pelo caminho Não.',
+                        )
+                    else:
+                        job.result_id = execute(job, rule, run, contact, workspace)
+                        job.status, job.detail = (
+                            'completed',
+                            ('Ação concluída.' if job.result_id else 'Condição não atendida; etapa dispensada.'),
+                        )
             except Exception as error:  # action boundary: one failed step must not stop the queue
                 current_app.logger.warning('Falha na etapa %s: %s', job.id, type(error).__name__)
                 job.status, job.detail = 'failed', 'Ação não concluída. Confira o contato, modelo e responsável.'

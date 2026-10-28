@@ -34,9 +34,57 @@ export type Step = {
   stage_id?: string;
   delay_minutes: number;
   due_days: number;
+  /** Only on `kind: 'branch'`: the steps for when its conditions match, and for when they don't. */
+  yes?: Step[];
+  no?: Step[];
 };
 
 export const newStep = (kind = 'create_task'): Step => ({ kind, title: '', delay_minutes: 0, due_days: 0 });
+export const newBranch = (yes: Step[] = []): Step => ({ kind: 'branch', conditions: emptyConditions(), delay_minutes: 0, due_days: 0, yes, no: [] });
+
+/** Limits the API enforces: 10 steps per path, 30 across the whole flow, branches 5 levels deep. */
+export const MAX_PATH_STEPS = 10;
+export const MAX_STEPS = 30;
+export const MAX_DEPTH = 5;
+export const BRANCH_LABEL = 'Ramificação (Se / Senão)';
+
+/**
+ * Where a step lives in the flow tree: indexes into each list, with the side taken at every branch.
+ * `[2]` is the third top-level step; `[2, 'yes', 0]` is the first step of its "Sim" path.
+ */
+export type StepPath = (number | 'yes' | 'no')[];
+export const pathKey = (path: StepPath) => path.join('.');
+
+export function listAt(steps: Step[], listPath: StepPath): Step[] {
+  let list = steps;
+  for (let k = 0; k < listPath.length; k += 2) list = list[listPath[k] as number]?.[listPath[k + 1] as 'yes' | 'no'] || [];
+  return list;
+}
+
+/** Returns a new tree with the list at `listPath` replaced by `edit(list)`. */
+export function editList(steps: Step[], listPath: StepPath, edit: (list: Step[]) => Step[]): Step[] {
+  if (!listPath.length) return edit(steps);
+  const [index, side, ...rest] = listPath as [number, 'yes' | 'no', ...StepPath];
+  return steps.map((step, i) => (i === index ? { ...step, [side]: editList(step[side] || [], rest, edit) } : step));
+}
+
+export const stepAt = (steps: Step[], path: StepPath) => listAt(steps, path.slice(0, -1))[path[path.length - 1] as number];
+
+export const countSteps = (steps: Step[]): number =>
+  steps.reduce((total, step) => total + 1 + countSteps(step.yes || []) + countSteps(step.no || []), 0);
+
+/** The first step that cannot be saved yet, depth first, so the editor can open it. */
+export function firstProblem(steps: Step[], listPath: StepPath = []): { path: StepPath; problem: string } | null {
+  for (let i = 0; i < steps.length; i += 1) {
+    const problem = stepProblem(steps[i]);
+    if (problem) return { path: [...listPath, i], problem };
+    for (const side of ['yes', 'no'] as const) {
+      const nested = firstProblem(steps[i][side] || [], [...listPath, i, side]);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
 
 export const DELAY_UNITS = [
   { value: 1, label: 'minutos' },
@@ -65,6 +113,10 @@ export function stepsOf(rule: Record<string, any>): Step[] {
 
 export function describeStep(step: Step, lookups: { template: (id?: string) => string | undefined; stage: (id?: string) => string | undefined }) {
   switch (step.kind) {
+    case 'branch': {
+      const count = step.conditions?.items?.length || 0;
+      return `Se ${count === 1 ? 'a condição for atendida' : `${step.conditions?.mode === 'any' ? 'alguma das' : 'as'} ${count} condições forem atendidas`}, segue pelo Sim; senão, pelo Não.`;
+    }
     case 'send_message': return `Enviar mensagem · ${lookups.template(step.template_id) || 'modelo indisponível'}`;
     case 'reply_comment': return `Responder o comentário: ${step.content || ''}`;
     case 'private_reply': return `Enviar DM ao autor: ${step.content || ''}`;
@@ -95,6 +147,7 @@ export const RECIPES = [
 
 /** Fields each action needs before the rule can be saved; returns the first problem or null. */
 export function stepProblem(step: Step): string | null {
+  if (step.kind === 'branch' && !step.conditions?.items?.length) return 'Defina a condição que divide os caminhos.';
   if (step.kind === 'send_message' && !step.template_id) return 'Escolha o modelo de mensagem.';
   if ((step.kind === 'reply_comment' || step.kind === 'private_reply') && !step.content?.trim()) return 'Escreva o texto da resposta.';
   if (step.kind === 'add_tag' && !step.tag?.trim()) return 'Informe a tag.';
@@ -104,7 +157,11 @@ export function stepProblem(step: Step): string | null {
 }
 
 /** The API payload for one step: only the fields its action uses. */
-export function stepPayload(step: Step) {
+export function stepPayload(step: Step): Record<string, unknown> {
+  if (step.kind === 'branch') {
+    return { kind: 'branch', conditions: step.conditions || emptyConditions(), delay_minutes: step.delay_minutes, due_days: 0,
+      yes: (step.yes || []).map(stepPayload), no: (step.no || []).map(stepPayload) };
+  }
   return {
     conditions: step.conditions || emptyConditions(), kind: step.kind, delay_minutes: step.delay_minutes, due_days: step.due_days,
     ...(step.kind === 'send_message' ? { template_id: step.template_id }

@@ -67,7 +67,9 @@ class SubmissionSchema(StrictSchema):
 
 class ActionSchema(StrictSchema):
     conditions = f.Nested(ConditionsSchema)
-    kind = choice('create_task send_message follow_up add_tag move_stage reply_comment private_reply', required=True)
+    kind = choice(
+        'create_task send_message follow_up add_tag move_stage reply_comment private_reply branch', required=True
+    )
     title = text(180)
     content = text(1000)
     template_id = ref()
@@ -75,6 +77,9 @@ class ActionSchema(StrictSchema):
     stage_id = ref()
     delay_minutes = f.Integer(validate=validate.Range(min=0, max=525600), load_default=0)
     due_days = f.Integer(validate=validate.Range(min=0, max=365), load_default=0)
+    # A branch splits the flow: `yes` runs when its conditions match, `no` otherwise.
+    yes = f.List(f.Nested(lambda: ActionSchema()), validate=validate.Length(max=10))
+    no = f.List(f.Nested(lambda: ActionSchema()), validate=validate.Length(max=10))
 
 
 class RuleSchema(StrictSchema):

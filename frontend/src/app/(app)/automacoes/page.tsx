@@ -7,7 +7,7 @@ import { useSession, useNotify } from '@/components/providers';
 import { useList, useData, post, patch, remove, refreshAll } from '@/lib/api';
 import { PageHeader, Button, DataState, EmptyState, Badge, ConfirmDialog, Popover, SearchInput } from '@/components/ui';
 import { Card, Tabs, Toolbar, ToolbarEnd } from '@/components/blocks';
-import { ACTIONS, EVENTS, RECIPES, RUN_STATUS, stepsOf } from '@/components/automations/model';
+import { ACTIONS, BRANCH_LABEL, EVENTS, RECIPES, RUN_STATUS, countSteps, stepsOf } from '@/components/automations/model';
 import { eventIcon, isInstagram } from '@/components/automations/icons';
 import { searchMatch } from '@/lib/format';
 import type { Row } from '@/lib/types';
@@ -132,13 +132,13 @@ export default function AutomationsPage() {
             <Card className="flow-list">
               {visibleRules.map((rule) => {
                 const stats = rule.stats || { runs: 0, failed: 0, last_run_at: null };
-                const steps = stepsOf(rule);
+                const steps = countSteps(stepsOf(rule));
                 return (
                   <div key={rule.id} className={'flow-list-row' + (rule.active ? '' : ' paused')} onClick={() => manage && router.push('/automacoes/' + rule.id)}>
                     <span className={'flow-row-icon' + (isInstagram(rule.event) ? ' ig' : '')}>{eventIcon(rule.event)}</span>
                     <div className="flow-list-name">
                       <strong>{rule.name}</strong>
-                      <span><span className="deal-chip">{EVENTS[rule.event]?.label || rule.event}</span><small>{steps.length} {steps.length === 1 ? 'passo' : 'passos'}</small></span>
+                      <span><span className="deal-chip">{EVENTS[rule.event]?.label || rule.event}</span><small>{steps} {steps === 1 ? 'passo' : 'passos'}</small></span>
                     </div>
                     <div className="flow-list-stat"><strong>{shortDate(rule.created_at)}</strong><small>Criada</small></div>
                     <div className="flow-list-stat"><strong>{shortDate(stats.last_run_at)}</strong><small>Última execução</small></div>
@@ -213,7 +213,7 @@ export default function AutomationsPage() {
                       <td>{dateTime(job.scheduled_at)}</td>
                       <td><strong>{ruleName(job.rule_id)}</strong><small>Etapa {job.position + 1}</small></td>
                       <td>{job.contact_name || '—'}</td>
-                      <td>{ACTIONS[job.action.kind]}{job.action.title ? ': ' + job.action.title : ''}{job.action.tag ? ': ' + job.action.tag : ''}</td>
+                      <td>{job.action.kind === 'branch' ? BRANCH_LABEL : ACTIONS[job.action.kind]}{job.action.title ? ': ' + job.action.title : ''}{job.action.tag ? ': ' + job.action.tag : ''}</td>
                       <td>{statusBadge(job.status)}{job.detail && job.status !== 'pending' && <small>{job.detail}</small>}</td>
                       {manage && (
                         <td className="text-right">
