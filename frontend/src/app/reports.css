@@ -1,31 +1,62 @@
 /* Relatórios */
 .reports-page { flex: none !important; }
-.rep-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-group); }
-.rep-filters select, .rep-filters input { width: auto; min-width: 150px; min-height: 36px; padding-block: var(--space-1); border-radius: var(--pill); }
+.rep-bar { align-items: flex-end; }
+.rep-bar .tabs-line { width: auto; border-bottom: 0; }
+.rep-bar .toolbar-end { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-left: auto; }
+.rep-bar select { min-height: 40px; }
 .rep-range { margin-top: calc(var(--space-2) * -1); color: var(--muted); font-size: 12px; }
+.text-success { color: #2e7d4f; }
+
+/* KPIs: Visão geral cards; the linked ones lift on hover. */
 .rep-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .rep-kpis .stat-value { font-size: 22px; }
-.delta { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 700; }
-.delta.up { color: #2e7d52; }
-.delta.down { color: var(--primary-hover); }
-.delta.flat { color: var(--muted); }
+.rep-kpi-link { color: inherit; transition: border-color .15s, box-shadow .15s; }
+.rep-kpi-link:hover { border-color: #d6d6da; box-shadow: 0 4px 14px #25282b0f; }
+
 .rep-grid { display: grid; gap: var(--gap-section); min-width: 0; }
 .rep-main { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
-.rep-two { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
 .rep-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.rep-chart { height: 280px; }
-.rep-legend { display: flex; flex-wrap: wrap; gap: var(--gap-section); margin-top: var(--space-3); font-size: 12px; color: var(--muted); }
-.rep-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: var(--space-1); }
-.rep-bars, .rep-funnel { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); }
-.rep-bar-top { display: flex; justify-content: space-between; gap: var(--space-3); font-size: 13px; }
+.rep-ops { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Evolution chart */
+.rep-chart { height: 300px; }
+.rep-empty { display: grid; place-items: center; gap: var(--space-2); height: 300px; color: var(--muted); text-align: center; font-size: 13px; }
+.rep-tooltip { min-width: 180px; padding: var(--space-3); background: var(--house, #25282b); color: #fff; border-radius: 10px; box-shadow: 0 8px 24px #0003; font-size: 12px; }
+.rep-tooltip strong { display: block; margin-bottom: 6px; font-size: 12px; }
+.rep-tooltip p { display: flex; align-items: center; gap: 6px; padding: 2px 0; color: #d4d4d8; }
+.rep-tooltip i { width: 8px; height: 8px; border-radius: 50%; }
+.rep-tooltip b { margin-left: auto; color: #fff; font-variant-numeric: tabular-nums; }
+
+/* Funnel: centred bars narrowing by stage, with the pass-through rate between them. */
+.rep-funnel { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.rep-funnel li { display: flex; flex-direction: column; gap: 2px; }
+.rep-funnel-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; gap: var(--space-3); }
+.rep-funnel-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rep-funnel-track { display: flex; justify-content: center; }
+.rep-funnel-track span { display: grid; place-items: center; min-width: 28px; height: 26px; border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rep-funnel small { margin-left: calc(110px + var(--space-3)); color: var(--muted); font-size: 11px; text-align: center; }
+.rep-step-rate { align-self: center; margin-left: calc(110px + var(--space-3)); padding: 1px 8px; border-radius: 999px; background: #f4f4f5; color: var(--muted); font-size: 10px; font-weight: 700; }
+.rep-funnel-foot { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--line-soft); font-size: 12px; color: var(--muted); }
+.rep-funnel-foot b { font-size: 14px; }
+
+/* Bar lists (sources, loss reasons) */
+.rep-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+.rep-bar-top { display: flex; justify-content: space-between; gap: var(--space-3); margin-bottom: 4px; font-size: 13px; }
 .rep-bar-top span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.rep-bars small, .rep-funnel small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.rep-bars small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
+.rep-bar-link { display: block; margin: calc(var(--space-2) * -1); padding: var(--space-2); border-radius: 8px; color: inherit; }
+.rep-bar-link:hover { background: #f7f7f8; }
+.rep-bar-link:hover .rep-bar-top span { color: var(--primary); }
+
+/* Health */
 .rep-health { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--gap-group); }
-.rep-health > div { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius); }
+.rep-health > div { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) var(--space-4); border: 1px solid var(--line-soft); border-radius: var(--radius-card); }
 .rep-health > div.warn { border-color: #f1d28c; background: #fbf3e4; }
 .rep-health span { font-size: 11px; color: var(--muted); }
 .rep-health strong { font-size: 18px; font-variant-numeric: tabular-nums; }
 .rep-health small { font-size: 11px; color: var(--muted); }
+
+/* Deal lists */
 .rep-list { display: flex; flex-direction: column; padding-block: var(--space-2); }
 .rep-deal { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid #f0f0f0; }
 .rep-deal:last-child { border-bottom: 0; }
@@ -34,10 +65,28 @@
 .rep-deal strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rep-deal small { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rep-deal > span { font-size: 13px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.rep-ops { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gap-section); }
-.rep-ops h3 { margin-bottom: var(--space-2); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
-.rep-ops p { display: flex; justify-content: space-between; gap: var(--space-2); padding: var(--space-1) 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
-.rep-ops strong { text-align: right; }
-@media (max-width: 1180px) { .rep-kpis, .rep-health { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rep-main, .rep-two { grid-template-columns: 1fr; } .rep-three { grid-template-columns: 1fr 1fr; } .rep-ops { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 700px) { .rep-kpis, .rep-health, .rep-three, .rep-ops { grid-template-columns: 1fr 1fr; } .rep-three { grid-template-columns: 1fr; } }
-.reports-page .data-table td { white-space: nowrap; }
+
+/* Team */
+.rep-team td { white-space: nowrap; vertical-align: middle; }
+.rep-person { display: inline-flex; align-items: center; gap: var(--space-2); }
+.rep-person .owner-avatar { width: 28px; height: 28px; font-size: 10px; }
+.rep-team td:nth-child(2) { min-width: 170px; }
+.rep-share { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-2); margin-bottom: 4px; }
+.rep-share small, .rep-sub { color: var(--muted); font-size: 11px; }
+.rep-sub { display: block; }
+
+/* Operação */
+.rep-ops-list p { display: flex; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+.rep-ops-list p:last-child { border-bottom: 0; }
+.rep-ops-list strong { text-align: right; }
+
+@media (max-width: 1180px) {
+  .rep-kpis, .rep-health { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .rep-main { grid-template-columns: 1fr; }
+  .rep-three { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 700px) {
+  .rep-kpis, .rep-health { grid-template-columns: 1fr 1fr; }
+  .rep-three, .rep-ops { grid-template-columns: 1fr; }
+  .rep-bar .toolbar-end { width: 100%; margin-left: 0; }
+}

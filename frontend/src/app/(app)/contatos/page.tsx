@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Plus, Pencil, Archive, Users, User, Mail, Phone, Building2, MessageCircle, CalendarPlus, FileText } from 'lucide-react';
 import { useList, usePage, useData, post, patch, remove, refreshAll } from '@/lib/api';
@@ -18,6 +18,11 @@ export default function ContactsPage() {
   const { user } = useSession();
   const { notify } = useNotify();
   const [filters, setFilters] = useState({ ...emptyContactFilters });
+  // Relatórios links here with ?origem= to list the contacts of one source.
+  useEffect(() => {
+    const source = new URLSearchParams(window.location.search).get('origem');
+    if (source) setFilters((f) => ({ ...f, source }));
+  }, []);
   const { search, archived } = filters;
   const displayName = (row?: Contact | null) => (row && hasRealName(row.name) ? row.name : 'Sem nome');
   const hasFilters = Object.values(filters).some(Boolean);

@@ -48,6 +48,10 @@ export default function CRMPage() {
     setAttentionOnly(params.get('attention') === 'true');
     setRequestedDeal(params.get('opportunity'));
     if (params.get('new') === 'true') setEditing(null);
+    // Links from Relatórios open the board on a status and funnel.
+    const linked = params.get('status');
+    if (linked === 'open' || linked === 'won' || linked === 'lost') setStatus(linked);
+    if (params.get('pipeline')) setPipelineId(params.get('pipeline')!);
   }, []);
   const users = useList<User>('/users');
   const stages = useData<{ items: PipelineStage[] }>('/pipeline/stages?pipeline_id=' + pipelineId);

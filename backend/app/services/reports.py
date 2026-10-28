@@ -11,6 +11,8 @@ from ..models import (
     Activity,
     AutomationRun,
     Contact,
+    InboxMessage,
+    InboxThread,
     Opportunity,
     PipelineStage,
     StageHistory,
@@ -270,10 +272,24 @@ def build(workspace_id, start, end, pipeline_id=None, today=None):
         'open': sum(1 for t in tasks if t.status in ('todo', 'doing')),
         'overdue': sum(1 for t in tasks if t.status in ('todo', 'doing') and t.due_date and t.due_date < today),
     }
-    messages = WhatsAppMessage.query.filter(WhatsAppMessage.workspace_id == workspace_id).all()
+    # WhatsApp has its own message store; Instagram and e-mail live in the inbox.
+    channels = defaultdict(lambda: {'received': 0, 'sent': 0})
+    for m in WhatsAppMessage.query.filter(WhatsAppMessage.workspace_id == workspace_id).all():
+        if in_range(m.occurred_at, lower, upper):
+            channels['whatsapp']['received' if m.direction == 'in' else 'sent'] += 1
+    inbox = (
+        db.session.query(InboxThread.channel, InboxMessage.direction, InboxMessage.created_at)
+        .join(InboxThread, InboxThread.id == InboxMessage.thread_id)
+        .filter(InboxMessage.workspace_id == workspace_id, InboxThread.channel != 'whatsapp')
+        .all()
+    )
+    for channel, direction, created_at in inbox:
+        if in_range(created_at, lower, upper):
+            channels[channel]['received' if direction == 'in' else 'sent'] += 1
     message_stats = {
-        'received': sum(1 for m in messages if m.direction == 'in' and in_range(m.occurred_at, lower, upper)),
-        'sent': sum(1 for m in messages if m.direction == 'out' and in_range(m.occurred_at, lower, upper)),
+        'received': sum(c['received'] for c in channels.values()),
+        'sent': sum(c['sent'] for c in channels.values()),
+        'channels': [{'channel': k, **v} for k, v in sorted(channels.items())],
     }
     runs = AutomationRun.query.filter_by(workspace_id=workspace_id).all()
     automation_stats = {

@@ -101,3 +101,25 @@ def test_overview_validates_period_and_isolates_accounts(env):
     )
     other = client.get('/api/v1/reports/overview', headers=d['headers'](d['outsider'])).get_json()
     assert other['current']['won_count'] == 0 and other['pipeline']['open_count'] == 0
+
+
+def test_messages_are_counted_per_channel_including_instagram(env):
+    from app.models import InboxMessage, InboxThread
+
+    client, d = env
+    ws = d['ws']
+    thread = InboxThread(workspace_id=ws.id, channel='instagram', address='1234:5678')
+    db.session.add(thread)
+    db.session.flush()
+    for direction, key in (('in', 'a'), ('in', 'b'), ('out', 'c')):
+        db.session.add(
+            InboxMessage(workspace_id=ws.id, thread_id=thread.id, direction=direction, content='x', idempotency_key=key)
+        )
+    old = InboxMessage(workspace_id=ws.id, thread_id=thread.id, direction='in', content='x', idempotency_key='old')
+    db.session.add(old)
+    db.session.commit()
+    old.created_at = now() - timedelta(days=90)  # Outside the default 30-day period.
+    db.session.commit()
+    messages = client.get('/api/v1/reports/overview', headers=d['headers']()).get_json()['messages']
+    assert messages['channels'] == [{'channel': 'instagram', 'received': 2, 'sent': 1}]
+    assert messages['received'] == 2 and messages['sent'] == 1
