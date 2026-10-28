@@ -342,7 +342,7 @@ html:has(.activities-page) { scrollbar-gutter: stable; }
 .settings-nav-item svg { color: var(--muted); flex-shrink: 0; }
 .settings-nav-item:hover { background: #f4f4f5; }
 .settings-nav-item:focus:not(:focus-visible) { outline: none; box-shadow: none; }
-.settings-nav-item.active { background: var(--primary-soft, #fde8ef); color: var(--primary); font-weight: 700; }
+.settings-nav-item.active { background: var(--primary-soft); color: var(--primary); font-weight: 700; }
 .settings-nav-item.active svg { color: var(--primary); }
 .settings-content { display: flex; flex-direction: column; gap: var(--gap-section); min-width: 0; }
 .settings-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-3); }
@@ -363,7 +363,7 @@ html:has(.activities-page) { scrollbar-gutter: stable; }
 .profile-hero small { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
 .profile-avatar { width: 52px; height: 52px; border-radius: 50%; font-size: 16px; }
 .role-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
-.role-badge.role-owner { background: #fde8ef; color: var(--primary-hover); }
+.role-badge.role-owner { background: var(--primary-soft); color: var(--primary-hover); }
 .role-badge.role-admin { background: #ede9fe; color: #6d28d9; }
 .role-badge.role-member { background: #f1f1f3; color: var(--muted); }
 .slug-box { display: flex; align-items: center; gap: var(--space-3); max-width: 560px; }

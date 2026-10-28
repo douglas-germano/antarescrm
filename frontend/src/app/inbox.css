@@ -67,7 +67,7 @@
 .wa-day span { padding: var(--space-1) var(--space-3); border-radius: 32px; background: #e6e6e6; color: #55585b; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .wa-load-older { align-self: center; min-height: 32px; font-size: 12px; }
 .wa-bubble { align-self: flex-start; max-width: min(560px, 72%); padding: var(--space-2) var(--space-3); background: #fff; border: 1px solid #e3e3e3; border-radius: 14px 14px 14px 4px; font-size: 13px; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
-.wa-bubble.outgoing { align-self: flex-end; background: #fde8ef; border-color: #f8c9d9; color: var(--ink); border-radius: 14px 14px 4px 14px; }
+.wa-bubble.outgoing { align-self: flex-end; background: var(--primary-soft); border-color: var(--primary-soft-line); color: var(--ink); border-radius: 14px 14px 4px 14px; }
 .wa-bubble p { white-space: pre-wrap; }
 .wa-bubble img, .wa-bubble video { display: block; max-width: 100%; max-height: 300px; border-radius: 8px; margin-bottom: var(--space-1); }
 .wa-bubble audio { width: 260px; max-width: 100%; }
