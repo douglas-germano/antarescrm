@@ -38,6 +38,7 @@ class UserUpdateSchema(StrictSchema):
 class ProfileSchema(StrictSchema):
     name = text(150)
     title = text(80, allow_none=True)
+    email = f.Email(validate=validate.Length(max=254))
     current_password = f.String(load_only=True, validate=validate.Length(max=128))
     password = f.String(load_only=True, validate=validate.Length(min=10, max=128))
 

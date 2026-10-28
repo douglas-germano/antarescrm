@@ -171,6 +171,18 @@ def me_update():
     data = payload(ProfileSchema)
     new_password = data.pop('password', None)
     current = data.pop('current_password', None)
+    email = (data.pop('email', None) or '').strip().lower()
+    if email and email != g.user.email.lower():
+        # The e-mail is the login, so changing it needs the current password, like changing the password does.
+        if not current or not check_password_hash(g.user.password_hash, current):
+            raise APIError('A senha atual não confere.', 400)
+        taken = User.query.filter(
+            User.workspace_id == g.user.workspace_id, func.lower(User.email) == email, User.id != g.user.id
+        ).first()
+        if taken:
+            raise APIError('Este e-mail já é usado por outra pessoa desta conta.', 409)
+        audit('email_change', g.user, {'from': g.user.email, 'to': email})
+        g.user.email = email
     if new_password:
         if not current or not check_password_hash(g.user.password_hash, current):
             raise APIError('A senha atual não confere.', 400)

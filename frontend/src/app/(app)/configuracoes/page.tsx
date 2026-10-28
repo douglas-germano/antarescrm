@@ -1,7 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Pencil, KeyRound, KanbanSquare, FolderKanban, Plug, UserCircle, Users, Building2, Save, Activity, Globe, Briefcase, Bell, CalendarClock } from 'lucide-react';
+import { KanbanSquare, FolderKanban, Plug, UserCircle, Users, Building2, Activity, Globe, Briefcase, Bell, CalendarClock, RefreshCw } from 'lucide-react';
 import { ConnectionsSettings } from '@/components/settings/connections-settings';
 import { DomainsSettings } from '@/components/settings/domains-settings';
 import { ProfileSettings } from '@/components/settings/profile-settings';
@@ -11,240 +11,103 @@ import { OperationsSettings } from '@/components/settings/operations-settings';
 import { ClientAccountsSettings } from '@/components/settings/client-accounts-settings';
 import { NotificationSettings } from '@/components/settings/notification-settings';
 import { BookingSettings } from '@/components/settings/booking-settings';
-import { useSession, useNotify } from '@/components/providers';
-import { useList, useData, post, patch, refreshAll } from '@/lib/api';
-import type { Workspace, Row, Field } from '@/lib/types';
-import { PageHeader, DataState, Button, FormDialog, Badge } from '@/components/ui';
-import { PagedTable } from '@/components/fit';
-import { Card, CardHeader, CardBody, Tabs, Toolbar } from '@/components/blocks';
-import { roles, opts, initials } from '@/lib/format';
+import { AccountSettings } from '@/components/settings/account-settings';
+import { TeamSettings } from '@/components/settings/team-settings';
+import { confirmLeave } from '@/components/settings/unsaved';
+import { useSession } from '@/components/providers';
+import { useData, refreshAll } from '@/lib/api';
+import type { Workspace } from '@/lib/types';
+import { PageHeader, Button } from '@/components/ui';
+
+type Section = { key: string; label: string; icon: ReactNode; description: string; show?: boolean };
 
 export default function SettingsPage() {
-  const { user, workspace, reload } = useSession();
-  const { notify } = useNotify();
+  const { user, workspace } = useSession();
   const canManage = ['owner', 'admin'].includes(user?.role || '');
   const agencyAdmin = workspace && !workspace.parent_workspace_id && user?.workspace_id === workspace.id && canManage;
   const { data: accessibleAccounts } = useData<{ items: Workspace[] }>(user ? '/auth/workspaces' : null);
-  const canChooseAccount = agencyAdmin || (workspace && user?.workspace_id !== workspace.id) || (accessibleAccounts?.items.length || 0) > 1;
-  const { data: users, isLoading, error } = useList('/users');
-  const [tab, setTab] = useState('profile');
+  const canChooseAccount = !!(agencyAdmin || (workspace && user?.workspace_id !== workspace.id) || (accessibleAccounts?.items.length || 0) > 1);
+
+  // Grouped like Gaio's settings; each section has its own address (?tab=…), so links and "back" land on it.
+  const groups: { title: string; items: Section[] }[] = [
+    { title: 'Pessoal', items: [
+      { key: 'perfil', label: 'Perfil', icon: <UserCircle size={16} />, description: 'Seus dados, e-mail de acesso e senha' },
+      { key: 'notificacoes', label: 'Notificações', icon: <Bell size={16} />, description: 'Avisos de novas mensagens' },
+    ] },
+    { title: 'Conta', items: [
+      { key: 'conta', label: 'Conta', icon: <Building2 size={16} />, description: 'Nome, identificador e fuso horário' },
+      { key: 'equipe', label: 'Equipe', icon: <Users size={16} />, description: 'Pessoas, níveis de acesso e convites' },
+      { key: 'clientes', label: 'Clientes', icon: <Briefcase size={16} />, description: 'Contas de clientes da agência', show: canChooseAccount },
+    ] },
+    { title: 'Vendas e agenda', items: [
+      { key: 'funis', label: 'Funis', icon: <KanbanSquare size={16} />, description: 'Funis de venda e etapas' },
+      { key: 'projetos', label: 'Projetos', icon: <FolderKanban size={16} />, description: 'Etapas dos projetos' },
+      { key: 'agendamento', label: 'Agendamento', icon: <CalendarClock size={16} />, description: 'Links públicos de agendamento' },
+    ] },
+    { title: 'Integrações', items: [
+      { key: 'conexoes', label: 'Conexões', icon: <Plug size={16} />, description: 'WhatsApp, Instagram e e-mail', show: canManage },
+      { key: 'dominios', label: 'Domínios', icon: <Globe size={16} />, description: 'Domínios próprios das páginas', show: canManage },
+    ] },
+    { title: 'Sistema', items: [
+      { key: 'operacao', label: 'Operação', icon: <Activity size={16} />, description: 'Saúde do sistema e backups', show: canManage },
+    ] },
+  ].map((g) => ({ ...g, items: g.items.filter((i) => i.show !== false) })).filter((g) => g.items.length);
+  const sections = groups.flatMap((g) => g.items);
+
+  const [tab, setTab] = useState('perfil');
   const searchParams = useSearchParams();
+  const OLD_KEYS: Record<string, string> = { profile: 'perfil', workspace: 'conta', team: 'equipe' };
   useEffect(() => {
-    const requested = searchParams.get('tab');
-    if (requested === 'notificacoes') setTab('notifications');
-    if (canManage && requested === 'operacao') setTab('operations');
-    if (requested === 'funis') setTab('pipelines');
-    if (requested === 'projetos') setTab('projects');
-    if (requested === 'agendamento') setTab('booking');
-    if (canManage && requested === 'conexoes') setTab('connections');
-    if (canManage && requested === 'dominios') setTab('domains');
-    if (canChooseAccount && requested === 'clientes') setTab('clients');
-  }, [canManage, canChooseAccount, searchParams]);
+    const requested = searchParams.get('tab') || 'perfil';
+    const key = OLD_KEYS[requested] || requested;
+    if (sections.some((s) => s.key === key)) setTab(key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, canManage, canChooseAccount]);
   function selectTab(value: string) {
+    if (value === tab || !confirmLeave()) return;
     setTab(value);
     const url = new URL(window.location.href);
-    if (value === 'operations') url.searchParams.set('tab', 'operacao');
-    else if (value === 'pipelines') url.searchParams.set('tab', 'funis');
-    else if (value === 'projects') url.searchParams.set('tab', 'projetos');
-    else if (value === 'booking') url.searchParams.set('tab', 'agendamento');
-    else if (value === 'connections') url.searchParams.set('tab', 'conexoes');
-    else if (value === 'domains') url.searchParams.set('tab', 'dominios');
-    else if (value === 'clients') url.searchParams.set('tab', 'clientes');
-    else if (value === 'notifications') url.searchParams.set('tab', 'notificacoes');
-    else url.searchParams.delete('tab');
-    window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+    if (value === 'perfil') url.searchParams.delete('tab');
+    else url.searchParams.set('tab', value);
+    window.history.pushState(null, '', url.pathname + url.search + url.hash);
   }
-  const [editUser, setEditUser] = useState<Row | null | false>(false);
-  const [passwordUser, setPasswordUser] = useState<Row | null>(null);
-  const [inviting, setInviting] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState('');
-  const userFields: Field[] = [
-    { name: 'name', label: 'Nome', required: true },
-    ...(!editUser ? [{ name: 'email', label: 'E-mail', type: 'email' as const, required: true }] : []),
-    ...(!editUser
-      ? [{ name: 'password', label: 'Senha inicial', type: 'password' as const, required: true, help: 'No mínimo 10 caracteres.' }]
-      : []),
-    { name: 'title', label: 'Perfil / cargo', placeholder: 'Vendedor, SDR, Gerente…' },
-    ...(!editUser || editUser.role !== 'owner'
-      ? [
-          {
-            name: 'role',
-            label: 'Nível',
-            type: 'select' as const,
-            options: opts(Object.fromEntries(Object.entries(roles).filter(([key]) => key !== 'owner'))),
-            defaultValue: 'member',
-          },
-          { name: 'active', label: 'Acesso ativo', type: 'checkbox' as const, defaultValue: true },
-        ]
-      : []),
-  ];
-  async function saveWorkspace(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setBusy(true);
-    setFormError('');
-    const raw = new FormData(e.currentTarget);
-    try {
-      await patch('/workspace', { name: raw.get('name'), timezone: raw.get('timezone') });
-      await reload();
-      notify('Dados da conta atualizados.');
-    } catch (err) {
-      setFormError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const current = sections.find((s) => s.key === tab) || sections[0];
+
   return (
-    <div className="page">
+    <div className="page settings-page">
       <PageHeader compact title="Configurações" />
-      <Toolbar>
-        <Tabs
-          label="Seções"
-          value={tab}
-          onChange={selectTab}
-          items={[
-            { value: 'profile', label: 'Perfil', icon: <UserCircle size={14} /> },
-            { value: 'notifications', label: 'Notificações', icon: <Bell size={14} /> },
-            { value: 'workspace', label: 'Conta', icon: <Building2 size={14} /> },
-            { value: 'team', label: 'Equipe', icon: <Users size={14} /> },
-            { value: 'pipelines', label: 'Funis', icon: <KanbanSquare size={14} /> },
-            { value: 'projects', label: 'Projetos', icon: <FolderKanban size={14} /> },
-            { value: 'booking', label: 'Agendamento', icon: <CalendarClock size={14} /> },
-            ...(canManage ? [{ value: 'connections', label: 'Conexões', icon: <Plug size={14} /> }] : []),
-            ...(canManage ? [{ value: 'domains', label: 'Domínios', icon: <Globe size={14} /> }] : []),
-            ...(canManage ? [{ value: 'operations', label: 'Operação', icon: <Activity size={14} /> }] : []),
-            ...(canChooseAccount ? [{ value: 'clients', label: 'Clientes', icon: <Briefcase size={14} /> }] : []),
-          ]}
-        />
-        {tab === 'operations' && canManage && <Button variant="secondary" onClick={() => refreshAll()}>Atualizar estado</Button>}
-      </Toolbar>
-      {tab === 'operations' && canManage && <OperationsSettings />}
-      {tab === 'clients' && canChooseAccount && <ClientAccountsSettings />}
-      {tab === 'profile' && <ProfileSettings />}
-      {tab === 'notifications' && <NotificationSettings />}
-      {tab === 'pipelines' && <PipelineSettings />}
-      {tab === 'projects' && <ProjectStageSettings />}
-      {tab === 'booking' && <BookingSettings />}
-      {tab === 'connections' && canManage && <ConnectionsSettings />}
-      {tab === 'domains' && canManage && <DomainsSettings />}
-      {tab === 'workspace' && (
-        <Card as="section">
-          <CardHeader title="Conta" description={`Identificador de acesso: ${workspace?.slug || ''}`} />
-          <CardBody>
-            <form className="stack" onSubmit={saveWorkspace}>
-              <fieldset disabled={!canManage} className="stack">
-              <div className="field">
-                <label htmlFor="name">Nome da conta</label>
-                <input id="name" name="name" defaultValue={workspace?.name} required maxLength={150} />
-              </div>
-              <div className="field">
-                <label htmlFor="timezone">Fuso horário</label>
-                <input id="timezone" name="timezone" defaultValue={workspace?.timezone} required placeholder="America/Sao_Paulo" />
-              </div>
-              </fieldset>
-              {!canManage && <p className="muted">Somente administradores podem alterar esta conta e gerenciar acessos.</p>}
-              {formError && <p className="form-error" role="alert">{formError}</p>}
-              {canManage && <div>
-                <Button type="submit" disabled={busy}>
-                  <Save size={16} /> {busy ? 'Salvando…' : 'Salvar'}
-                </Button>
-              </div>}
-            </form>
-          </CardBody>
-        </Card>
-      )}
-      {tab === 'team' && (
-        <Card as="section" fill>
-          <CardHeader
-            title="Perfis da equipe"
-            actions={
-              canManage ? <div className="row-actions"><Button variant="secondary" onClick={() => setInviting(true)}>Convidar por e-mail</Button><Button onClick={() => setEditUser(null)}>
-                <Plus size={16} /> Novo perfil
-              </Button></div> : undefined
-            }
-          />
-          <DataState loading={isLoading} error={error}>
-            <PagedTable
-              rows={users || []}
-              header={
-                <tr>
-                  <th>Pessoa</th>
-                  <th>Cargo</th>
-                  <th>Nível</th>
-                  <th>Situação</th>
-                  <th className="text-right">Ações</th>
-                </tr>
-              }
-              renderRow={(u) => (
-                <tr key={u.id}>
-                  <td>
-                    <div className="client-identity">
-                      <span className="avatar">{initials(u.name)}</span>
-                      <span>
-                        {u.name}
-                        <small className="muted"> {u.email}</small>
-                      </span>
-                    </div>
-                  </td>
-                  <td>{u.title || '—'}</td>
-                  <td>{roles[u.role] || u.role}</td>
-                  <td>
-                    <Badge value={u.active ? 'completed' : 'cancelled'} label={u.invite_pending ? 'Convite pendente' : u.active ? 'Ativo' : 'Inativo'} />
-                  </td>
-                  <td>
-                    {canManage && u.workspace_id === workspace?.id && <div className="row-actions">
-                      <Button variant="ghost" aria-label={'Editar ' + u.name} onClick={() => setEditUser(u)}>
-                        <Pencil size={16} />
-                      </Button>
-                      <Button variant="ghost" aria-label={'Nova senha de ' + u.name} onClick={() => setPasswordUser(u)}>
-                        <KeyRound size={16} />
-                      </Button>
-                    </div>}
-                  </td>
-                </tr>
-              )}
-            />
-          </DataState>
-        </Card>
-      )}
-      <FormDialog
-        open={inviting} onClose={() => setInviting(false)} title="Convidar para a equipe"
-        description="A pessoa receberá um link válido por 24 horas para definir sua própria senha. Para reenviar, informe o mesmo e-mail."
-        fields={[{ name: 'name', label: 'Nome', required: true }, { name: 'email', label: 'E-mail', type: 'email', required: true },
-          { name: 'role', label: 'Nível', type: 'select', required: true, defaultValue: 'member', options: opts({ member: 'Membro', admin: 'Administrador' }) }]}
-        onSubmit={async data => {
-          const result = await post<{ delivery_status: string }>('/users/invitations', data);
-          await refreshAll(); setInviting(false);
-          notify(result.delivery_status === 'sent' ? 'Convite enviado por e-mail.' : 'Convite criado, mas o envio está sem confirmação. Confira no Brevo antes de solicitar outro.', result.delivery_status === 'sent' ? undefined : 'error');
-        }}
-      />
-      <FormDialog
-        open={editUser !== false}
-        onClose={() => setEditUser(false)}
-        title={editUser ? 'Editar perfil' : 'Novo perfil'}
-        fields={userFields}
-        initial={editUser || { role: 'member', active: true }}
-        onSubmit={async (data) => {
-          const body = { ...data, title: data.title || null };
-          if (editUser) await patch('/users/' + editUser.id, body);
-          else await post('/users', body);
-          await refreshAll();
-          notify('Perfil salvo.');
-          setEditUser(false);
-        }}
-      />
-      <FormDialog
-        open={!!passwordUser}
-        onClose={() => setPasswordUser(null)}
-        title={'Nova senha — ' + (passwordUser?.name || '')}
-        description={passwordUser?.id === user?.id ? 'Você será desconectado dos outros dispositivos.' : 'Os acessos desta pessoa serão encerrados.'}
-        fields={[{ name: 'password', label: 'Nova senha', type: 'password', required: true, help: 'No mínimo 10 caracteres.' }]}
-        onSubmit={async (data) => {
-          await patch('/users/' + passwordUser!.id, { password: data.password });
-          notify('Senha atualizada.');
-          setPasswordUser(null);
-        }}
-      />
+      <div className="settings-layout">
+        <nav className="settings-nav" aria-label="Seções das configurações">
+          {groups.map((group) => (
+            <div className="settings-nav-group" key={group.title}>
+              <span className="settings-nav-title">{group.title}</span>
+              {group.items.map((item) => (
+                <button type="button" key={item.key} className={'settings-nav-item' + (item.key === tab ? ' active' : '')}
+                  aria-current={item.key === tab ? 'page' : undefined} onClick={() => selectTab(item.key)}>
+                  {item.icon}<span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <div className="settings-content">
+          <header className="settings-heading">
+            <div><h2>{current.label}</h2><p>{current.description}</p></div>
+            {tab === 'operacao' && <Button variant="soft" onClick={() => refreshAll()}><RefreshCw size={15} />Atualizar estado</Button>}
+          </header>
+          {tab === 'perfil' && <ProfileSettings key={user?.id} />}
+          {tab === 'notificacoes' && <NotificationSettings />}
+          {tab === 'conta' && <AccountSettings key={workspace?.id} canManage={canManage} />}
+          {tab === 'equipe' && <TeamSettings canManage={canManage} />}
+          {tab === 'clientes' && canChooseAccount && <ClientAccountsSettings />}
+          {tab === 'funis' && <PipelineSettings />}
+          {tab === 'projetos' && <ProjectStageSettings />}
+          {tab === 'agendamento' && <BookingSettings />}
+          {tab === 'conexoes' && canManage && <ConnectionsSettings />}
+          {tab === 'dominios' && canManage && <DomainsSettings />}
+          {tab === 'operacao' && canManage && <OperationsSettings />}
+        </div>
+      </div>
     </div>
   );
 }
