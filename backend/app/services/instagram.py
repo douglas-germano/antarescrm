@@ -355,6 +355,7 @@ def ingest_message(connection, item, key, historical=False):
     thread.updated_at = max(previous_updated, occurred)
     flag_modified(thread, 'updated_at')  # Override Base.onupdate, even when the date is unchanged.
     if not outgoing and not historical:
+        thread.status = 'open'  # A new message reopens a closed conversation, as on WhatsApp.
         from .notifications import record
 
         record(thread, row, 'inbox')

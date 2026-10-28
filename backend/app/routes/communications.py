@@ -7,7 +7,7 @@ from flask import Blueprint, g, request
 from marshmallow import fields as f
 from marshmallow import validate
 
-from ..common import APIError, add, commit, get, page, payload, query, require, update
+from ..common import APIError, add, audit, commit, get, page, payload, query, require, update, user_ref
 from ..extensions import db, limiter
 from ..models import (
     AuditLog,
@@ -15,6 +15,7 @@ from ..models import (
     InboxMessage,
     InboxThread,
     MessageTemplate,
+    Opportunity,
     WhatsAppConversation,
     WhatsAppMessage,
     Workspace,
@@ -145,8 +146,20 @@ def resume(message_id):
 @bp.get('/inbox')
 @require()
 def inbox():
+    """Every conversation across channels, newest first, with what the list needs to triage it."""
     items = []
-    for thread in query(InboxThread).order_by(InboxThread.updated_at.desc()).limit(200):
+    inbox_threads = query(InboxThread).order_by(InboxThread.updated_at.desc()).limit(200).all()
+    last_in = (
+        dict(
+            db.session.query(InboxMessage.thread_id, db.func.max(InboxMessage.created_at))
+            .filter(InboxMessage.thread_id.in_([t.id for t in inbox_threads]), InboxMessage.direction == 'in')
+            .group_by(InboxMessage.thread_id)
+            .all()
+        )
+        if inbox_threads
+        else {}
+    )
+    for thread in inbox_threads:
         last = query(InboxMessage).filter_by(thread_id=thread.id).order_by(InboxMessage.created_at.desc()).first()
         items.append(
             {
@@ -154,13 +167,25 @@ def inbox():
                 'source': 'inbox',
                 'preview': last.content[:255] if last else '',
                 'last_status': last.status if last else '',
+                'last_direction': last.direction if last else '',
+                'last_message_at': (last.created_at.isoformat() if last else None),
+                'last_inbound_at': last_in[thread.id].isoformat() if last_in.get(thread.id) else None,
             }
         )
-        if thread.channel == 'instagram':
-            owner = db.session.get(Contact, thread.contact_id) if thread.contact_id else None
-            username = (owner.custom_fields or {}).get('instagram_username') if owner else None
-            items[-1]['display_address'] = '@' + username if username else 'Instagram'
-    for thread in query(WhatsAppConversation).order_by(WhatsAppConversation.last_message_at.desc()).limit(200):
+    last_direction = (
+        db.session.query(WhatsAppMessage.direction)
+        .filter(WhatsAppMessage.conversation_id == WhatsAppConversation.id)
+        .order_by(WhatsAppMessage.occurred_at.desc())
+        .limit(1)
+        .correlate(WhatsAppConversation)
+        .scalar_subquery()
+    )
+    for thread, direction in (
+        query(WhatsAppConversation)
+        .add_columns(last_direction)
+        .order_by(WhatsAppConversation.last_message_at.desc())
+        .limit(200)
+    ):
         items.append(
             {
                 **thread.to_dict(),
@@ -168,15 +193,54 @@ def inbox():
                 'channel': 'whatsapp',
                 'address': thread.phone,
                 'preview': thread.last_message_preview or '',
+                'last_direction': direction or '',
             }
         )
+    contact_ids = {item['contact_id'] for item in items if item.get('contact_id')}
+    contacts = {c.id: c for c in query(Contact).filter(Contact.id.in_(contact_ids))} if contact_ids else {}
+    open_deals = (
+        {
+            row[0]
+            for row in query(Opportunity)
+            .filter(Opportunity.contact_id.in_(contact_ids), Opportunity.status == 'open')
+            .with_entities(Opportunity.contact_id)
+        }
+        if contact_ids
+        else set()
+    )
     counts = notifications.thread_counts()
     for item in items:
+        contact = contacts.get(item.get('contact_id'))
+        item['has_open_deal'] = item.get('contact_id') in open_deals
+        if item['channel'] == 'instagram':
+            username = (contact.custom_fields or {}).get('instagram_username') if contact else None
+            item['display_address'] = '@' + username if username else 'Instagram'
         key = (item['source'], item['id'])
         if key in counts:
             item['unread_count'] = counts[key]
     items.sort(key=lambda row: row.get('last_message_at') or row.get('updated_at') or '', reverse=True)
     return {'items': items}
+
+
+class ThreadUpdate(StrictSchema):
+    status = choice('open closed')
+    assigned_to_id = ref(nullable=True)
+
+
+@bp.patch('/inbox/inbox/<uuid:thread_id>')
+@require()
+def inbox_thread_update(thread_id):
+    """Close, reopen or assign an Instagram or e-mail conversation, as WhatsApp ones already can be."""
+    row = get(InboxThread, thread_id, lock=True)
+    data = payload(ThreadUpdate)
+    if data.get('assigned_to_id'):
+        data['assigned_to_id'] = str(data['assigned_to_id'])
+    user_ref(data.get('assigned_to_id'))
+    for key, value in data.items():
+        setattr(row, key, value)
+    audit('conversation_update', row)
+    db.session.commit()
+    return {**row.to_dict(), 'source': 'inbox'}
 
 
 class NotificationReadSchema(StrictSchema):

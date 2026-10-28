@@ -172,7 +172,7 @@ function ScopedMessageNotificationProvider({ children }: { children: React.React
 
 export function MessageNotificationButton() {
   const { count, open } = useMessageNotifications();
-  return <Button variant="secondary" className={styles.trigger} onClick={open} aria-label={`Notificações de mensagens${count ? `: ${count} não lidas` : ''}`} title="Mensagens não lidas"><Bell size={16} />Não lidas{count > 0 && <span className={styles.badge}>{count > 99 ? '99+' : count}</span>}</Button>;
+  return <button type="button" className={'icon-btn ' + styles.trigger} onClick={open} aria-label={`Notificações de mensagens${count ? `: ${count} não lidas` : ''}`} data-tip="Mensagens não lidas"><Bell size={18} />{count > 0 && <span className={styles.badge}>{count > 99 ? '99+' : count}</span>}</button>;
 }
 
 /** Only acknowledge the most recent received message that has actually loaded on a visible chat. */

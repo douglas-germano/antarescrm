@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { post } from '@/lib/api';
 import { useNotify } from '@/components/providers';
 import type { Row } from '@/lib/types';
-import { ChatHeader } from '@/components/whatsapp/ChatHeader';
+import { ConversationHeader } from '@/components/inbox/inbox-tools';
 import { Composer } from '@/components/whatsapp/Composer';
 import { useMessages } from '@/components/whatsapp/hooks';
 import { useReadIncomingMessages } from '@/components/inbox/message-notifications';
@@ -18,7 +18,15 @@ export function ChatPane({
   onRefresh,
   onRead,
   onCreateOpportunity,
+  staff,
+  contact,
+  panelOpen,
+  onTogglePanel,
 }: {
+  staff: Row[];
+  contact?: Row | null;
+  panelOpen: boolean;
+  onTogglePanel: () => void;
   conversation: Row;
   connection?: Row;
   onBack: () => void;
@@ -59,13 +67,18 @@ export function ChatPane({
   }
   return (
     <>
-      <ChatHeader
-        conversation={conversation}
+      <ConversationHeader
+        thread={{ ...conversation, channel: 'whatsapp' }}
+        name={contact?.name || conversation.contact_name || conversation.phone}
+        address={'+' + conversation.phone}
+        staff={staff}
+        panelOpen={panelOpen}
+        onTogglePanel={onTogglePanel}
         canSync={connected}
         syncing={syncing}
         onBack={onBack}
         onDetails={onDetails}
-        onToggleStatus={() => onUpdate({ status: closed ? 'open' : 'closed' })}
+        onUpdate={onUpdate}
         onSync={sync}
         onCreateOpportunity={onCreateOpportunity}
       />
@@ -75,6 +88,7 @@ export function ChatPane({
         </div>
       )}
       <MessageList
+        conversationId={conversation.id}
         messages={messages.messages}
         latestId={messages.latestId}
         loading={messages.loading}
@@ -86,6 +100,7 @@ export function ChatPane({
         conversationId={conversation.id}
         connected={connected}
         closed={closed}
+        contact={contact}
         onSent={async () => {
           messages.clearOlder();
           await refresh();

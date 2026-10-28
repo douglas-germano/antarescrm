@@ -120,6 +120,10 @@ button:focus-visible,a:focus-visible { outline: 2px solid var(--primary); outlin
 [data-tip][data-tip-align='start']::after { left: 0; transform: translateY(4px); }
 [data-tip][data-tip-align='end']::after { left: auto; right: 0; transform: translateY(4px); }
 [data-tip][data-tip-align]:hover::after,[data-tip][data-tip-align]:focus-visible::after,[data-tip][data-tip-align]:focus-within::after { transform: translateY(0); }
+/* Below the control, for controls at the top edge of a clipped area (e.g. the chat header). */
+.tips-below [data-tip]::after { bottom: auto; top: calc(100% + 8px); transform: translate(-50%, -4px); }
+.tips-below [data-tip]::before { bottom: auto; top: calc(100% + 3px); transform: translateY(-4px) rotate(45deg); }
+.tips-below [data-tip][data-tip-align='end']::after { transform: translateY(-4px); }
 /* Popover: a trigger button with a small floating panel (menus, filter panels). */
 .popover { position: relative; display: inline-flex; }
 .popover-caret { color: #8a8a8a; margin-left: -2px; }

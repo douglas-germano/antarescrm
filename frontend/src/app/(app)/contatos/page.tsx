@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Plus, Pencil, Archive, Users, User, Mail, Phone, Building2, MessageCircle, CalendarPlus, FileText } from 'lucide-react';
-import { useList, usePage, useData, post, patch, remove, refreshAll } from '@/lib/api';
+import { api, useList, usePage, useData, post, patch, remove, refreshAll } from '@/lib/api';
 import { initials, rowOptions, hasRealName, formatPhone } from '@/lib/format';
 import type { Field, Row, Contact, ContactPage } from '@/lib/types';
 import { useSession, useNotify } from '@/components/providers';
@@ -37,6 +37,11 @@ export default function ContactsPage() {
   const [editing, setEditing] = useState<Contact | null | undefined>();
   const [deleting, setDeleting] = useState<Contact | null>(null);
   const [detail, setDetail] = useState<Contact | null>(null);
+  // The inbox contact panel links here with ?contato= to open that contact's detail.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('contato');
+    if (id) api<Contact>('/contacts/' + id).then(setDetail).catch(() => {});
+  }, []);
   const timeline = useData<Row>(detail ? '/contacts/' + detail.id + '/timeline' : null);
   const companyList = companies.data || [];
   const companyName = (id?: string | null) => companyList.find((c) => c.id === id)?.name;

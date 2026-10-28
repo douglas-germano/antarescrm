@@ -18,6 +18,8 @@ class InboxThread(TenantBase):
     address = db.Column(db.String(254), nullable=False)
     contact_id = db.Column(db.String(36), db.ForeignKey('contacts.id'), index=True)
     subject = db.Column(db.String(180), nullable=False, default='')
+    status = db.Column(db.String(20), nullable=False, default='open', server_default='open')
+    assigned_to_id = db.Column(db.String(36), db.ForeignKey('users.id'))
     __table_args__ = (UniqueConstraint('workspace_id', 'channel', 'address'),)
 
 

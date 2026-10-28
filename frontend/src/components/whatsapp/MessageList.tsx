@@ -1,10 +1,12 @@
-import { Fragment, useEffect, useRef } from 'react';
+import { Fragment } from 'react';
 import { Button, DataState, EmptyState } from '@/components/ui';
 import type { Row } from '@/lib/types';
 import { dayLabel, messageDay } from '@/components/whatsapp/helpers';
 import { MessageBubble } from '@/components/whatsapp/MessageBubble';
+import { useStickToBottom } from '@/components/whatsapp/use-stick-to-bottom';
 
 export function MessageList({
+  conversationId,
   messages,
   latestId,
   loading,
@@ -12,6 +14,7 @@ export function MessageList({
   hasOlder,
   onLoadOlder,
 }: {
+  conversationId: string;
   messages: Row[];
   latestId?: string;
   loading: boolean;
@@ -19,12 +22,9 @@ export function MessageList({
   hasOlder: boolean;
   onLoadOlder: () => void;
 }) {
-  const end = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    end.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [latestId]);
+  const box = useStickToBottom(conversationId, latestId, !loading);
   return (
-    <div className="wa-messages">
+    <div className="wa-messages" ref={box}>
       <DataState loading={loading} error={error}>
         {hasOlder && (
           <Button className="wa-load-older" variant="ghost" onClick={onLoadOlder}>
@@ -45,7 +45,6 @@ export function MessageList({
         ) : (
           <EmptyState title="Nenhuma mensagem ainda" description="Envie a primeira mensagem para iniciar a conversa." />
         )}
-        <div ref={end} />
       </DataState>
     </div>
   );

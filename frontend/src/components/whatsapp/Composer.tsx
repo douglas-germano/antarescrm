@@ -3,6 +3,7 @@ import { Loader2, Paperclip, Send, X } from 'lucide-react';
 import { post } from '@/lib/api';
 import { useNotify } from '@/components/providers';
 import type { Row } from '@/lib/types';
+import { TemplatePicker } from '@/components/inbox/inbox-tools';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -10,11 +11,14 @@ export function Composer({
   conversationId,
   connected,
   closed,
+  contact,
   onSent,
 }: {
   conversationId: string;
   connected: boolean;
   closed: boolean;
+  /** The linked contact, to fill reply templates. */
+  contact?: Row | null;
   /** Runs after a successful send so lists and messages can refresh before the composer unlocks. */
   onSent: () => Promise<void>;
 }) {
@@ -111,6 +115,7 @@ export function Composer({
         >
           <Paperclip size={20} />
         </button>
+        <TemplatePicker channel="whatsapp" contact={contact} disabled={sending || closed} onPick={(text) => { setInput(text); field.current?.focus(); }} />
         <textarea
           ref={field}
           aria-label="Mensagem para o cliente"
