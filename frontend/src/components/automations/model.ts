@@ -22,7 +22,14 @@ export const ACTIONS: Record<string, string> = {
   move_stage: 'Mover negócio de etapa',
   reply_comment: 'Responder o comentário (Instagram)',
   private_reply: 'Enviar DM ao autor do comentário',
+  instagram_message: 'Enviar direct no Instagram',
 };
+
+/** Instagram direct messages can carry link buttons and quick replies; other actions cannot. */
+export const INSTAGRAM_DMS = ['private_reply', 'instagram_message'];
+export const MAX_BUTTONS = 3;
+export const MAX_QUICK_REPLIES = 13;
+export type LinkButton = { title: string; url: string };
 
 export type Step = {
   conditions?: Conditions;
@@ -37,6 +44,10 @@ export type Step = {
   /** Only on `kind: 'branch'`: the steps for when its conditions match, and for when they don't. */
   yes?: Step[];
   no?: Step[];
+  /** How far the user dragged the card from its automatic place on the canvas. */
+  offset?: { x: number; y: number };
+  buttons?: LinkButton[];
+  quick_replies?: string[];
 };
 
 export const newStep = (kind = 'create_task'): Step => ({ kind, title: '', delay_minutes: 0, due_days: 0 });
@@ -120,6 +131,7 @@ export function describeStep(step: Step, lookups: { template: (id?: string) => s
     case 'send_message': return `Enviar mensagem · ${lookups.template(step.template_id) || 'modelo indisponível'}`;
     case 'reply_comment': return `Responder o comentário: ${step.content || ''}`;
     case 'private_reply': return `Enviar DM ao autor: ${step.content || ''}`;
+    case 'instagram_message': return `Enviar direct: ${step.content || ''}`;
     case 'add_tag': return `Adicionar a tag “${step.tag || ''}”`;
     case 'move_stage': return `Mover o negócio para ${lookups.stage(step.stage_id) || 'etapa indisponível'}`;
     case 'follow_up': return `Agendar retorno${step.title ? ': ' + step.title : ''}${step.due_days ? ` (em ${step.due_days} d)` : ''}`;
@@ -149,23 +161,39 @@ export const RECIPES = [
 export function stepProblem(step: Step): string | null {
   if (step.kind === 'branch' && !step.conditions?.items?.length) return 'Defina a condição que divide os caminhos.';
   if (step.kind === 'send_message' && !step.template_id) return 'Escolha o modelo de mensagem.';
-  if ((step.kind === 'reply_comment' || step.kind === 'private_reply') && !step.content?.trim()) return 'Escreva o texto da resposta.';
+  if ((step.kind === 'reply_comment' || INSTAGRAM_DMS.includes(step.kind)) && !step.content?.trim()) return 'Escreva o texto da mensagem.';
+  if (INSTAGRAM_DMS.includes(step.kind)) {
+    if (step.buttons?.some((b) => !b.title.trim() || !/^https:\/\/\S+\.\S+/.test(b.url.trim()))) return 'Cada botão precisa de um nome e de um link começando com https://.';
+    if (step.buttons?.length && (step.content || '').length > 640) return 'Com botões, o texto pode ter até 640 caracteres.';
+    const replies = (step.quick_replies || []).map((q) => q.trim());
+    if (replies.some((q) => !q)) return 'Preencha ou remova as respostas rápidas vazias.';
+    if (new Set(replies).size !== replies.length) return 'As respostas rápidas precisam ser diferentes.';
+  }
   if (step.kind === 'add_tag' && !step.tag?.trim()) return 'Informe a tag.';
   if (step.kind === 'move_stage' && !step.stage_id) return 'Escolha a etapa de destino.';
   if ((step.kind === 'create_task' || step.kind === 'follow_up') && !step.title?.trim()) return 'Informe o título.';
   return null;
 }
 
+const offsetOf = (step: Step) =>
+  step.offset && (step.offset.x || step.offset.y) ? { offset: { x: Math.round(step.offset.x), y: Math.round(step.offset.y) } } : {};
+
 /** The API payload for one step: only the fields its action uses. */
 export function stepPayload(step: Step): Record<string, unknown> {
   if (step.kind === 'branch') {
     return { kind: 'branch', conditions: step.conditions || emptyConditions(), delay_minutes: step.delay_minutes, due_days: 0,
-      yes: (step.yes || []).map(stepPayload), no: (step.no || []).map(stepPayload) };
+      yes: (step.yes || []).map(stepPayload), no: (step.no || []).map(stepPayload), ...offsetOf(step) };
   }
   return {
+    ...offsetOf(step),
     conditions: step.conditions || emptyConditions(), kind: step.kind, delay_minutes: step.delay_minutes, due_days: step.due_days,
     ...(step.kind === 'send_message' ? { template_id: step.template_id }
-      : step.kind === 'reply_comment' || step.kind === 'private_reply' ? { content: step.content }
+      : INSTAGRAM_DMS.includes(step.kind) ? {
+        content: step.content,
+        ...(step.buttons?.length ? { buttons: step.buttons.map((b) => ({ title: b.title.trim(), url: b.url.trim() })) } : {}),
+        ...(step.quick_replies?.length ? { quick_replies: step.quick_replies.map((q) => q.trim()) } : {}),
+      }
+      : step.kind === 'reply_comment' ? { content: step.content }
       : step.kind === 'add_tag' ? { tag: step.tag }
       : step.kind === 'move_stage' ? { stage_id: step.stage_id }
       : { title: step.title }),

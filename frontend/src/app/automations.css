@@ -133,11 +133,16 @@
 .flow-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: 0; padding: 10px var(--page-pad-x); background: #fbeeea; color: #8f2a2a; font-size: 13px; font-weight: 600; flex-shrink: 0; }
 .flow-error button { display: grid; background: transparent; color: inherit; padding: 4px; }
 .flow-body { position: relative; flex: 1; min-height: 0; display: flex; }
-.flow-canvas { flex: 1; min-width: 0; overflow: auto; background-color: #f7f7f8; background-image: radial-gradient(#d9d9de 1px, transparent 1px); background-size: 18px 18px; }
-.flow-stage { display: flex; align-items: flex-start; width: max-content; padding: 120px 140px 160px 120px; transform-origin: 0 0; transition: transform .2s var(--ease); }
-.flow-trigger-wrap, .flow-step-wrap { display: flex; align-items: flex-start; position: relative; }
-.flow-trigger-wrap { flex-direction: column; }
-.flow-tag { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 3px 10px; border-radius: 8px 8px 0 0; background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; }
+.flow-canvas { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; background-color: #f7f7f8; background-image: radial-gradient(#d9d9de 1px, transparent 1px); background-size: 18px 18px; }
+.flow-canvas.dragging, .flow-canvas.dragging * { cursor: grabbing !important; }
+/* Free canvas: cards are placed absolutely, connectors are SVG curves under them. */
+.flow-stage { position: absolute; inset: 0 auto auto 0; width: 0; height: 0; transform-origin: 0 0; }
+.flow-place { position: absolute; }
+.flow-place[data-path] .flow-node { cursor: grab; }
+.flow-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.flow-edges path { fill: none; stroke: #c3c3ca; stroke-width: 2; }
+.flow-edges path.dashed { stroke-dasharray: 6 6; }
+.flow-tag { position: absolute; bottom: 100%; left: 0; display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 8px 8px 0 0; background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; }
 .flow-node { position: relative; display: flex; flex-direction: column; gap: var(--space-2); width: 280px; padding: 14px; background: #fff; border: 1.5px solid #e6e6e9; border-radius: 14px; box-shadow: 0 2px 8px #25282b0d; cursor: pointer; text-align: left; transition: border-color .15s, box-shadow .15s; }
 .flow-node:hover { border-color: #cfcfd6; }
 .flow-node.selected { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-ring); }
@@ -164,15 +169,11 @@
 .flow-port { position: absolute; top: 46px; width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #b9b9c0; }
 .flow-port.in { left: -6px; }
 .flow-port.out { right: -6px; }
-.flow-trigger .flow-port.out { top: auto; bottom: 18px; }
-.flow-connector { position: relative; width: 120px; height: 92px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.flow-line { position: absolute; left: 0; right: 0; top: 50px; height: 2px; background: #c3c3ca; }
-.flow-line.dashed { background: repeating-linear-gradient(90deg, #c3c3ca 0 6px, transparent 6px 12px); }
-.flow-delay { position: absolute; top: 18px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 10px; background: #fff; border: 1px solid #e3e3e8; color: var(--foreground); font-size: 11px; font-weight: 600; white-space: nowrap; }
-.flow-insert { position: absolute; top: 40px; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: 50%; background: #fff; border: 1.5px solid #c3c3ca; color: var(--muted); opacity: 0; transition: opacity .15s, border-color .15s, color .15s; }
-.flow-connector:hover .flow-insert, .flow-insert:focus-visible { opacity: 1; }
+.flow-delay { position: absolute; transform: translate(-50%, -50%); z-index: 1; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 10px; background: #fff; border: 1px solid #e3e3e8; color: var(--foreground); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.flow-insert { position: absolute; transform: translate(-50%, -50%); z-index: 1; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border-radius: 50%; background: #fff; border: 1.5px solid #c3c3ca; color: var(--muted); opacity: .6; transition: opacity .15s, border-color .15s, color .15s; }
+.flow-insert:hover, .flow-insert:focus-visible { opacity: 1; }
 .flow-insert:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
-.flow-add { flex-direction: row; align-items: center; justify-content: center; gap: var(--space-2); min-height: 100px; margin-top: 0; border-style: dashed; color: var(--muted); font-weight: 600; font-size: 13px; }
+.flow-add { flex-direction: row; align-items: center; justify-content: center; gap: var(--space-2); min-height: 102px; margin-top: 0; border-style: dashed; color: var(--muted); font-weight: 600; font-size: 13px; }
 .flow-add:hover { color: var(--primary); border-color: var(--primary); }
 .flow-panel { width: 400px; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line-soft); background: #fff; z-index: 2; animation: panel-in .18s var(--ease); }
 @keyframes panel-in { from { opacity: 0; transform: translateX(-12px); } }
@@ -183,7 +184,8 @@
 .flow-panel-tools { display: flex; align-items: center; gap: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--line-soft); }
 .flow-panel-tools .spacer { flex: 1; }
 .flow-tools { position: absolute; right: var(--space-5); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-2); background: #fff; border: 1px solid var(--line-soft); border-radius: 14px; box-shadow: 0 6px 20px #25282b14; }
-.flow-zoom { font-size: 10px; font-weight: 700; color: var(--muted); padding-top: 2px; }
+.flow-zoom { padding: 4px 2px 0; background: transparent; font-size: 10px; font-weight: 700; color: var(--muted); }
+.flow-zoom:hover { color: var(--primary); }
 @media (max-width: 960px) {
   .flow-editor { margin: -64px calc(var(--space-4) * -1) calc(var(--space-4) * -1); height: calc(100dvh); }
   .flow-topbar { padding-left: 60px; flex-wrap: wrap; }
@@ -192,19 +194,25 @@
   .flow-tools { top: auto; bottom: var(--space-4); transform: none; }
 }
 
-/* Branches: the "Sim" path runs on the upper row and "Não" below, joined by a vertical spine. */
+/* Branches: a curve to each path, labelled Sim / Não where it leaves the branch card. */
 .flow-node-footer { display: flex; justify-content: space-between; gap: var(--space-2); }
 .flow-row-icon.branch { background: #fff4e5; color: #b45309; }
 .flow-branch-node { border-color: #f3d3a6; }
-.flow-branches { display: flex; flex-direction: column; gap: 32px; }
-.flow-branch-row { position: relative; display: flex; align-items: flex-start; }
-.flow-branch-row::before { content: ''; position: absolute; left: 0; width: 2px; background: #c3c3ca; }
-.flow-branch-row.yes::before { top: 50px; bottom: -32px; }
-.flow-branch-row.no::before { top: -1px; height: 52px; }
-.flow-branch-lead { position: relative; width: 72px; height: 92px; flex-shrink: 0; }
-.flow-branch-lead .flow-line { top: 50px; }
-.flow-branch-label { position: absolute; top: 18px; left: 14px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.flow-branch-label { position: absolute; z-index: 1; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; white-space: nowrap; pointer-events: none; }
 .flow-branch-label.yes { background: #e7f6ec; color: #15803d; }
 .flow-branch-label.no { background: #fdecec; color: #b91c1c; }
-.flow-add-small { width: 200px; min-height: 72px; margin-top: 14px; font-size: 12px; }
-.flow-add-small:disabled { opacity: .5; cursor: not-allowed; }
+.flow-add-small { width: 220px; font-size: 12px; }
+.flow-add:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Instagram direct: link buttons and quick replies, in the side panel and as chips on the card. */
+.ig-buttons .field > label { display: inline-flex; align-items: center; gap: 6px; }
+.ig-button-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto; gap: var(--space-2); align-items: center; }
+.ig-add { align-self: flex-start; }
+.ig-replies { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ig-reply { display: inline-flex; align-items: center; gap: 2px; padding-right: 6px; border: 1px solid #d9d9d9; border-radius: 999px; background: #fff; }
+.ig-reply input { width: 132px; min-height: 32px; border: 0; background: transparent; border-radius: 999px; }
+.ig-reply button { display: grid; padding: 2px; background: transparent; color: var(--muted); }
+.flow-dm-options { display: flex; flex-wrap: wrap; gap: 4px; }
+.flow-dm-button, .flow-dm-reply { padding: 2px 8px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.flow-dm-button { border: 1px solid #d9d9de; border-radius: 6px; background: #fff; color: #3b82f6; }
+.flow-dm-reply { border: 1px solid #c4b5fd; border-radius: 999px; color: #6d28d9; background: #f5f3ff; }

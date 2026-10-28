@@ -65,10 +65,25 @@ class SubmissionSchema(StrictSchema):
         return data
 
 
+class OffsetSchema(StrictSchema):
+    """How far the user dragged a card from its automatic place on the editor canvas."""
+
+    x = f.Integer(required=True, validate=validate.Range(min=-20000, max=20000))
+    y = f.Integer(required=True, validate=validate.Range(min=-20000, max=20000))
+
+
+class LinkButtonSchema(StrictSchema):
+    """An Instagram button that opens a web page inside the app."""
+
+    title = text(20, required=True)
+    url = f.Url(required=True, schemes={'https'}, validate=validate.Length(max=1000))
+
+
 class ActionSchema(StrictSchema):
     conditions = f.Nested(ConditionsSchema)
     kind = choice(
-        'create_task send_message follow_up add_tag move_stage reply_comment private_reply branch', required=True
+        'create_task send_message follow_up add_tag move_stage reply_comment private_reply instagram_message branch',
+        required=True,
     )
     title = text(180)
     content = text(1000)
@@ -80,6 +95,10 @@ class ActionSchema(StrictSchema):
     # A branch splits the flow: `yes` runs when its conditions match, `no` otherwise.
     yes = f.List(f.Nested(lambda: ActionSchema()), validate=validate.Length(max=10))
     no = f.List(f.Nested(lambda: ActionSchema()), validate=validate.Length(max=10))
+    offset = f.Nested(OffsetSchema)
+    # Instagram only: up to 3 link buttons, and up to 13 quick replies whose tap comes back as the contact's message.
+    buttons = f.List(f.Nested(LinkButtonSchema), validate=validate.Length(max=3))
+    quick_replies = f.List(text(20), validate=validate.Length(max=13))
 
 
 class RuleSchema(StrictSchema):

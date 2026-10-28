@@ -40,13 +40,25 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
       slug: 'Identificador',
       url: 'Link',
       title: 'Título',
+      buttons: 'Botões',
+      quick_replies: 'Respostas rápidas',
+      offset: 'Posição do card',
     };
-    const messages =
-      detail && typeof detail === 'object'
-        ? Object.entries(detail)
-            .map(([k, v]) => `${labels[k] || k}: ${Array.isArray(v) ? v.join(' ') : v}`)
-            .join(' · ')
-        : '';
+    // Nested errors (e.g. one field of an automation step) arrive as objects; list each leaf with its field name.
+    const leaves: string[] = [];
+    const walk = (value: unknown, keys: string[]) => {
+      if (Array.isArray(value) && value.every((item) => typeof item === 'string')) {
+        const field = [...keys].reverse().find((k) => !/^\d+$/.test(k)) || '';
+        const text = value.map((item) => (item === 'Unknown field.' ? 'campo não reconhecido pelo servidor' : item)).join(' ');
+        leaves.push(`${labels[field] || field}: ${text}`);
+      } else if (value && typeof value === 'object') {
+        Object.entries(value).forEach(([k, v]) => walk(v, [...keys, k]));
+      } else if (value) {
+        leaves.push(`${labels[keys[keys.length - 1]] || keys[keys.length - 1]}: ${value}`);
+      }
+    };
+    if (detail && typeof detail === 'object') walk(detail, []);
+    const messages = leaves.join(' · ');
     throw new RequestError(
       messages || body?.error?.message || 'Não foi possível conectar ao sistema. Tente novamente.',
       response.status,

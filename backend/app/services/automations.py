@@ -18,6 +18,7 @@ from ..models import (
     AutomationRun,
     Contact,
     InboxMessage,
+    InboxThread,
     InstagramComment,
     MessageTemplate,
     Opportunity,
@@ -128,11 +129,30 @@ def subject(action, workspace):
     return deal, comment
 
 
+def condition_context(comment, run, contact):
+    """Event data conditions can test: the Instagram comment, and the contact's latest reply since the run began."""
+    context = {'text': comment.text, 'media_id': comment.media_id} if comment else {}
+    reply = (
+        InboxMessage.query.join(InboxThread, InboxThread.id == InboxMessage.thread_id)
+        .filter(
+            InboxMessage.workspace_id == run.workspace_id,
+            InboxThread.contact_id == contact.id,
+            InboxMessage.direction == 'in',
+            InboxMessage.created_at >= run.created_at,
+        )
+        .order_by(InboxMessage.created_at.desc())
+        .first()
+    )
+    if reply:
+        context['reply_text'] = reply.content
+    return context
+
+
 def follow_branch(job, run, contact, workspace):
     """Evaluate the branch now, against the contact as it is, and queue only the chosen path."""
     action = job.action
     deal, comment = subject(action, workspace)
-    context = {'text': comment.text, 'media_id': comment.media_id} if comment else None
+    context = condition_context(comment, run, contact)
     path = 'yes' if matches(action.get('conditions', {}), contact, deal, context) else 'no'
     event_data = {key: action[key] for key in ('opportunity_id', 'comment_id') if key in action}
     schedule(run, action.get(path) or [], job.position + 1, now(), event_data)
@@ -143,17 +163,31 @@ def follow_branch(job, run, contact, workspace):
 def execute(job, rule, run, contact, workspace):
     action = job.action
     deal, comment = subject(action, workspace)
-    if not matches(
-        action.get('conditions', {}),
-        contact,
-        deal,
-        {'text': comment.text, 'media_id': comment.media_id} if comment else None,
-    ):
+    if not matches(action.get('conditions', {}), contact, deal, condition_context(comment, run, contact)):
         return None
     if action['kind'] in ('reply_comment', 'private_reply'):
         from .instagram import comment_action
 
-        return comment_action(action['kind'], comment, contact, action.get('content', ''), workspace)
+        return comment_action(
+            action['kind'],
+            comment,
+            contact,
+            action.get('content', ''),
+            workspace,
+            action.get('buttons'),
+            action.get('quick_replies'),
+        )
+    if action['kind'] == 'instagram_message':
+        from .instagram import automation_message
+
+        return automation_message(
+            contact,
+            action.get('content', ''),
+            workspace,
+            'automation:' + job.id,
+            action.get('buttons'),
+            action.get('quick_replies'),
+        )
     if action['kind'] == 'send_message':
         from .communications import enqueue, render
 
@@ -330,4 +364,11 @@ def received_reply(workspace_id, contact, event_key):
         if changed:
             run.status, run.detail = 'cancelled', 'Contato respondeu; ações futuras canceladas.'
             log(workspace_id, 'automation_stopped_on_reply', run)
-    emit(workspace_id, 'message.received', event_key, contact)
+    message = InboxMessage.query.filter_by(id=str(event_key), workspace_id=workspace_id).first()
+    emit(
+        workspace_id,
+        'message.received',
+        event_key,
+        contact,
+        context={'reply_text': message.content} if message else None,
+    )

@@ -45,13 +45,25 @@ def validate_branch(action, index, total, counter, depth):
     action['no'] = validate_steps(action.get('no', []), counter, depth + 1)
 
 
+INSTAGRAM_DMS = ('private_reply', 'instagram_message')
+
+
 def validate_action(action):
+    if action['kind'] not in INSTAGRAM_DMS:
+        action.pop('buttons', None)
+        action.pop('quick_replies', None)
+    else:
+        if action.get('buttons') and len(action.get('content') or '') > 640:
+            raise APIError('Com botões, o Instagram aceita até 640 caracteres de texto.', 422)
+        replies = action.get('quick_replies') or []
+        if len(set(replies)) != len(replies):
+            raise APIError('As respostas rápidas precisam ser diferentes entre si.', 422)
     if action['kind'] == 'send_message':
         if not action.get('template_id'):
             raise APIError('Selecione um modelo para enviar a mensagem.', 422)
         action['template_id'] = str(action['template_id'])
         get(MessageTemplate, action['template_id'])
-    elif action['kind'] in ('reply_comment', 'private_reply'):
+    elif action['kind'] in ('reply_comment', *INSTAGRAM_DMS):
         if not (action.get('content') or '').strip():
             raise APIError('Escreva o texto da resposta.', 422)
         if len(action['content'].encode()) > 1000:

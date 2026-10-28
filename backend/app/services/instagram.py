@@ -465,7 +465,37 @@ def process_comment(connection, value):
     )
 
 
-def comment_action(kind, comment, contact, content, workspace):
+def dm_message(text, buttons=None, quick_replies=None):
+    """The Send API `message`: plain text, or a button template when there are link buttons; quick replies ride along."""
+    if buttons:
+        message = {
+            'attachment': {
+                'type': 'template',
+                'payload': {
+                    'template_type': 'button',
+                    'text': text,
+                    'buttons': [{'type': 'web_url', 'url': b['url'], 'title': b['title']} for b in buttons],
+                },
+            }
+        }
+    else:
+        message = {'text': text}
+    if quick_replies:
+        message['quick_replies'] = [{'content_type': 'text', 'title': q, 'payload': q} for q in quick_replies]
+    return message
+
+
+def dm_record(text, buttons=None, quick_replies=None):
+    """How a sent message with buttons reads in the inbox, which stores plain text."""
+    lines = [text]
+    if buttons:
+        lines.append('Botões: ' + ' · '.join(f'{b["title"]} ({b["url"]})' for b in buttons))
+    if quick_replies:
+        lines.append('Respostas rápidas: ' + ' · '.join(quick_replies))
+    return '\n\n'.join(lines)
+
+
+def comment_action(kind, comment, contact, content, workspace, buttons=None, quick_replies=None):
     """Runs one automated comment action. Returns the comment id on success, or None when it no longer applies."""
     if not comment:
         raise APIError('Comentário indisponível.', 422)
@@ -504,7 +534,7 @@ def comment_action(kind, comment, contact, content, workspace):
         connection.instagram_id + '/messages',
         token,
         method='POST',
-        json={'recipient': {'comment_id': comment.comment_id}, 'message': {'text': text}},
+        json={'recipient': {'comment_id': comment.comment_id}, 'message': dm_message(text, buttons, quick_replies)},
     )
     setattr(comment, sent_field, now())
     thread = InboxThread.query.filter_by(
@@ -526,7 +556,7 @@ def comment_action(kind, comment, contact, content, workspace):
         workspace_id=workspace.id,
         thread_id=thread.id,
         direction='out',
-        content=text,
+        content=dm_record(text, buttons, quick_replies),
         status='sent',
         provider_id=message_id,
         idempotency_key='instagram-private:' + comment.comment_id,
@@ -536,6 +566,60 @@ def comment_action(kind, comment, contact, content, workspace):
     confirm_reply(message, message_id)
     thread.updated_at = now()
     return comment.id
+
+
+def automation_message(contact, content, workspace, key, buttons=None, quick_replies=None):
+    """An automated direct message in the contact's Instagram conversation. Returns None when there is no
+    conversation or Instagram's 24-hour window has closed: those steps are dismissed, not failed."""
+    connection = active_connection(workspace.id)
+    thread = (
+        InboxThread.query.filter_by(workspace_id=workspace.id, channel='instagram', contact_id=contact.id)
+        .filter(InboxThread.address.startswith(connection.instagram_id + ':'))
+        .order_by(InboxThread.updated_at.desc())
+        .first()
+    )
+    if not thread:
+        return None
+    last = (
+        InboxMessage.query.filter_by(workspace_id=workspace.id, thread_id=thread.id, direction='in')
+        .order_by(InboxMessage.created_at.desc())
+        .first()
+    )
+    if not last or last.created_at < now() - timedelta(hours=24):
+        return None
+    if CommunicationSuppression.query.filter_by(
+        workspace_id=workspace.id, contact_id=contact.id, channel='instagram'
+    ).first():
+        return None
+    existing = InboxMessage.query.filter_by(workspace_id=workspace.id, idempotency_key=key).first()
+    if existing:
+        return existing.id
+    from .communications import render
+
+    text = render(content, contact).strip()
+    if not text or len(text.encode()) > 1000:
+        raise APIError('Texto da mensagem inválido.', 422)
+    result = graph(
+        connection.instagram_id + '/messages',
+        cipher().decrypt(connection.encrypted_token.encode()).decode(),
+        method='POST',
+        json={'recipient': {'id': thread.address.split(':')[1]}, 'message': dm_message(text, buttons, quick_replies)},
+    )
+    if not result.get('message_id'):
+        raise APIError('Sem confirmação do Instagram.', 502)
+    row = InboxMessage(
+        workspace_id=workspace.id,
+        thread_id=thread.id,
+        direction='out',
+        content=dm_record(text, buttons, quick_replies),
+        status='sent',
+        idempotency_key=key,
+    )
+    db.session.add(row)
+    db.session.flush()
+    confirm_reply(row, result['message_id'])
+    thread.updated_at = now()
+    return row.id
 
 
 def receive(body):

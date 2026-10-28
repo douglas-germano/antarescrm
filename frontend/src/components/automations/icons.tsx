@@ -21,8 +21,9 @@ const ACTION_ICONS: Record<string, ReactNode> = {
   move_stage: <ArrowRightLeft size={15} />,
   reply_comment: <Reply size={15} />,
   private_reply: <Instagram size={15} />,
+  instagram_message: <Instagram size={15} />,
 };
 export const eventIcon = (event: string) => EVENT_ICONS[event] || <Zap size={15} />;
 export const actionIcon = (kind: string) => ACTION_ICONS[kind] || <Zap size={15} />;
 /** Instagram triggers and actions get the platform tint, like Gaio's channel badges. */
-export const isInstagram = (key: string) => key.startsWith('instagram') || key === 'reply_comment' || key === 'private_reply';
+export const isInstagram = (key: string) => key.startsWith('instagram') || key === 'reply_comment' || key === 'private_reply' || key === 'instagram_message';

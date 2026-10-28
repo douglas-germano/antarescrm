@@ -108,3 +108,14 @@ def test_branch_validation(env):
     stored = db.session.get(AutomationRule, saved.json['id']).actions[0]
     assert stored['yes'][0]['title'] == 'A' and stored['no'][0]['title'] == 'B'
     assert 'yes' not in stored['yes'][0]
+
+
+def test_card_offsets_are_stored_with_each_step(env):
+    client, d = env
+    actions = [branch(yes=[task('A', offset={'x': 40, 'y': -12})], offset={'x': 0, 'y': 80})]
+    saved = client.post('/api/v1/automations', headers=d['headers'](), json={**BASE, 'actions': actions})
+    assert saved.status_code == 201
+    stored = db.session.get(AutomationRule, saved.json['id']).actions[0]
+    assert stored['offset'] == {'x': 0, 'y': 80} and stored['yes'][0]['offset'] == {'x': 40, 'y': -12}
+    bad = [task('A', offset={'x': 'longe', 'y': 0})]
+    assert client.post('/api/v1/automations', headers=d['headers'](), json={**BASE, 'actions': bad}).status_code == 422

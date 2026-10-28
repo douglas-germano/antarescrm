@@ -1,17 +1,19 @@
 'use client';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Copy, Filter, GitBranch, Maximize2, Pencil, Plus, Trash2, X, Zap, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Copy, Filter, GitBranch, LayoutGrid, Maximize2, Pencil, Plus, Trash2, X, Zap, ZoomIn, ZoomOut } from 'lucide-react';
 import { post, patch, refreshAll } from '@/lib/api';
 import { useNotify } from '@/components/providers';
 import { Button, ConfirmDialog } from '@/components/ui';
 import { ConditionsEditor, emptyConditions, type Conditions } from '@/components/automations/conditions-editor';
 import {
-  ACTIONS, BRANCH_LABEL, DELAY_UNITS, EVENTS, MAX_DEPTH, MAX_PATH_STEPS, MAX_STEPS, countSteps, describeStep, editList, firstProblem,
+  ACTIONS, BRANCH_LABEL, DELAY_UNITS, EVENTS, INSTAGRAM_DMS, MAX_DEPTH, MAX_PATH_STEPS, MAX_STEPS, countSteps, describeStep, editList, firstProblem,
   formatDelay, listAt, newBranch, newStep, pathKey, splitDelay, stepAt, stepPayload, stepProblem, type Step, type StepPath,
 } from '@/components/automations/model';
 import { actionIcon, eventIcon, isInstagram } from '@/components/automations/icons';
+import { InstagramButtons } from '@/components/automations/instagram-buttons';
+import { NODE_W, edgeCurve, layoutFlow, type FlowEdge, type FlowNode } from '@/components/automations/layout';
 import type { Row } from '@/lib/types';
 
 /** Everything the editor changes; `id` is present when the rule already exists. */
@@ -20,7 +22,13 @@ export type FlowDraft = {
   active: boolean; stop_on_reply: boolean; conditions: Conditions; steps: Step[];
 };
 type Selection = 'trigger' | StepPath | null;
-const ZOOMS = [0.6, 0.75, 0.9, 1, 1.15, 1.3];
+type View = { x: number; y: number; z: number };
+const MIN_ZOOM = 0.3;
+const MAX_ZOOM = 2;
+const START_VIEW: View = { x: 120, y: 120, z: 1 };
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+/** A drag shorter than this is a click: it selects the card instead of moving it. */
+const DRAG_THRESHOLD = 4;
 
 function DelayField({ minutes, onChange }: { minutes: number; onChange: (minutes: number) => void }) {
   const initial = splitDelay(minutes);
@@ -40,15 +48,20 @@ function DelayField({ minutes, onChange }: { minutes: number; onChange: (minutes
   );
 }
 
-/** Line between two cards; shows the wait before the next step, like Gaio's connectors. */
-function Connector({ delay, onInsert, disabled }: { delay?: number; onInsert: () => void; disabled: boolean }) {
-  return (
-    <div className="flow-connector">
-      <span className="flow-line" />
-      {delay ? <span className="flow-delay"><Clock size={12} />Esperar {formatDelay(delay)}</span> : null}
-      <button type="button" className="flow-insert" aria-label="Inserir passo aqui" data-tip="Inserir passo" disabled={disabled} onClick={onInsert}><Plus size={13} /></button>
-    </div>
-  );
+/** Wait time and "+" sitting halfway along a connector; the line itself is drawn in the SVG layer. */
+function EdgeControls({ edge, onInsert, disabled }: { edge: FlowEdge; onInsert?: () => void; disabled: boolean }) {
+  const { mid } = edgeCurve(edge.from, edge.to);
+  return <>
+    {edge.side && (
+      <span className={'flow-branch-label ' + edge.side} style={{ left: edge.from.x + 18, top: edge.from.y + (edge.side === 'yes' ? -26 : 6) }}>
+        {edge.side === 'yes' ? <><Check size={11} />Sim</> : <><X size={11} />Não</>}
+      </span>
+    )}
+    {!!edge.delay && <span className="flow-delay" style={{ left: mid.x, top: mid.y - 32 }}><Clock size={12} />Esperar {formatDelay(edge.delay)}</span>}
+    {onInsert && (
+      <button type="button" className="flow-insert" style={{ left: mid.x, top: mid.y }} aria-label="Inserir passo aqui" data-tip="Inserir passo" disabled={disabled} onClick={onInsert}><Plus size={13} /></button>
+    )}
+  </>;
 }
 
 /** "Próximo passo" adds an action after the card; "Ramificar" splits everything after it into Sim / Não. */
@@ -70,7 +83,13 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
   const { notify } = useNotify();
   const [draft, setDraft] = useState<FlowDraft>(initial);
   const [selected, setSelected] = useState<Selection>(initial.id ? null : 'trigger');
-  const [zoom, setZoom] = useState(3);
+  const [view, setView] = useState<View>(START_VIEW);
+  const [dragging, setDragging] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  // Set while a press turns into a drag, so the click that follows it does not select or deselect.
+  const dragged = useRef(false);
   const [dirty, setDirty] = useState(!initial.id);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState('');
@@ -179,6 +198,7 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
       <div className="field"><label htmlFor="flow-tag">Somente contatos com a tag</label><input id="flow-tag" maxLength={80} value={draft.required_tag} placeholder="Opcional" onChange={(e) => update({ required_tag: e.target.value })} /></div>
       <ConditionsEditor value={draft.conditions} onChange={(conditions) => update({ conditions })} />
       <label className="checkbox-label"><input type="checkbox" checked={draft.stop_on_reply} onChange={(e) => update({ stop_on_reply: e.target.checked })} />Interromper os próximos passos quando o contato responder</label>
+      {draft.stop_on_reply && <small className="muted">Deixe desmarcado se o fluxo espera uma resposta rápida para decidir o caminho: a resposta interromperia o fluxo.</small>}
       <div className="field"><label htmlFor="flow-assignee">Responsável pelas tarefas criadas</label>
         <select id="flow-assignee" value={draft.assignee_id} onChange={(e) => update({ assignee_id: e.target.value })}>
           <option value="">Sem responsável</option>{staff.filter((u) => u.active).map((u) => <option value={u.id} key={u.id}>{u.name}</option>)}
@@ -216,6 +236,14 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
           <textarea rows={4} maxLength={1000} aria-label="Texto da resposta" value={step.content || ''} onChange={(e) => updateStep(path, { content: e.target.value })} placeholder="Ex.: Oi, {{name}}! Obrigado pelo comentário." />
           <small>Use {'{{name}}'} para o nome e {'{{username}}'} para o @. Cada comentário recebe no máximo uma resposta de cada tipo, com limite de 60 por hora. A mensagem privada só pode ser enviada até 7 dias após o comentário.</small></div>
       )}
+      {step.kind === 'instagram_message' && (
+        <div className="field"><label>Mensagem no direct</label>
+          <textarea rows={4} maxLength={1000} aria-label="Texto da mensagem" value={step.content || ''} onChange={(e) => updateStep(path, { content: e.target.value })} placeholder="Ex.: Oi, {{name}}! Quer receber os detalhes?" />
+          <small>Vai para a conversa do contato no Instagram. Pelas regras do Instagram, só é enviada se o contato escreveu nas últimas 24 horas; fora disso, o passo é dispensado.</small></div>
+      )}
+      {INSTAGRAM_DMS.includes(step.kind) && (
+        <InstagramButtons buttons={step.buttons || []} quickReplies={step.quick_replies || []} onChange={(patchStep) => updateStep(path, patchStep)} />
+      )}
       {step.kind === 'add_tag' && (
         <div className="field"><label>Tag</label><input maxLength={80} aria-label="Tag" value={step.tag || ''} onChange={(e) => updateStep(path, { tag: e.target.value })} placeholder="Ex.: cliente" /></div>
       )}
@@ -246,71 +274,147 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
 
   const isSelected = (path: StepPath) => Array.isArray(selected) && pathKey(selected) === pathKey(path);
   const select = (path: StepPath) => (e: { stopPropagation: () => void }) => { e.stopPropagation(); setSelected(path); };
+  const { nodes, edges } = layoutFlow(draft.steps);
 
-  /** Draws one path of the flow; a branch at its end splits into a "Sim" row above a "Não" row. */
-  function renderPath(list: Step[], listPath: StepPath): ReactNode {
-    return list.map((s, index) => {
-      const path = [...listPath, index];
-      const problem = stepProblem(s);
-      const last = index === list.length - 1;
-      if (s.kind === 'branch') {
-        return (
-          <div className="flow-step-wrap" key={pathKey(path)}>
-            <Connector delay={s.delay_minutes} disabled={!canInsert(listPath)} onInsert={() => insertStep(listPath, index)} />
-            <article className={'flow-node flow-step flow-branch-node' + (isSelected(path) ? ' selected' : '') + (problem ? ' incomplete' : '')} onClick={select(path)}>
-              <span className="flow-port in" />
-              <header>
-                <span className="flow-row-icon branch"><GitBranch size={15} /></span>
-                <strong>Ramificação</strong>
-              </header>
-              <div className="flow-node-body">
-                {problem ? <span className="flow-missing">{problem}</span> : <p>{describeStep(s, lookups)}</p>}
-              </div>
-              <span className="flow-port out" />
-            </article>
-            <div className="flow-branches">
-              {(['yes', 'no'] as const).map((side) => {
-                const sub = s[side] || [];
-                const subPath = [...path, side];
-                return (
-                  <div className={'flow-branch-row ' + side} key={side}>
-                    <div className="flow-branch-lead">
-                      <span className="flow-line" />
-                      <span className={'flow-branch-label ' + side}>{side === 'yes' ? <><Check size={11} />Sim</> : <><X size={11} />Não</>}</span>
-                    </div>
-                    {sub.length ? renderPath(sub, subPath) : (
-                      <button type="button" className="flow-node flow-add flow-add-small" disabled={!canInsert(subPath)} onClick={(e) => { e.stopPropagation(); insertStep(subPath, 0); }}>
-                        <Plus size={15} />{side === 'yes' ? 'Passo se atender' : 'Passo se não atender'}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
+  /** Zoom keeping the canvas point under (px, py) still, like map apps and Figma. */
+  const zoomAt = (px: number, py: number, factor: number) => setView((v) => {
+    const z = clampZoom(v.z * factor);
+    return { z, x: px - ((px - v.x) * z) / v.z, y: py - ((py - v.y) * z) / v.z };
+  });
+  const zoomCenter = (factor: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (rect) zoomAt(rect.width / 2, rect.height / 2, factor);
+  };
+  /** Frames every card in the visible area, never enlarging past 100%. */
+  const fitView = () => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const xs = nodes.map((n) => n.x);
+    const ys = nodes.map((n) => n.y);
+    const minX = Math.min(...xs), minY = Math.min(...ys);
+    const width = Math.max(...xs) + NODE_W - minX, height = Math.max(...ys) + 260 - minY;
+    const z = clampZoom(Math.min(1, (rect.width - 160) / width, (rect.height - 160) / height));
+    setView({ z, x: (rect.width - width * z) / 2 - minX * z, y: (rect.height - height * z) / 2 - minY * z });
+  };
+  const resetLayout = () => {
+    const clear = (list: Step[]): Step[] => list.map(({ offset: _offset, ...s }) => ({ ...s, ...(s.yes ? { yes: clear(s.yes) } : {}), ...(s.no ? { no: clear(s.no) } : {}) }));
+    update({ steps: clear(draft.steps) });
+  };
+
+  // Wheel and trackpad: pinch (ctrl + wheel) or a mouse wheel zooms at the cursor; two-finger scroll pans.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const mouseWheel = e.deltaMode === 1 || (e.deltaX === 0 && Number.isInteger(e.deltaY) && Math.abs(e.deltaY) >= 50);
+      if (e.ctrlKey || e.metaKey) zoomAt(e.clientX - rect.left, e.clientY - rect.top, Math.exp(-e.deltaY * 0.01));
+      else if (mouseWheel) zoomAt(e.clientX - rect.left, e.clientY - rect.top, Math.exp(-(e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY) * 0.002));
+      else setView((v) => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', onWheel);
+  }, []);
+
+  /** Pressing a step card drags that card; pressing the background or the trigger pans the whole canvas. */
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest('button, input, select, textarea, a')) return;
+    const card = (e.target as HTMLElement).closest<HTMLElement>('[data-path]');
+    const path = card ? (JSON.parse(card.dataset.path!) as StepPath) : null;
+    const origin = path ? { ...(stepAt(draft.steps, path)?.offset || { x: 0, y: 0 }) } : { x: viewRef.current.x, y: viewRef.current.y };
+    const start = { x: e.clientX, y: e.clientY };
+    const target = e.currentTarget;
+    const pointerId = e.pointerId;
+    dragged.current = false;
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
+      if (!dragged.current && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      // Capture only once it is a drag: capturing on press would send a plain click to the canvas, not the card.
+      if (!dragged.current) { dragged.current = true; setDragging(true); target.setPointerCapture(pointerId); }
+      if (path) {
+        const z = viewRef.current.z;
+        updateStep(path, { offset: { x: Math.round(origin.x + dx / z), y: Math.round(origin.y + dy / z) } });
+      } else {
+        setView((v) => ({ ...v, x: origin.x + dx, y: origin.y + dy }));
       }
+    };
+    const up = () => {
+      target.removeEventListener('pointermove', move);
+      target.removeEventListener('pointerup', up);
+      target.removeEventListener('pointercancel', up);
+      setDragging(false);
+    };
+    target.addEventListener('pointermove', move);
+    target.addEventListener('pointerup', up);
+    target.addEventListener('pointercancel', up);
+  };
+
+  function renderNode(node: FlowNode): ReactNode {
+    const style = { left: node.x, top: node.y };
+    if (node.kind === 'trigger') {
       return (
-        <div className="flow-step-wrap" key={pathKey(path)}>
-          <Connector delay={s.delay_minutes} disabled={!canInsert(listPath)} onInsert={() => insertStep(listPath, index)} />
-          <article className={'flow-node flow-step' + (isSelected(path) ? ' selected' : '') + (problem ? ' incomplete' : '')} onClick={select(path)}>
-            <span className="flow-port in" />
-            <header>
-              <span className={'flow-row-icon' + (isInstagram(s.kind) ? ' ig' : '')}>{actionIcon(s.kind)}</span>
-              <strong>{ACTIONS[s.kind] || s.kind}</strong>
-              <small className="flow-index">{index + 1}</small>
-            </header>
-            <div className="flow-node-body">
-              {problem ? <span className="flow-missing">{problem}</span> : <p>{describeStep(s, lookups)}</p>}
-              {!!s.conditions?.items?.length && <span className="deal-chip"><Filter size={10} />Se {s.conditions.items.length} {s.conditions.items.length === 1 ? 'condição' : 'condições'}</span>}
+        <div className="flow-place flow-trigger-wrap" style={style} key={node.key}>
+          <span className="flow-tag"><Zap size={11} />Gatilho</span>
+          <article className={'flow-node flow-trigger' + (selected === 'trigger' ? ' selected' : '')} onClick={(e) => { e.stopPropagation(); setSelected('trigger'); }}>
+            <small className="flow-kicker">{isInstagram(draft.event) ? 'Instagram' : 'Antares'}</small>
+            <strong className="flow-title">O que inicia a automação</strong>
+            <div className="flow-row">
+              <span className={'flow-row-icon' + (isInstagram(draft.event) ? ' ig' : '')}>{eventIcon(draft.event)}</span>
+              <span><b>Evento</b><small>{EVENTS[draft.event]?.label || draft.event}</small></span>
+              <ChevronRight size={14} />
             </div>
-            <NodeFooter disabled={!canInsert(listPath)} branchDisabled={!canBranch(listPath)}
-              onAdd={() => insertStep(listPath, index + 1)} onBranch={() => insertBranch(listPath, index + 1)} />
-            {!last && <span className="flow-port out" />}
+            <div className="flow-row">
+              <span className="flow-row-icon"><Filter size={14} /></span>
+              <span><b>Condições</b><small>{filters || 'Qualquer contato'}</small></span>
+              <ChevronRight size={14} />
+            </div>
+            <NodeFooter disabled={!canInsert([])} branchDisabled={!canBranch([])} onAdd={() => insertStep([], 0)} onBranch={() => insertBranch([], 0)} />
+            <span className="flow-port out" />
           </article>
         </div>
       );
-    });
+    }
+    if (node.kind === 'add') {
+      const label = node.side === 'yes' ? 'Passo se atender' : node.side === 'no' ? 'Passo se não atender' : 'Adicionar o primeiro passo';
+      return (
+        <div className="flow-place" style={style} key={node.key}>
+          <button type="button" className={'flow-node flow-add' + (node.side ? ' flow-add-small' : '')} disabled={!canInsert(node.listPath)}
+            onClick={(e) => { e.stopPropagation(); insertStep(node.listPath, 0); }}>
+            <Plus size={node.side ? 15 : 18} />{label}
+          </button>
+        </div>
+      );
+    }
+    const { step: s, path, listPath, index } = node;
+    const problem = stepProblem(s);
+    const branch = s.kind === 'branch';
+    return (
+      <div className="flow-place" style={style} key={node.key} data-path={JSON.stringify(path)}>
+        <article className={'flow-node flow-step' + (branch ? ' flow-branch-node' : '') + (isSelected(path) ? ' selected' : '') + (problem ? ' incomplete' : '')} onClick={select(path)}>
+          <span className="flow-port in" />
+          <header>
+            {branch ? <span className="flow-row-icon branch"><GitBranch size={15} /></span>
+              : <span className={'flow-row-icon' + (isInstagram(s.kind) ? ' ig' : '')}>{actionIcon(s.kind)}</span>}
+            <strong>{branch ? 'Ramificação' : ACTIONS[s.kind] || s.kind}</strong>
+            {!branch && <small className="flow-index">{index + 1}</small>}
+          </header>
+          <div className="flow-node-body">
+            {problem ? <span className="flow-missing">{problem}</span> : <p>{describeStep(s, lookups)}</p>}
+            {!branch && !!s.conditions?.items?.length && <span className="deal-chip"><Filter size={10} />Se {s.conditions.items.length} {s.conditions.items.length === 1 ? 'condição' : 'condições'}</span>}
+            {!branch && (!!s.buttons?.length || !!s.quick_replies?.length) && (
+              <span className="flow-dm-options">
+                {s.buttons?.map((b, i) => <span key={'b' + i} className="flow-dm-button">{b.title || 'Botão'}</span>)}
+                {s.quick_replies?.map((q, i) => <span key={'q' + i} className="flow-dm-reply">{q || '…'}</span>)}
+              </span>
+            )}
+          </div>
+          {!branch && <NodeFooter disabled={!canInsert(listPath)} branchDisabled={!canBranch(listPath)}
+            onAdd={() => insertStep(listPath, index + 1)} onBranch={() => insertBranch(listPath, index + 1)} />}
+          {(branch || !node.last) && <span className="flow-port out" />}
+        </article>
+      </div>
+    );
   }
 
   return (
@@ -349,38 +453,19 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
           </aside>
         )}
 
-        <div className="flow-canvas" onClick={() => setSelected(null)}>
-          <div className="flow-stage" style={{ transform: `scale(${ZOOMS[zoom]})` }}>
-            <div className="flow-trigger-wrap">
-              <span className="flow-tag"><Zap size={11} />Gatilho</span>
-              <article className={'flow-node flow-trigger' + (selected === 'trigger' ? ' selected' : '')} onClick={(e) => { e.stopPropagation(); setSelected('trigger'); }}>
-                <small className="flow-kicker">{isInstagram(draft.event) ? 'Instagram' : 'Antares'}</small>
-                <strong className="flow-title">O que inicia a automação</strong>
-                <div className="flow-row">
-                  <span className={'flow-row-icon' + (isInstagram(draft.event) ? ' ig' : '')}>{eventIcon(draft.event)}</span>
-                  <span><b>Evento</b><small>{EVENTS[draft.event]?.label || draft.event}</small></span>
-                  <ChevronRight size={14} />
-                </div>
-                <div className="flow-row">
-                  <span className="flow-row-icon"><Filter size={14} /></span>
-                  <span><b>Condições</b><small>{filters || 'Qualquer contato'}</small></span>
-                  <ChevronRight size={14} />
-                </div>
-                <NodeFooter disabled={!canInsert([])} branchDisabled={!canBranch([])} onAdd={() => insertStep([], 0)} onBranch={() => insertBranch([], 0)} />
-                <span className="flow-port out" />
-              </article>
-            </div>
-
-            {renderPath(draft.steps, [])}
-
-            {!draft.steps.length && (
-              <div className="flow-step-wrap">
-                <div className="flow-connector"><span className="flow-line dashed" /></div>
-                <button type="button" className="flow-node flow-add" onClick={(e) => { e.stopPropagation(); insertStep([], 0); }}>
-                  <Plus size={18} />Adicionar o primeiro passo
-                </button>
-              </div>
-            )}
+        <div ref={canvasRef} className={'flow-canvas' + (dragging ? ' dragging' : '')} onPointerDown={onPointerDown}
+          onClickCapture={(e) => { if (dragged.current) { e.stopPropagation(); dragged.current = false; } }}
+          onClick={() => setSelected(null)}
+          style={{ backgroundPosition: `${view.x}px ${view.y}px`, backgroundSize: `${18 * view.z}px ${18 * view.z}px` }}>
+          <div className="flow-stage" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
+            <svg className="flow-edges" aria-hidden="true">
+              {edges.map((edge) => <path key={edge.key} d={edgeCurve(edge.from, edge.to).d} className={edge.dashed ? 'dashed' : undefined} />)}
+            </svg>
+            {edges.map((edge) => (
+              <EdgeControls key={edge.key} edge={edge} disabled={!edge.insert || !canInsert(edge.insert.listPath)}
+                onInsert={edge.insert ? () => insertStep(edge.insert!.listPath, edge.insert!.index) : undefined} />
+            ))}
+            {nodes.map(renderNode)}
           </div>
         </div>
 
@@ -388,10 +473,11 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
           description="Os passos dos caminhos Sim e Não também serão excluídos."
           onConfirm={async () => { if (removingBranch) removeStep(removingBranch); setRemovingBranch(null); }} />
         <div className="flow-tools" aria-label="Zoom">
-          <button type="button" className="icon-btn" aria-label="Aproximar" data-tip="Aproximar" data-tip-align="end" disabled={zoom === ZOOMS.length - 1} onClick={() => setZoom((z) => z + 1)}><ZoomIn size={17} /></button>
-          <button type="button" className="icon-btn" aria-label="Afastar" data-tip="Afastar" data-tip-align="end" disabled={zoom === 0} onClick={() => setZoom((z) => z - 1)}><ZoomOut size={17} /></button>
-          <button type="button" className="icon-btn" aria-label="Tamanho original" data-tip="Tamanho original" data-tip-align="end" onClick={() => setZoom(3)}><Maximize2 size={16} /></button>
-          <span className="flow-zoom">{Math.round(ZOOMS[zoom] * 100)}%</span>
+          <button type="button" className="icon-btn" aria-label="Aproximar" data-tip="Aproximar" data-tip-align="end" disabled={view.z >= MAX_ZOOM} onClick={() => zoomCenter(1.2)}><ZoomIn size={17} /></button>
+          <button type="button" className="icon-btn" aria-label="Afastar" data-tip="Afastar" data-tip-align="end" disabled={view.z <= MIN_ZOOM} onClick={() => zoomCenter(1 / 1.2)}><ZoomOut size={17} /></button>
+          <button type="button" className="icon-btn" aria-label="Ajustar à tela" data-tip="Ajustar à tela" data-tip-align="end" onClick={fitView}><Maximize2 size={16} /></button>
+          <button type="button" className="icon-btn" aria-label="Organizar cards" data-tip="Organizar cards" data-tip-align="end" onClick={resetLayout}><LayoutGrid size={16} /></button>
+          <button type="button" className="flow-zoom" aria-label="Voltar para 100%" data-tip="Voltar para 100%" data-tip-align="end" onClick={() => setView(START_VIEW)}>{Math.round(view.z * 100)}%</button>
         </div>
       </div>
     </div>
