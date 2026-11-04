@@ -1,0 +1,43 @@
+name: antares-code-graph
+services:
+  neo4j:
+    image: neo4j:5.26-community@sha256:249a1ec6e3c52d82101a5ed33d6ed2b5ed5b0017b21a28c0bfebc335e87fb177
+    restart: unless-stopped
+    # Compose bind-mounted secrets retain the host UID. Copy as root before the
+    # official entrypoint drops to neo4j, preserving mode 0600 on the host.
+    entrypoint:
+      - tini
+      - '-g'
+      - '--'
+      - bash
+      - '-ec'
+      - >-
+        install -o neo4j -g neo4j -m 400 /run/secrets/neo4j_auth /tmp/neo4j-auth;
+        export NEO4J_AUTH_FILE=/tmp/neo4j-auth;
+        exec /startup/docker-entrypoint.sh neo4j
+    ports:
+      - '127.0.0.1:7475:7474'
+      - '127.0.0.1:7688:7687'
+    environment:
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 256m
+      NEO4J_dbms_usage__report_enabled: 'false'
+    secrets:
+      - neo4j_auth
+    volumes:
+      - data:/data
+      - logs:/logs
+    mem_limit: 1536m
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://localhost:7474/ || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+secrets:
+  neo4j_auth:
+    file: ${CODE_GRAPH_AUTH_FILE:?Run python3 scripts/code-graph.py init first}
+volumes:
+  data:
+  logs:

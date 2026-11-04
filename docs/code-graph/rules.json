@@ -1,0 +1,50 @@
+[
+  {
+    "id": "workspace-isolation",
+    "title": "Isolar dados e permissões por workspace",
+    "description": "Consultas e operações devem usar a conta autorizada. Um identificador fornecido pelo cliente não concede acesso.",
+    "applies_to": [
+      {"path": "backend/app/common.py", "anchor": "def require(*roles):"},
+      {"path": "backend/app/tenancy.py", "anchor": "class AccountContext:"}
+    ],
+    "tests": [
+      {"path": "backend/tests/test_agency_accounts.py", "anchor": "def test_client_cannot_access_agency_sibling_or_foreign("},
+      {"path": "backend/tests/test_maintenance_boundaries.py", "anchor": "def test_explicit_account_context_is_scoped_without_a_request("}
+    ],
+    "documents": [
+      {"path": "docs/MANUTENCAO-BACKEND.md", "anchor": "O isolamento por `workspace_id` continua obrigatório."}
+    ]
+  },
+  {
+    "id": "silent-history",
+    "title": "Importação histórica não dispara notificações ou automações",
+    "description": "Preservar histórico silencioso, deduplicação, checkpoints transacionais e isolamento por conta.",
+    "applies_to": [
+      {"path": "backend/app/services/history.py", "anchor": "def messages_page("},
+      {"path": "backend/app/services/whatsapp.py", "anchor": "def ingest("},
+      {"path": "backend/app/services/instagram/messages.py", "anchor": "def ingest_message("}
+    ],
+    "tests": [
+      {"path": "backend/tests/test_history_sync.py", "anchor": "def test_whatsapp_two_pass_mapping_silent_import_and_rerun("},
+      {"path": "backend/tests/test_history_sync.py", "anchor": "def test_instagram_pagination_dates_dedup_and_no_side_effects("}
+    ],
+    "documents": [
+      {"path": "docs/SINCRONIZACAO-HISTORICO.md", "anchor": "## WhatsApp"}
+    ]
+  },
+  {
+    "id": "durable-delivery",
+    "title": "Persistir intenção antes da chamada ao provedor",
+    "description": "Manter commits de claim e outcome e idempotência. Falha de rede não autoriza repetir cegamente um envio.",
+    "applies_to": [
+      {"path": "backend/app/services/delivery_transactions.py", "anchor": "def commit_delivery("},
+      {"path": "backend/app/services/messaging.py", "anchor": "def send_whatsapp("}
+    ],
+    "tests": [
+      {"path": "backend/tests/test_maintenance_boundaries.py", "anchor": "def test_provider_is_never_called_when_durable_claim_fails("}
+    ],
+    "documents": [
+      {"path": "docs/MANUTENCAO-BACKEND.md", "anchor": "## Transações de entrega"}
+    ]
+  }
+]
