@@ -25,6 +25,7 @@ def register_commands(app):
         from .models import WorkerHeartbeat, now
         from .services.automations import process
         from .services.communications import dispatch as dispatch_messages
+        from .services.fishing import process as process_fishing
         from .services.history import process as process_history
 
         while True:
@@ -33,6 +34,7 @@ def register_commands(app):
             try:
                 actions, messages = process(limit=50), (dispatch_messages(limit=20) if dispatch else [])
                 history_batches = process_history(limit=2)
+                process_fishing(limit=1)
                 if actions or messages or once:
                     click.echo(f'{len(actions)} etapa(s), {len(messages)} mensagem(ns).')
             except Exception as error:  # worker boundary: keep the loop alive and report

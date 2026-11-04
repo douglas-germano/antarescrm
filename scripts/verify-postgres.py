@@ -11,7 +11,7 @@ name = 'antares_test_' + secrets.token_hex(6)
 with psycopg.connect('dbname=postgres', autocommit=True) as connection:
     connection.execute(sql.SQL('CREATE DATABASE {}').format(sql.Identifier(name)))
 try:
-    result = subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_postgres_integration.py', 'tests/test_workflows_postgres.py'], cwd=root/'backend', env={**os.environ, 'ANTARES_POSTGRES_TEST_URL': 'postgresql+psycopg:///' + name})
+    result = subprocess.run([sys.executable, '-m', 'pytest', '-q', 'tests/test_postgres_integration.py', 'tests/test_workflows_postgres.py', 'tests/test_history_postgres.py', 'tests/test_fishing_postgres.py'], cwd=root/'backend', env={**os.environ, 'ANTARES_POSTGRES_TEST_URL': 'postgresql+psycopg:///' + name})
 finally:
     with psycopg.connect('dbname=postgres', autocommit=True) as connection:
         connection.execute(sql.SQL('DROP DATABASE {} WITH (FORCE)').format(sql.Identifier(name)))

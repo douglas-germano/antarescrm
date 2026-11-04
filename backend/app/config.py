@@ -16,6 +16,12 @@ def normalize_database_url(value):
 
 
 class Config:
+    OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+    FISHING_TRIAGE_MODEL = os.getenv('FISHING_TRIAGE_MODEL', '')
+    FISHING_DRAFT_MODEL = os.getenv('FISHING_DRAFT_MODEL', '')
+    FISHING_DISABLE_REASONING = os.getenv('FISHING_DISABLE_REASONING', 'false').lower() == 'true'
+    FISHING_ALLOW_FREE_MODEL_TRAINING = os.getenv('FISHING_ALLOW_FREE_MODEL_TRAINING', 'false').lower() == 'true'
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     BACKUP_STATUS_PATH = os.getenv(
         'BACKUP_STATUS_PATH', str(Path.home() / '.antarescrm-deploy-backups/automatic/latest.json')
     )
@@ -56,7 +62,7 @@ class Config:
         'INSTAGRAM_REDIRECT_URI', 'https://antares.douglasgermano.com/api/v1/instagram/callback'
     )
     INSTAGRAM_API_VERSION = os.getenv('INSTAGRAM_API_VERSION', 'v25.0')
-    # Custom domains. Visitors reach customer hostnames through the same Next.js server as PUBLIC_APP_HOST.
+    # Customer hostnames reach the same frontend server as PUBLIC_APP_HOST.
     PUBLIC_APP_HOST = os.getenv('PUBLIC_APP_HOST', 'antares.douglasgermano.com')
     CUSTOM_DOMAIN_CNAME_TARGET = os.getenv('CUSTOM_DOMAIN_CNAME_TARGET') or PUBLIC_APP_HOST
     CUSTOM_DOMAIN_IPS = [x.strip() for x in os.getenv('CUSTOM_DOMAIN_IPS', '').split(',') if x.strip()]
@@ -68,7 +74,14 @@ class Config:
 
 
 class TestingConfig(Config):
+    OPENROUTER_API_KEY = None
+    FISHING_TRIAGE_MODEL = ''
+    FISHING_DRAFT_MODEL = ''
+    FISHING_DISABLE_REASONING = False
+    FISHING_ALLOW_FREE_MODEL_TRAINING = False
     TESTING = True
+    SECRET_KEY = 'test-only-application-key-never-use-in-production'
+    JWT_SECRET_KEY = 'test-only-jwt-key-never-use-in-production'
     SQLALCHEMY_DATABASE_URI = normalize_database_url(os.getenv('TEST_DATABASE_URL', 'sqlite:///:memory:'))
     SQLALCHEMY_ENGINE_OPTIONS = {}
     RATELIMIT_ENABLED = False
@@ -77,3 +90,11 @@ class TestingConfig(Config):
     EVOLUTION_API_KEY = None
     WHATSAPP_WEBHOOK_BASE_URL = None
     WHATSAPP_WEBHOOK_SECRET = None
+    INSTAGRAM_APP_ID = None
+    INSTAGRAM_APP_SECRET = None
+    INSTAGRAM_ENCRYPTION_KEY = None
+    BREVO_ENCRYPTION_KEY = None
+    BREVO_SYSTEM_API_KEY = None
+    BREVO_SYSTEM_SENDER_EMAIL = None
+    COMMUNICATION_ACCOUNTS = {}
+    CLOUDFLARE_API_TOKEN = None

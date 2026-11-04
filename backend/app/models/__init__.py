@@ -7,6 +7,7 @@ from .brevo import BrevoConnection, BrevoEvent, CampaignRecipient, EmailCampaign
 from .communications import CommunicationSuppression, InboxMessage, InboxThread, MessageTemplate
 from .crm import Activity, Company, Contact, Opportunity, Pipeline, PipelineStage, SavedContactView, StageHistory, Task
 from .domains import CustomDomain
+from .fishing import FishingDraft, FishingPost, FishingSettings, FishingUsage
 from .funnels import Funnel, FunnelEvent, FunnelStep
 from .history import HistorySync
 from .instagram import InstagramComment, InstagramConnection, InstagramEvent, InstagramOAuthState
@@ -16,6 +17,10 @@ from .tenancy import AuditLog, User, Workspace, WorkspaceAccess
 from .whatsapp import WhatsAppConnection, WhatsAppConversation, WhatsAppMedia, WhatsAppMessage
 
 __all__ = [
+    'FishingDraft',
+    'FishingPost',
+    'FishingSettings',
+    'FishingUsage',
     'HistorySync',
     'MessageNotification',
     'NotificationReadState',

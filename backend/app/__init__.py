@@ -5,15 +5,18 @@ from .cli import register_commands
 from .config import Config, TestingConfig
 from .errors import register_error_handlers
 from .extensions import db, jwt, limiter, migrate
+from .observability import register_observability
 from .security import register_jwt_callbacks, register_security_headers, validate_production_config
 
 
 def create_app(config=None):
     app = Flask(__name__)
-    app.config.from_object(TestingConfig if config == 'testing' else Config)
+    testing = config == 'testing' or (isinstance(config, dict) and config.get('TESTING') is True)
+    app.config.from_object(TestingConfig if testing else Config)
     if isinstance(config, dict):
         app.config.update(config)
     validate_production_config(app)
+    register_observability(app)
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -47,6 +50,7 @@ def register_blueprints(app):
         contact_views,
         crm,
         domains,
+        fishing,
         funnels,
         growth,
         history,
@@ -60,6 +64,7 @@ def register_blueprints(app):
 
     for module in (
         auth,
+        fishing,
         crm,
         tasks,
         reports,
