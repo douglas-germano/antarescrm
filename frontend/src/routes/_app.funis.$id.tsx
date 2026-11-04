@@ -1,0 +1,8 @@
+import { prepareRoute } from '@/lib/route-data';
+import { createFileRoute } from '@tanstack/react-router';
+import Screen from '@/screens/app/funis/[id]/index';
+
+export const Route = createFileRoute('/_app/funis/$id')({
+  loader: ({ location }) => prepareRoute(location.pathname),
+  component: Screen,
+});

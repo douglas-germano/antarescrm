@@ -1,4 +1,3 @@
-'use client';
 import { useState } from 'react';
 import { Plus, ExternalLink } from 'lucide-react';
 import { useList, post, patch, refreshAll } from '@/lib/api';

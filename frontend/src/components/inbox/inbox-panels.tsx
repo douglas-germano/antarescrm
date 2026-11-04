@@ -1,4 +1,3 @@
-'use client';
 import { useState } from 'react';
 import { Pencil, Play, Plus, Search, Send } from 'lucide-react';
 import { searchMatch } from '@/lib/format';

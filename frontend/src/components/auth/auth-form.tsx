@@ -1,6 +1,5 @@
-'use client';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 import { ArrowRight, Loader2, Eye, EyeOff, AlertCircle, ArrowUpFromLine } from 'lucide-react';
 import { ACCOUNT_KEY, AuthShell, PREFILL_KEY, readStorage, writeStorage } from '@/components/auth/auth-shell';
 
@@ -61,7 +60,7 @@ export function AuthForm() {
         <div className="field">
           <div className="auth-label-row">
             <label htmlFor="password">Senha</label>
-            <Link href="/recuperar-acesso" className="auth-link" onClick={() => writeStorage('session', PREFILL_KEY, JSON.stringify({ slug, email }))}>Esqueci minha senha</Link>
+            <Link to="/recuperar-acesso" className="auth-link" onClick={() => writeStorage('session', PREFILL_KEY, JSON.stringify({ slug, email }))}>Esqueci minha senha</Link>
           </div>
           <div className="password-field">
             <input id="password" name="password" type={show ? 'text' : 'password'} autoComplete="current-password" maxLength={128} required placeholder="Sua senha" disabled={busy}

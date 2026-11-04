@@ -1,9 +1,9 @@
-'use client';
 import { useEffect, useRef, useState, useId, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Loader2, Search, X, FolderOpen, ArrowUpRight, AlertCircle, ChevronDown } from 'lucide-react';
 import { statuses, priorities } from '@/lib/format';
 import type { Field, FormData } from '@/lib/types';
 import { EntitySelect } from '@/components/contacts/entity-select';
+import { refreshAll } from '@/lib/api';
 
 export function Button({
   variant = 'primary',
@@ -110,9 +110,10 @@ export function DataState({
 }) {
   if (loading)
     return (
-      <div className="loading-state" role="status">
-        <Loader2 className="spin" size={22} />
-        <span>Carregando…</span>
+      <div className="loading-state data-placeholder" role="status" aria-label="Carregando dados">
+        <span className="sr-only">Carregando dados</span>
+        <div className="data-placeholder-heading" aria-hidden="true" />
+        {[0, 1, 2].map(row => <div className="data-placeholder-row" key={row} aria-hidden="true"><i /><span /><span /></div>)}
       </div>
     );
   if (error)
@@ -122,7 +123,7 @@ export function DataState({
         <div>
           <strong>Não foi possível carregar os dados</strong>
           <p>{error.message || 'Tente novamente em instantes.'}</p>
-          <Button variant="secondary" onClick={() => window.location.reload()}>
+          <Button variant="secondary" onClick={() => { void refreshAll().catch(() => undefined); }}>
             Tentar novamente
           </Button>
         </div>

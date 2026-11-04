@@ -1,4 +1,3 @@
-'use client';
 import { FormDialog } from '@/components/ui';
 import { useNotify, useSession } from '@/components/providers';
 import { post, refreshAll } from '@/lib/api';

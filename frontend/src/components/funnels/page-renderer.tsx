@@ -1,4 +1,3 @@
-'use client';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Check, ChevronDown, Circle, ImageOff, Video as VideoIcon } from 'lucide-react';
 import { FormView } from '@/components/forms/form-view';
@@ -50,7 +49,6 @@ function BlockView({ block, forms, mode, onNext, attribution, funnelId }: { bloc
     case 'text': return <p className={'fp-text fp-text-' + (p.size || 'md')}>{p.text}</p>;
     case 'image': {
       if (!p.src) return edit ? <div className="fp-placeholder"><ImageOff size={24} /><span>Informe o link de uma imagem</span></div> : null;
-      // eslint-disable-next-line @next/next/no-img-element
       const img = <img src={p.src} alt={p.alt || ''} className={'fp-image' + (p.rounded ? ' fp-rounded' : '')} loading="lazy" />;
       return p.link && !edit ? <a href={p.link} rel="noopener noreferrer">{img}</a> : img;
     }
@@ -67,7 +65,6 @@ function BlockView({ block, forms, mode, onNext, attribution, funnelId }: { bloc
     case 'form': return <FormBlock block={block} form={forms[p.form_id]} edit={edit} onNext={onNext} attribution={attribution} />;
     case 'list': return <ul className="fp-list">{(p.items || []).map((item: string, i: number) => <li key={i}>{p.icon === 'dot' ? <Circle size={8} fill="currentColor" /> : <Check size={16} />}<span>{item}</span></li>)}</ul>;
     case 'testimonial': return <figure className="fp-testimonial"><blockquote>{p.quote}</blockquote><figcaption>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       {p.avatar && <img src={p.avatar} alt="" />}<span><strong>{p.author}</strong>{p.role && <small>{p.role}</small>}</span></figcaption></figure>;
     case 'faq': return <div className="fp-faq">{(p.items || []).map((item: { q: string; a: string }, i: number) => <details key={i}><summary>{item.q}<ChevronDown size={16} /></summary><p>{item.a}</p></details>)}</div>;
     case 'countdown': return <Countdown block={block} edit={edit} funnelId={funnelId} />;

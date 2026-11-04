@@ -1,4 +1,3 @@
-'use client';
 import { useState } from 'react';
 import { ArrowDown, ArrowUp, Flag, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useData, post, patch, remove, refreshAll } from '@/lib/api';

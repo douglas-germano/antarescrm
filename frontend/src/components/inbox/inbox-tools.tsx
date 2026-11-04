@@ -1,4 +1,3 @@
-'use client';
 import { ArrowLeft, Check, ChevronDown, Clock, Handshake, Link2, MessageSquareText, MoreVertical, PanelRight, RefreshCw, RotateCcw, UserPlus } from 'lucide-react';
 import { useList } from '@/lib/api';
 import { Popover } from '@/components/ui';

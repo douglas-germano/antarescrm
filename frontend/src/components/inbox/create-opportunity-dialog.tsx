@@ -1,6 +1,6 @@
-'use client';
+import { RecordLink } from '@/components/record-link';
 import { useId, useRef, useState } from 'react';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 import { ExternalLink, Handshake } from 'lucide-react';
 import { EntitySelect } from '@/components/contacts/entity-select';
 import { Button, DataState, Modal } from '@/components/ui';
@@ -64,7 +64,7 @@ export function CreateInboxOpportunityDialog({ thread, label, onClose, onCreated
     {created ? <div className="stack" role="status">
       <p><strong>{created.title}</strong> foi vinculado ao contato desta conversa e adicionado ao funil.</p>
       {error && <p className="form-error" role="alert">O negócio foi criado. Não foi possível atualizar a conversa: {error}</p>}
-      <div className="row-actions"><Link className="btn btn-secondary" href={'/crm?opportunity=' + created.id}><ExternalLink size={16} />Ver negócio no funil</Link><Button disabled={busy} onClick={onClose}>Continuar conversa</Button></div>
+      <div className="row-actions"><RecordLink className="btn btn-secondary" href={'/crm?opportunity=' + created.id}><ExternalLink size={16} />Ver negócio no funil</RecordLink><Button disabled={busy} onClick={onClose}>Continuar conversa</Button></div>
     </div> : <DataState loading={pipelines.isLoading || stages.isLoading || users.isLoading || Boolean(thread.contact_id && contact.isLoading)} error={pipelines.error || stages.error || users.error || contact.error}>
       <form className="stack" onSubmit={submit}>
         <fieldset disabled={busy} className="form-grid">
@@ -84,7 +84,7 @@ export function CreateInboxOpportunityDialog({ thread, label, onClose, onCreated
           <div className="field field-wide"><label htmlFor={fieldId('date')}>Previsão de fechamento</label><input id={fieldId('date')} type="date" name="expected_close_date" /></div>
           <div className="field field-wide"><label htmlFor={fieldId('description')}>Descrição</label><textarea id={fieldId('description')} name="description" rows={3} maxLength={5000} /></div>
         </fieldset>
-        {!filteredStages.length && <p role="status">Este funil não possui etapas. Selecione outro funil{canManage ? <> ou <Link href="/configuracoes?tab=funis">configure as etapas</Link></> : ' ou peça a um administrador para configurá-lo'}.</p>}
+        {!filteredStages.length && <p role="status">Este funil não possui etapas. Selecione outro funil{canManage ? <> ou <Link to="/configuracoes" search={{"tab": "funis"}}>configure as etapas</Link></> : ' ou peça a um administrador para configurá-lo'}.</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="row-actions"><Button type="submit" disabled={busy || !selectedStage || Boolean(contact.data?.archived) || (!thread.contact_id && mode === 'existing' && !contactId)}><Handshake size={16} />{busy ? 'Criando…' : 'Criar negócio'}</Button><Button variant="secondary" disabled={busy} onClick={onClose}>Cancelar</Button></div>
       </form>

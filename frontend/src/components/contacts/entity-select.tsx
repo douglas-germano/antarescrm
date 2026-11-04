@@ -1,4 +1,3 @@
-'use client';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, Loader2, X } from 'lucide-react';
 import { api } from '@/lib/api';

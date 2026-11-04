@@ -1,4 +1,3 @@
-'use client';
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, FileUp, Loader2, SlidersHorizontal, UploadCloud } from 'lucide-react';
 import { post, refreshAll } from '@/lib/api';

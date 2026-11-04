@@ -2,7 +2,7 @@
 
 ## Limites da aplicação
 
-O layout raiz fornece notificações. Somente `(app)/layout.tsx` monta `SessionProvider`, que busca a sessão e
+O layout raiz fornece notificações. Somente `routes/_app.tsx` monta `SessionProvider`, que busca a sessão e
 configura o workspace. Funis, formulários, agendas e aprovações públicas não participam dessa autenticação.
 Evite listas manuais de caminhos públicos em providers globais: novas rotas públicas devem funcionar por construção.
 
@@ -23,11 +23,11 @@ filtrado, independentemente da página. O seletor de origem recebe os valores di
 Novas tabelas volumosas devem usar `usePage`; não use `listAll` para contornar paginação.
 
 As visualizações do funil ficam em `components/crm/deal-views.tsx`. Os estilos antes concentrados em `modules.css`
-ficam em quatro arquivos sob `app/styles/`; os imports mantêm a ordem original da cascata.
+ficam em quatro arquivos sob `styles/styles/`; os imports mantêm a ordem original da cascata.
 
 ## Desenvolvimento
 
-`./scripts/dev.sh` usa `backend/.env.development`, PostgreSQL local isolado, portas 5003/3003 e `.next-dev`.
+`./scripts/dev.sh` usa `backend/.env.development`, PostgreSQL local isolado, portas 5003/3003 e o servidor Vite.
 Não herda credenciais de integrações do shell ou do `.env` da produção. Integrações de teste precisam ser
 configuradas expressamente no arquivo de desenvolvimento. Anexos de desenvolvimento ficam em
 `.local-services/dev/project-files`. O banco deve existir antes de iniciar.
@@ -55,12 +55,12 @@ avaliação explícita. O backup não é uma política de rollback automático.
 backend/.venv/bin/python scripts/verify-migrations.py
 backend/.venv/bin/python scripts/verify-postgres.py
 cd frontend
-NEXT_DIST_DIR=.next-check npm run build
+npm run build
 npx playwright install chromium
 npm run test:browser
 ```
 
-Os testes PostgreSQL criam e removem bancos descartáveis. Os testes de navegador iniciam um Next isolado em porta
+Os testes PostgreSQL criam e removem bancos descartáveis. Os testes de navegador iniciam um servidor TanStack Start isolado em porta
 livre e uma API de fixtures; não acessam contas reais nem enviam mensagens externas. Incluem navegação anônima em
 funis, proteção de páginas internas, domínio personalizado e paginação/busca de tarefas e negócios em desktop e celular.
 
@@ -69,3 +69,5 @@ concorrência PostgreSQL, build e navegador. A execução remota depende de envi
 
 Os testes de WhatsApp usam adaptadores falsos para validar ingestão, deduplicação, supressão, envio durável,
 resultados ambíguos e mídia. Eles não confirmam disponibilidade ou conexão real do provedor.
+
+Responsabilidades do backend, transações de envio, logs, fixtures e geração de contratos estão descritos em [MANUTENCAO-BACKEND.md](MANUTENCAO-BACKEND.md).

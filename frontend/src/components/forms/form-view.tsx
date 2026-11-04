@@ -1,4 +1,3 @@
-'use client';
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { contrastOn, formStyle } from './theme';

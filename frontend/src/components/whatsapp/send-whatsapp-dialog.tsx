@@ -1,4 +1,3 @@
-'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Send } from 'lucide-react';
 import { post, patch, refreshAll } from '@/lib/api';

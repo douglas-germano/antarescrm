@@ -1,6 +1,5 @@
-'use client';
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 import { ArrowDown, ArrowLeft, ArrowUp, Copy, ExternalLink, Monitor, Plus, Smartphone, Trash2 } from 'lucide-react';
 import { Badge, Button, ConfirmDialog } from '@/components/ui';
 import { Tabs } from '@/components/blocks';
@@ -134,7 +133,7 @@ export function FunnelEditor({ funnel: initial }: { funnel: Funnel }) {
 
   return <div className="page">
     <div className="bld-toolbar">
-      <Link className="btn btn-ghost" href="/funis"><ArrowLeft size={16} /> Funis</Link>
+      <Link className="btn btn-ghost" to="/funis"><ArrowLeft size={16} /> Funis</Link>
       <input className="fe-title" aria-label="Nome do funil" value={funnel.name} maxLength={150} onChange={(e) => setFunnel((f) => ({ ...f, name: e.target.value }))} />
       <Badge value={published ? 'completed' : 'cancelled'} label={published ? 'Publicado' : 'Rascunho'} />
       <span className="spacer" />

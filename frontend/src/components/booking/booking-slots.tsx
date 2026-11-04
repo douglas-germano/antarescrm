@@ -1,4 +1,3 @@
-'use client';
 import { useEffect, useState } from 'react';
 import { publicApi } from '@/lib/public-api';
 import { DataState } from '@/components/ui';

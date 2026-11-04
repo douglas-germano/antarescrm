@@ -1,6 +1,5 @@
-'use client';
+import { RecordLink } from '@/components/record-link';
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { CheckCircle2, AlertCircle, MessageCircle, X } from 'lucide-react';
 import { useData, setActiveWorkspace } from '@/lib/api';
 import { setZone } from '@/lib/format';
@@ -61,7 +60,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           {notices.map((n) => (
             <div className={'toast ' + n.type} key={n.id}>
               {n.type === 'message' ? <MessageCircle size={20} /> : n.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-              <span>{n.message}{n.action && <Link className="toast-action" href={n.action.href} onClick={() => setNotices(current => current.filter(item => item.id !== n.id))}>{n.action.label}</Link>}</span>
+              <span>{n.message}{n.action && <RecordLink className="toast-action" href={n.action.href} onClick={() => setNotices(current => current.filter(item => item.id !== n.id))}>{n.action.label}</RecordLink>}</span>
               <button
                 aria-label="Fechar aviso"
                 onClick={() => setNotices((a) => a.filter((x) => x.id !== n.id))}

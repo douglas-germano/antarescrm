@@ -8,13 +8,28 @@ import { chromium } from 'playwright';
 const funnel = '11111111-1111-4111-8111-111111111111';
 const workspace = { id: 'workspace-test', name: 'Conta de teste', slug: 'test', timezone: 'America/Cuiaba' };
 const requests = [];
+const deliveries = [];
 let upstream, server, browser, origin;
 const listen = async server => { server.listen(0, '127.0.0.1'); await once(server, 'listening'); return server.address().port; };
 const fixture = (req, res) => {
   const url = new URL(req.url, 'http://fixture');
   requests.push(url.pathname + url.search);
   res.setHeader('Content-Type', 'application/json');
-  if (url.pathname.endsWith('/public/domains/resolve')) return res.end(JSON.stringify({ funnel_id: funnel }));
+  if (url.pathname.endsWith('/public/domains/resolve')) {
+    if (url.searchParams.get('host') === 'unknown.fixture.test') { res.statusCode = 404; return res.end('{}'); }
+    return res.end(JSON.stringify({ funnel_id: funnel }));
+  }
+  if (url.pathname.endsWith('/auth/login')) return res.end(JSON.stringify({ access_token: 'fixture-access', refresh_token: 'fixture-refresh' }));
+  if (url.pathname.endsWith('/auth/logout')) { res.statusCode = 204; return res.end(); }
+  if (/\/whatsapp\/webhook$|\/brevo\/webhook\//.test(url.pathname) || url.pathname.includes('/public/forms/')) {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      deliveries.push({ path: url.pathname, method: req.method, body, headers: req.headers });
+      res.end(JSON.stringify({ received: true }));
+    });
+    return;
+  }
   if (url.pathname.includes('/public/funnels/') && req.method === 'GET') {
     const second = url.pathname.endsWith('/obrigado');
     return res.end(JSON.stringify({
@@ -57,15 +72,15 @@ before(async () => {
   const port = await listen(reservation); await new Promise(resolve => reservation.close(resolve));
   origin = `http://127.0.0.1:${port}`;
   let output = '';
-  server = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', String(port)], {
-    env: { ...process.env, NEXT_DIST_DIR: process.env.NEXT_DIST_DIR || '.next-check', FLASK_API_URL: `http://127.0.0.1:${apiPort}/api/v1`, APP_URL: origin, COOKIE_SECURE: 'false' },
+  server = spawn(process.execPath, ['scripts/start.mjs', '--host', '127.0.0.1', '--port', String(port)], {
+    env: { ...process.env, FLASK_API_URL: `http://127.0.0.1:${apiPort}/api/v1`, APP_URL: origin, COOKIE_SECURE: 'false', INSTAGRAM_WEBHOOK_VERIFY_TOKEN: 'fixture-verify-token' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   server.stdout.on('data', chunk => { output += chunk; }); server.stderr.on('data', chunk => { output += chunk; });
   for (let attempt = 0; attempt < 100; attempt++) {
-    if (server.exitCode !== null) throw new Error(`Next failed: ${output}`);
+    if (server.exitCode !== null) throw new Error(`TanStack Start failed: ${output}`);
     try { if ((await fetch(origin + '/login')).ok) break; } catch {}
-    if (attempt === 99) throw new Error(`Next timeout: ${output}`);
+    if (attempt === 99) throw new Error(`TanStack Start timeout: ${output}`);
     await new Promise(resolve => setTimeout(resolve, 200));
   }
   browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}) });
@@ -93,13 +108,157 @@ test('authenticated routes redirect anonymous visitors to login', async () => {
   await page.goto(origin + '/crm'); await page.waitForURL(origin + '/login');
   await context.close();
 });
+
+test('project list supports keyboard navigation and mobile menu restores focus', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.request.post(origin + '/api/session/login', { headers: { origin }, data: { slug: 'test', email: 'fixture@example.test', password: 'fixture-only' } });
+  await context.route('**/api/backend/projects?*', route => route.fulfill({ json: { items: [{ id: 'project-1', title: 'Projeto de teste', status: 'active', amount: 0, pending_approvals: 0 }], page: 1, pages: 1, total: 1, per_page: 100 } }));
+  const page = await context.newPage();
+  await page.goto(origin + '/projetos');
+  const menu = page.getByRole('button', { name: 'Abrir menu' });
+  await menu.click();
+  await page.locator('.sidebar-scrim').click({ position: { x: 380, y: 400 } });
+  assert.equal(await menu.evaluate(element => document.activeElement === element), true);
+  await page.getByRole('tab', { name: 'Lista', exact: true }).click();
+  const link = page.getByRole('link', { name: 'Projeto de teste' });
+  await link.waitFor();
+  await link.focus();
+  await page.keyboard.press('Enter');
+  await page.waitForURL('**/projetos/project-1');
+  await context.close();
+});
+
+test('session endpoints preserve HttpOnly cookies, private API access and logout', async () => {
+  const context = await browser.newContext();
+  assert.equal((await context.request.get(origin + '/api/backend/auth/me')).status(), 401);
+  const denied = await context.request.post(origin + '/api/session/login', {
+    headers: { origin: 'https://foreign.fixture.test' }, data: { slug: 'test' },
+  });
+  assert.equal(denied.status(), 403);
+  const login = await context.request.post(origin + '/api/session/login', {
+    headers: { origin }, data: { slug: 'test', email: 'fixture@example.test', password: 'fixture-only' },
+  });
+  assert.equal(login.status(), 200);
+  const cookies = await context.cookies();
+  assert.equal(cookies.filter(cookie => ['crm_access', 'crm_refresh'].includes(cookie.name) && cookie.httpOnly).length, 2);
+  const page = await context.newPage(); await page.goto(origin + '/tarefas');
+  await page.getByText('Tarefa 01', { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => /crm_access|crm_refresh/.test(document.cookie)), false);
+  assert.equal((await context.request.get(origin + '/api/backend/auth/me')).status(), 200);
+  assert.equal((await context.request.post(origin + '/api/session/logout', { headers: { origin }, data: {} })).status(), 200);
+  assert.equal((await context.cookies()).some(cookie => ['crm_access', 'crm_refresh'].includes(cookie.name)), false);
+  await page.goto(origin + '/tarefas'); await page.waitForURL(origin + '/login');
+  await context.close();
+});
+
+test('public and webhook endpoints keep their URLs, dynamic parameters and raw payloads', async () => {
+  const handshake = await fetch(origin + '/api/v1/instagram/webhook?hub.mode=subscribe&hub.verify_token=fixture-verify-token&hub.challenge=12345');
+  assert.equal(handshake.status, 200); assert.equal(await handshake.text(), '12345');
+  const body = '{ "event": "fixture", "value": "ação" }';
+  const whatsapp = await fetch(origin + '/api/v1/whatsapp/webhook', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-webhook-secret': 'fixture-secret' }, body,
+  });
+  assert.equal(whatsapp.status, 200);
+  assert.equal(deliveries.at(-1).body, body);
+  assert.equal(deliveries.at(-1).headers['x-webhook-secret'], 'fixture-secret');
+  assert.equal(deliveries.at(-1).headers.authorization, undefined);
+  const form = await fetch(origin + '/api/public/forms/' + funnel);
+  assert.equal(form.status, 200);
+  assert.equal(deliveries.at(-1).path, '/api/v1/public/forms/' + funnel);
+  const submission = await fetch(origin + '/api/public/forms/' + funnel + '/submit', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', origin }, body: '{"name":"Visitante"}',
+  });
+  assert.equal(submission.status, 200);
+  assert.equal(deliveries.at(-1).path, '/api/v1/public/forms/' + funnel + '/submit');
+  assert.equal(deliveries.at(-1).method, 'POST');
+  const blocked = await fetch(origin + '/api/backend/auth/me', { headers: { 'x-forwarded-host': 'landing.fixture.test', cookie: 'crm_access=fixture-session' } });
+  assert.equal(blocked.status, 404);
+  assert.equal((await fetch(origin + '/', { headers: { 'x-forwarded-host': 'unknown.fixture.test' } })).status, 404);
+});
+
+test('router links preserve query strings, browser history, redirects and legal metadata', async () => {
+  const context = await browser.newContext();
+  await context.addCookies([{ name: 'crm_access', value: 'fixture-session', url: origin }]);
+  const page = await context.newPage();
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto(origin + '/campanhas');
+  await page.getByRole('button', { name: 'Nova campanha', exact: true }).click();
+  await page.locator('.menu-panel').getByRole('button', { name: 'E-mail', exact: true }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await page.locator('.sidebar').getByRole('link', { name: 'Configurações', exact: true }).click();
+  await page.locator('.settings-nav').getByRole('button', { name: 'Notificações', exact: true }).click();
+  await page.waitForURL(origin + '/configuracoes?tab=notificacoes');
+  await page.reload();
+  await page.getByRole('heading', { name: 'Notificações', exact: true }).waitFor();
+  await page.goto(origin + '/whatsapp?conversation=thread-fixture');
+  await page.waitForURL(origin + '/mensagens?conversation=thread-fixture');
+  await page.goto(origin + '/agendamentos');
+  await page.waitForURL(origin + '/configuracoes?tab=agendamento');
+  await page.goto(origin + '/termos');
+  assert.equal(await page.title(), 'Termos de Serviço · Antares CRM');
+  assert.ok(await page.locator('link[rel=canonical]').getAttribute('href'));
+  await page.getByRole('link', { name: 'Política de Privacidade', exact: true }).first().click();
+  await page.waitForURL(origin + '/privacidade');
+  await page.goBack(); await page.waitForURL(origin + '/termos');
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test('detail routes load their own screens and parameters instead of their list screens', async () => {
+  const context = await browser.newContext();
+  await context.addCookies([{ name: 'crm_access', value: 'fixture-session', url: origin }]);
+  const page = await context.newPage();
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  for (const [screen, api] of [['formularios', 'forms'], ['funis', 'funnels'], ['projetos', 'projects']]) {
+    const message = 'Detalhe fixture: ' + screen;
+    await page.route(`**/api/backend/${api}/${funnel}`, route => route.fulfill({
+      status: 404, contentType: 'application/json', body: JSON.stringify({ error: { message } }),
+    }));
+    await page.goto(`${origin}/${screen}/${funnel}`);
+    await page.getByText(message, { exact: true }).waitFor();
+  }
+  await page.goto(`${origin}/automacoes/${funnel}`);
+  await page.getByRole('heading', { name: 'Automação não encontrada', exact: true }).waitFor();
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
+test('internal navigation keeps the shell and current content while preparing a slow destination', async () => {
+  const context = await browser.newContext();
+  await context.addCookies([{ name: 'crm_access', value: 'fixture-session', url: origin }]);
+  const page = await context.newPage();
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto(origin + '/crm');
+  await page.getByText('Negócio 01', { exact: true }).waitFor();
+  await page.evaluate(() => { window.__navigationDocument = 'same-document'; });
+  const sidebar = await page.locator('.sidebar').elementHandle();
+  let release;
+  const slow = new Promise(resolve => { release = resolve; });
+  await page.route('**/api/backend/tasks?**', async route => { await slow; await route.continue(); });
+  const documentRequests = [];
+  page.on('request', request => { if (request.isNavigationRequest()) documentRequests.push(request.url()); });
+  await page.locator('.sidebar').getByRole('link', { name: 'Tarefas', exact: true }).click();
+  await page.getByRole('progressbar', { name: 'Abrindo tela' }).waitFor();
+  assert.equal(await page.getByText('Negócio 01', { exact: true }).isVisible(), true);
+  assert.equal(await sidebar.evaluate(node => node.isConnected), true);
+  release();
+  await page.waitForURL(origin + '/tarefas');
+  await page.getByText('Tarefa 01', { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.__navigationDocument), 'same-document');
+  assert.equal(await sidebar.evaluate(node => node.isConnected), true);
+  assert.equal(await page.getByText('Carregando…', { exact: true }).count(), 0);
+  assert.deepEqual(documentRequests, []);
+  assert.deepEqual(errors, []);
+  await context.close();
+});
 test('task pagination fetches only the displayed page and resets on search', async () => {
   requests.length = 0;
   const context = await browser.newContext();
   await context.addCookies([{ name: 'crm_access', value: 'fixture-session', url: origin }]);
   const page = await context.newPage(); await page.goto(origin + '/tarefas');
   await page.getByText('Tarefa 01', { exact: true }).waitFor();
-  assert.equal(requests.filter(url => url.startsWith('/api/v1/tasks?')).length, 1);
+  const taskPages = requests.filter(url => url.startsWith('/api/v1/tasks?') && new URL(url, origin).searchParams.get('per_page') !== '1');
+  assert.equal(taskPages.length, 1); // The separate open-task counter requests one row, not another full page.
   assert.equal(requests.some(url => url.startsWith('/api/v1/contacts')), false);
   await page.getByRole('button', { name: 'Próxima página' }).click();
   await page.getByText('Tarefa 26', { exact: true }).waitFor();
@@ -122,6 +281,11 @@ test('customer domain root renders the public funnel and blocks CRM routes', asy
   await page.goto(origin + '/');
   await page.getByRole('heading', { name: 'Conteúdo público sem login' }).waitFor();
   assert.equal(network.some(url => url.includes('/api/backend')), false);
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByRole('heading', { name: 'Obrigado pela visita' }).waitFor();
+  await page.goBack();
+  await page.getByRole('heading', { name: 'Conteúdo público sem login' }).waitFor();
+  assert.equal(network.some(url => url.includes('/api/backend')), false);
   const protectedResponse = await page.goto(origin + '/crm');
   assert.equal(protectedResponse.status(), 404);
   await context.close();
@@ -141,7 +305,7 @@ test('CRM uses server pages and retains totals across pages and views', async ()
   await context.close();
 });
 
-test('calendar controls keep their geometry when switching all three views', async () => {
+test('calendar controls keep their geometry when switching month and list views', async () => {
   const context = await browser.newContext();
   await context.addCookies([{ name: 'crm_access', value: 'fixture-session', url: origin }]);
   const page = await context.newPage(); await page.goto(origin + '/agenda');
@@ -157,7 +321,7 @@ test('calendar controls keep their geometry when switching all three views', asy
     await page.evaluate(() => scrollTo(0, 0)); await settle();
     const baseline = await measure();
     if (process.env.CALENDAR_SCREENSHOT_DIR && [1440, 390].includes(width)) await page.screenshot({ path: `${process.env.CALENDAR_SCREENSHOT_DIR}/calendar-${width}.png`, fullPage: true });
-    for (const label of ['Lista', 'Links de agendamento', 'Mês', 'Links de agendamento', 'Lista']) {
+    for (const label of ['Lista', 'Mês', 'Lista']) {
       await page.getByRole('tab', { name: label, exact: true }).click();
       await page.evaluate(() => scrollTo(0, 0)); await settle();
       const current = await measure(); assert.equal(current.length, baseline.length);
@@ -167,10 +331,6 @@ test('calendar controls keep their geometry when switching all three views', asy
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `overflow at ${width}px`);
     }
   }
-  await page.getByRole('tab', { name: 'Links de agendamento', exact: true }).click();
-  await page.getByPlaceholder('Buscar link de agendamento').fill('comercial');
-  await page.getByRole('heading', { name: 'Agenda comercial', exact: true }).waitFor();
-  assert.equal(await page.getByRole('heading', { name: 'Atendimento técnico', exact: true }).count(), 0);
   await context.close();
 });
 
@@ -180,13 +340,17 @@ test('campaigns offer both channels and models while inbox keeps only conversati
   const page = await context.newPage();
   page.on('pageerror', error => console.error('Campaign page error:', error.message));
   await page.goto(origin + '/campanhas');
-  for (const name of ['Campanha de e-mail', 'Campanha de WhatsApp', 'Modelo de e-mail', 'Modelo de WhatsApp']) {
-    await page.getByRole('button', { name, exact: true }).waitFor();
-  }
-  for (const [button, title, email] of [['Campanha de e-mail', 'Nova campanha de e-mail', true], ['Campanha de WhatsApp', 'Nova campanha de WhatsApp', false], ['Modelo de e-mail', 'Novo modelo de e-mail', true], ['Modelo de WhatsApp', 'Novo modelo de WhatsApp', false]]) {
-    await page.getByRole('button', { name: button, exact: true }).click();
+  for (const [kind, channel, title, email] of [
+    ['campaign', 'E-mail', 'Nova campanha de e-mail', true],
+    ['campaign', 'WhatsApp', 'Nova campanha de WhatsApp', false],
+    ['template', 'E-mail', 'Novo modelo de e-mail', true],
+    ['template', 'WhatsApp', 'Novo modelo de WhatsApp', false],
+  ]) {
+    if (kind === 'template') await page.getByRole('tab', { name: /^Modelos/ }).click();
+    await page.getByRole('button', { name: kind === 'campaign' ? 'Nova campanha' : 'Novo modelo', exact: true }).click();
+    await page.locator('.menu-panel').getByRole('button', { name: channel, exact: true }).click();
     const dialog = page.locator('dialog[open]');
-    await dialog.waitFor({timeout:5000}).catch(async error => { console.error('Failed to open', button, page.url(), await page.evaluate(() => document.body.innerText)); throw error; });
+    await dialog.waitFor();
     assert.equal(await dialog.locator('h2').textContent(), title);
     assert.equal(await dialog.getByLabel('Assunto do e-mail', { exact: false }).count(), email ? 1 : 0);
     await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
@@ -241,6 +405,7 @@ test('inbox creates deals for linked contacts, selected contacts and new contact
   });
   await page.goto(origin + '/mensagens');
   await page.locator('.wa-item').filter({ hasText: 'Cliente vinculado' }).click();
+  await page.locator('.wa-chat-head').getByRole('button', { name: 'Mais ações', exact: true }).click();
   await page.locator('.wa-chat-head').getByRole('button', { name: 'Criar negócio', exact: true }).click();
   let dialog = page.locator('dialog[open]');
   await dialog.getByLabel('Título do negócio *', { exact: true }).fill('Proposta do atendimento');
@@ -258,6 +423,7 @@ test('inbox creates deals for linked contacts, selected contacts and new contact
   assert.ok(page.url().endsWith('/mensagens'));
 
   await page.locator('.wa-item').filter({ hasText: 'sender@example.test' }).click();
+  await page.locator('.wa-chat-head').getByRole('button', { name: 'Mais ações', exact: true }).click();
   await page.locator('.wa-chat-head').getByRole('button', { name: 'Criar negócio', exact: true }).click();
   dialog = page.locator('dialog[open]');
   await dialog.getByLabel('Usar contato cadastrado', { exact: true }).check();
@@ -268,7 +434,8 @@ test('inbox creates deals for linked contacts, selected contacts and new contact
   await dialog.getByRole('button', { name: 'Continuar conversa', exact: true }).click();
   assert.equal(sent[1].data.contact_id, contacts[1].id);
 
-  await page.locator('.wa-item').filter({ hasText: 'instagram-person' }).click();
+  await page.locator('.wa-item').filter({ hasText: '@nova.pessoa' }).click();
+  await page.locator('.wa-chat-head').getByRole('button', { name: 'Mais ações', exact: true }).click();
   await page.locator('.wa-chat-head').getByRole('button', { name: 'Criar negócio', exact: true }).click();
   dialog = page.locator('dialog[open]');
   await dialog.getByLabel('Nome do contato *', { exact: true }).fill('Contato novo do Instagram');
@@ -356,11 +523,6 @@ test('message alerts use settings for browser permission and preserve old unread
   const inboxLink = page.locator('.sidebar').getByRole('link', { name: /^Caixa de entrada/ });
   assert.equal(await inboxLink.locator('.nav-unread-count').innerText(), '1');
   if (process.env.NOTIFICATION_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.NOTIFICATION_SCREENSHOT_DIR}/inbox-indicator-desktop.png`, fullPage: true, animations: 'disabled' });
-  await page.getByRole('button', { name: 'Recolher sidebar', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('.sidebar').getBoundingClientRect().width <= 89);
-  assert.equal(await inboxLink.locator('.nav-unread-count').isVisible(), true);
-  if (process.env.NOTIFICATION_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.NOTIFICATION_SCREENSHOT_DIR}/inbox-indicator-collapsed.png`, fullPage: true, animations: 'disabled' });
-  await page.getByRole('button', { name: 'Expandir sidebar', exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Abrir menu', exact: true }).click();
   await inboxLink.waitFor();
@@ -376,7 +538,7 @@ test('message alerts use settings for browser permission and preserve old unread
   assert.equal(await dialog.getByRole('button', { name: /Ativar avisos|Desativar avisos/ }).count(), 0);
   await dialog.getByRole('link', { name: 'Preferências de notificações', exact: true }).click();
   await page.waitForURL(origin + '/configuracoes?tab=notificacoes');
-  await page.getByRole('tab', { name: 'Notificações', exact: true, selected: true }).waitFor();
+  await page.locator('.settings-nav').getByRole('button', { name: 'Notificações', exact: true, current: 'page' }).waitFor();
   await page.getByRole('button', { name: 'Ativar avisos', exact: true }).click();
   assert.equal(await page.evaluate(() => window.__permissionRequests), 1);
   await page.getByRole('button', { name: 'Desativar avisos', exact: true }).waitFor();
@@ -467,9 +629,9 @@ test('two background tabs claim only one browser notification for the same recei
   await first.locator('dialog[open]').getByRole('heading', { name: 'Tudo em dia' }).waitFor();
   if (process.env.NOTIFICATION_SCREENSHOT_DIR) await first.screenshot({ path: `${process.env.NOTIFICATION_SCREENSHOT_DIR}/notifications-desktop.png`, fullPage: true });
   await first.locator('dialog[open]').getByRole('link', { name: 'Preferências de notificações', exact: true }).click();
-  await first.getByRole('tab', { name: 'Perfil', exact: true }).click();
-  await first.getByRole('tab', { name: 'Notificações', exact: true }).click();
-  await first.getByRole('tab', { name: 'Notificações', exact: true, selected: true }).waitFor();
+  await first.locator('.settings-nav').getByRole('button', { name: 'Perfil', exact: true }).click();
+  await first.locator('.settings-nav').getByRole('button', { name: 'Notificações', exact: true }).click();
+  await first.locator('.settings-nav').getByRole('button', { name: 'Notificações', exact: true, current: 'page' }).waitFor();
   await first.getByRole('button', { name: 'Desativar avisos', exact: true }).click();
   await second.getByRole('button', { name: 'Ativar avisos', exact: true }).waitFor();
   assert.equal(await first.evaluate(() => window.__permissionRequests), 1);

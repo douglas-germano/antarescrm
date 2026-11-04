@@ -1,4 +1,3 @@
-'use client';
 import { useEffect, useState } from 'react';
 import { Check, Copy, Save } from 'lucide-react';
 import { patch } from '@/lib/api';

@@ -1,4 +1,3 @@
-'use client';
 import { useData } from '@/lib/api';
 import { Button } from '@/components/ui';
 export type Conditions = { mode: 'all' | 'any'; items: { field: string; operator: string; value: string }[] };

@@ -1,6 +1,6 @@
-'use client';
+import { RecordLink } from '@/components/record-link';
 import { useState } from 'react';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 import { AtSign, CalendarPlus, Handshake, Mail, Phone, Tag, UserRound } from 'lucide-react';
 import { useData, post, refreshAll } from '@/lib/api';
 import { useNotify, useSession } from '@/components/providers';
@@ -48,20 +48,20 @@ export function ContactPanel({ contactId, onCreateOpportunity, onLink }: { conta
         {!!c?.tags?.length && <li className="contact-tags"><Tag size={14} />{c.tags.map((tag: string) => <span key={tag} className="deal-chip">{tag}</span>)}</li>}
       </ul>
       <div className="contact-actions">
-        <Link href={'/contatos?contato=' + contactId} className="btn btn-soft">Abrir contato</Link>
+        <RecordLink href={'/contatos?contato=' + contactId} className="btn btn-soft">Abrir contato</RecordLink>
         <Button variant="soft" onClick={onCreateOpportunity}><Handshake size={15} />Criar negócio</Button>
         <Button variant="soft" onClick={() => setScheduling(true)}><CalendarPlus size={15} />Agendar retorno</Button>
       </div>
       <section>
         <h3>Negócios em aberto</h3>
         {deals.length ? deals.map((o: Row) => (
-          <Link key={o.id} href={'/crm?opportunity=' + o.id} className="contact-row"><span><strong>{o.title}</strong><small>{stageName(o.stage_id) || 'Etapa'}</small></span><b>{brl(o.amount)}</b></Link>
+          <RecordLink key={o.id} href={'/crm?opportunity=' + o.id} className="contact-row"><span><strong>{o.title}</strong><small>{stageName(o.stage_id) || 'Etapa'}</small></span><b>{brl(o.amount)}</b></RecordLink>
         )) : <p className="muted">Nenhum negócio em aberto.</p>}
       </section>
       <section>
         <h3>Próximos compromissos</h3>
         {activities.map((a: Row) => <div key={a.id} className="contact-row"><span><strong>{a.title}</strong><small>{kinds[a.kind] || 'Atividade'} · {day(a.scheduled_at)}</small></span></div>)}
-        {tasks.map((x: Row) => <Link key={x.id} href="/tarefas" className="contact-row"><span><strong>{x.title}</strong><small>Tarefa{x.due_date ? ' · ' + day(x.due_date) : ''}</small></span></Link>)}
+        {tasks.map((x: Row) => <Link key={x.id} to="/tarefas" className="contact-row"><span><strong>{x.title}</strong><small>Tarefa{x.due_date ? ' · ' + day(x.due_date) : ''}</small></span></Link>)}
         {!activities.length && !tasks.length && <p className="muted">Nada agendado.</p>}
       </section>
       <FormDialog

@@ -1,4 +1,3 @@
-'use client';
 import { useRef, useState } from 'react';
 import { api, post, refreshAll } from '@/lib/api';
 import { useNotify } from '@/components/providers';

@@ -1,4 +1,3 @@
-'use client';
 import { Eye, Percent, Target, Users } from 'lucide-react';
 import { DataState, StatCard } from '@/components/ui';
 import { Card, CardHeader } from '@/components/blocks';

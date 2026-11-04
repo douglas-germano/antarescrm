@@ -1,4 +1,3 @@
-'use client';
 import { AlignCenter, AlignLeft } from 'lucide-react';
 import { ColorInput, RangeInput, Section, SelectInput, Segmented, TextInput, TextAreaInput, ToggleInput } from '@/components/builder/controls';
 import { FONT_LABELS } from './theme';

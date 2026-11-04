@@ -1,4 +1,3 @@
-'use client';
 import { useState } from 'react';
 import { CheckCheck, Loader2, Mail, MessageCircle, Power, QrCode, Smartphone } from 'lucide-react';
 import { api, post } from '@/lib/api';

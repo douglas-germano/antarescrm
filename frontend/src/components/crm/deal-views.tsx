@@ -1,6 +1,5 @@
-'use client';
 import type { ReactNode } from 'react';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 import { Handshake, ArrowUp, ArrowDown, CalendarDays, AlertCircle } from 'lucide-react';
 import { brl, day } from '@/lib/format';
 import type { Opportunity, OpportunityPage, PipelineStage } from '@/lib/types';

@@ -1,6 +1,5 @@
-'use client';
+import { RecordLink } from '@/components/record-link';
 import type { ReactNode } from 'react';
-import Link from 'next/link';
 import { BarChart3 } from 'lucide-react';
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts';
 import { brl, day, initials, kinds } from '@/lib/format';
@@ -31,7 +30,7 @@ export function Kpi({ label, value, now, before, points = false, detail, href }:
     {detail && <span className="stat-detail">{detail}</span>}
     <span className={'stat-trend ' + t.tone}>{t.text} <span>vs. período anterior</span></span>
   </>;
-  return href ? <Link href={href} className="stat-card rep-kpi-link">{body}</Link> : <div className="stat-card">{body}</div>;
+  return href ? <RecordLink href={href} className="stat-card rep-kpi-link">{body}</RecordLink> : <div className="stat-card">{body}</div>;
 }
 
 const SERIES: Record<string, string> = { won_amount: 'Vendido', new_deals: 'Novos negócios', new_contacts: 'Novos contatos' };
@@ -108,7 +107,7 @@ export function Bars({ rows, label, value, format, sub, href }: {
           <div className="dash-bar"><span style={{ width: `${Math.max(2, (Number(r[value]) / max) * 100)}%` }} /></div>
           {sub && <small>{sub(r)}</small>}
         </>;
-        return <li key={r[label]}>{href ? <Link href={href(r)} className="rep-bar-link">{content}</Link> : content}</li>;
+        return <li key={r[label]}>{href ? <RecordLink href={href(r)} className="rep-bar-link">{content}</RecordLink> : content}</li>;
       })}
     </ul>
   );

@@ -1,4 +1,3 @@
-'use client';
 import { useState } from 'react';
 import { CheckCircle2, FileText, MessageSquare, Repeat, ShieldCheck, Sparkles } from 'lucide-react';
 import { post, refreshAll } from '@/lib/api';

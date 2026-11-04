@@ -1,4 +1,3 @@
-'use client';
 import { useState } from 'react';
 import { Plus, ArrowUpRight, Users, Pencil, Building2 } from 'lucide-react';
 import { useSession, useNotify } from '@/components/providers';

@@ -1,5 +1,5 @@
 'use client';
-import useSWR from 'swr';
+import useSWR, { preload } from 'swr';
 import { fetchWithRetry } from './retry.ts';
 import { useState, useEffect } from 'react';
 import { collectPages, pagePath } from './pagination.ts';
@@ -79,6 +79,13 @@ export function useData<T = unknown>(path: string | null) {
 }
 export async function listAll<T = Row>(path: string): Promise<T[]> {
   return collectPages<T>(path, (url) => api<Page<T>>(url));
+}
+/** Warm the same cache keys used by the screens before the router commits a navigation. */
+export async function prepareData({ data = [], lists = [] }: { data?: string[]; lists?: string[] }) {
+  await Promise.all([
+    ...data.map(path => preload(path, () => api(path))),
+    ...lists.map(path => preload(['list', activeWorkspaceId, path], () => listAll(path))),
+  ]);
 }
 /** Complete lists for options/small resources. Main tables should use usePage. */
 export function useList<T = Row>(path: string | null) {

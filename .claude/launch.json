@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd frontend && FLASK_API_URL=http://127.0.0.1:5002/api/v1 npm run dev -- --port 3000"
+      ],
+      "port": 3000
+    }
+  ]
+}

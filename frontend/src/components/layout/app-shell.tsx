@@ -1,8 +1,9 @@
-'use client';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { RecordLink } from '@/components/record-link';
+import { Link } from '@tanstack/react-router';
+import { usePathname } from '@/lib/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Fish,
   House,
   MessageCircle,
   Users,
@@ -35,6 +36,7 @@ const links = [
   { href: '/agenda', label: 'Atividades', icon: CalendarDays },
   { href: '/formularios', label: 'Formulários', icon: FileInput },
   { href: '/funis', label: 'Funis de páginas', icon: Filter },
+  { href: '/pesca', label: 'Pesca', icon: Fish },
   { href: '/automacoes', label: 'Automações', icon: Workflow },
   { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
 ];
@@ -93,10 +95,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <a href="#main-content" className="skip-link">
         Ir para o conteúdo
       </a>
-      {open && <div className="sidebar-scrim" onClick={() => setOpen(false)} />}
+      {open && <div className="sidebar-scrim" onClick={() => { setOpen(false); menuRef.current?.focus(); }} />}
       <aside id="app-sidebar" ref={sidebarRef} className={'sidebar ' + (open ? 'sidebar-open' : '')}>
         <div className="sidebar-header">
-          <Link href="/" className="brand" onClick={() => setOpen(false)} aria-label="Antares CRM — visão geral">
+          <Link to="/" className="brand" onClick={() => setOpen(false)} aria-label="Antares CRM — visão geral">
             <img src="/mark.svg" width="36" height="36" alt="" />
             <span>antares<strong>crm</strong></span>
           </Link>
@@ -104,7 +106,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <nav aria-label="Navegação principal">
           {navigation.map((l) => (
-            <Link key={l.href} href={l.href}
+            <RecordLink key={l.href} href={l.href}
               aria-label={l.href === '/mensagens' ? inboxLabel : l.label}
               {...tipProps(l.label)}
               className={active?.href === l.href ? 'active' : ''}
@@ -113,7 +115,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <l.icon size={20} strokeWidth={1.7} />
               <span>{l.label}</span>
               {l.href === '/mensagens' && unreadMessages > 0 && <strong className="nav-unread-count" aria-hidden="true">{unreadMessages > 99 ? '99+' : unreadMessages}</strong>}
-            </Link>
+            </RecordLink>
           ))}
         </nav>
         <div className="sidebar-bottom">
@@ -122,7 +124,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="Configurações"
             {...tipProps('Configurações')}
             aria-current={pathname === '/configuracoes' ? 'page' : undefined}
-            href="/configuracoes"
+            to="/configuracoes"
             onClick={() => setOpen(false)}
           >
             <Settings size={20} strokeWidth={1.7} />

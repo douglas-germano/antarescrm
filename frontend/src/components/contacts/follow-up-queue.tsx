@@ -1,5 +1,5 @@
-'use client';
-import Link from 'next/link';
+import { RecordLink } from '@/components/record-link';
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ArrowUpRight, CalendarPlus, CheckCircle2 } from 'lucide-react';
 import { useData } from '@/lib/api';
@@ -23,14 +23,14 @@ export function FollowUpQueue() {
         {report.data?.items.length ? <div className="followup-list">
           {report.data.items.slice(0, 5).map(row => <div className="followup-row" key={row.id}>
             <div className="followup-context"><span className={'followup-reason ' + row.reason}>{followUpReasons[row.reason]}</span>
-              <Link href={'/crm?opportunity=' + row.id} className="followup-title">{row.title}<ArrowUpRight size={13} /></Link>
+              <RecordLink href={'/crm?opportunity=' + row.id} className="followup-title">{row.title}<ArrowUpRight size={13} /></RecordLink>
               <p>{[row.contact_name || row.company_name, row.owner_name || 'Sem responsável', brl(row.amount)].filter(Boolean).join(' · ')}</p>
               {row.next_action && <small>{row.next_action.title} · {day(row.next_action.scheduled_at)}{row.next_action.type === 'activity' ? ' às ' + hour(row.next_action.scheduled_at) : ''}</small>}
               {row.reason === 'overdue_close' && <small>Revise a previsão de fechamento no negócio.</small>}
             </div>
             <Button variant="secondary" onClick={() => setRecord({ label: row.title, opportunity_id: row.id, contact_id: row.contact_id, company_id: row.company_id, owner_id: row.owner_id })}><CalendarPlus size={15} />Agendar retorno</Button>
           </div>)}
-          {report.data.total > 5 && <Link href="/crm?attention=true" className="card-footer card-link">Ver os {report.data.total} negócios no funil<ArrowUpRight size={14} /></Link>}
+          {report.data.total > 5 && <Link to="/crm" search={{"attention": "true"}} className="card-footer card-link">Ver os {report.data.total} negócios no funil<ArrowUpRight size={14} /></Link>}
         </div> : <div className="followup-clear"><CheckCircle2 size={18} /><span>Nenhum negócio pendente de acompanhamento nesta visão.</span></div>}
       </DataState>
     </Card>

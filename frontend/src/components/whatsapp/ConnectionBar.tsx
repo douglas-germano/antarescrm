@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 import { Instagram, MessageCircle } from 'lucide-react';
 import type { Row } from '@/lib/types';
 
@@ -22,7 +22,7 @@ export function ConnectionBar({ connection, instagram, canManage }: { connection
       {channels.map((c) => {
         const content = <>{c.icon}<span className={'wa-dot' + (c.online ? ' online' : '')} aria-hidden /></>;
         return canManage
-          ? <Link key={c.key} className={'connection-icon ' + c.key} href="/configuracoes?tab=conexoes" aria-label={c.label} data-tip={c.label}>{content}</Link>
+          ? <Link key={c.key} className={'connection-icon ' + c.key} to="/configuracoes" search={{"tab": "conexoes"}} aria-label={c.label} data-tip={c.label}>{content}</Link>
           : <span key={c.key} className={'connection-icon ' + c.key} role="status" aria-label={c.label} data-tip={c.label}>{content}</span>;
       })}
     </div>

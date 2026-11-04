@@ -1,4 +1,3 @@
-'use client';
 import { Button } from '@/components/ui';
 export type Availability = Record<string, { start: string; end: string }[]>;
 export function AvailabilityEditor({ value, onChange }: { value: Availability; onChange: (value: Availability) => void }) {

@@ -1,7 +1,6 @@
-'use client';
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Link } from '@tanstack/react-router';
+import { useAppRouter } from '@/lib/navigation';
 import { ArrowDown, ArrowLeft, ArrowUp, Copy, ExternalLink, GripVertical, Monitor, Plus, Smartphone, Trash2 } from 'lucide-react';
 import { Button, ConfirmDialog } from '@/components/ui';
 import { useNotify } from '@/components/providers';
@@ -60,7 +59,7 @@ function toPayload(d: Draft) {
 
 export function FormBuilder({ form, stages }: { form: Row; stages: Row[] }) {
   const { notify } = useNotify();
-  const router = useRouter();
+  const router = useAppRouter();
   const [deleting, setDeleting] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => toDraft(form));
   const [saved, setSaved] = useState(() => JSON.stringify(toPayload(toDraft(form))));
@@ -128,7 +127,7 @@ export function FormBuilder({ form, stages }: { form: Row; stages: Row[] }) {
 
   return <div className="page">
     <div className="bld-toolbar">
-      <Link className="btn btn-ghost" href="/formularios"><ArrowLeft size={16} /> Formulários</Link>
+      <Link className="btn btn-ghost" to="/formularios"><ArrowLeft size={16} /> Formulários</Link>
       <strong>{draft.name}</strong>
       <span className="spacer" />
       <span className="bld-status" data-dirty={dirty} role="status">{dirty ? 'Alterações não salvas' : 'Tudo salvo'}</span>

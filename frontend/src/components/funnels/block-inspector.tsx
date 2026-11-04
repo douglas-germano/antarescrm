@@ -1,6 +1,5 @@
-'use client';
+import { RecordLink } from '@/components/record-link';
 import { AlignCenter, AlignLeft, AlignRight, Plus, Trash2 } from 'lucide-react';
-import Link from 'next/link';
 import { Button } from '@/components/ui';
 import { ColorInput, RangeInput, Section, Segmented, SelectInput, TextAreaInput, TextInput, ToggleInput } from '@/components/builder/controls';
 import type { Row } from '@/lib/types';
@@ -42,7 +41,7 @@ export function BlockInspector({ block, forms, onProps, onStyle, onNewForm, busy
         <SelectInput label="Formulário" value={p.form_id || ''} onChange={(form_id) => onProps({ form_id })} options={[{ value: '', label: 'Selecione…' }, ...forms.map((f) => ({ value: f.id, label: f.name }))]} />
         <div className="bld-grid-2">
           <Button variant="secondary" disabled={busy} onClick={onNewForm}><Plus size={14} /> Novo</Button>
-          {p.form_id && <Link className="btn btn-secondary" href={'/formularios/' + p.form_id} target="_blank">Personalizar</Link>}
+          {p.form_id && <RecordLink className="btn btn-secondary" href={'/formularios/' + p.form_id} target="_blank">Personalizar</RecordLink>}
         </div>
         <Segmented label="Depois do envio" value={p.on_submit || 'next'} onChange={(on_submit) => onProps({ on_submit })} options={[{ value: 'next', label: 'Próxima página' }, { value: 'message', label: 'Mensagem' }, { value: 'url', label: 'Link' }]} />
         {p.on_submit === 'url' && <TextInput label="Link de destino" type="url" value={p.url || ''} maxLength={500} placeholder="https://" onChange={(url) => onProps({ url })} />}

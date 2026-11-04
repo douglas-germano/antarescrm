@@ -1,5 +1,4 @@
-'use client';
-import Link from 'next/link';
+import { RecordLink } from '@/components/record-link';
 import { useState } from 'react';
 import { Check, CalendarDays, FileText, Handshake, CheckSquare } from 'lucide-react';
 import { patch, refreshAll } from '@/lib/api';
@@ -20,7 +19,7 @@ export function ContactTimeline({ data }: { data?: Row }) {
     {entries.map(entry => <li key={entry.type + entry.id}>
       <span className="timeline-symbol"><entry.icon size={16} /></span>
       <div className="timeline-copy"><small>{entry.subtitle}{entry.date ? ' · ' + day(entry.date) : ''}{entry.type === 'activity' && entry.date ? ' às ' + hour(entry.date) : ''}</small>
-        <strong>{entry.type === 'deal' ? <Link href={'/crm?opportunity=' + entry.id}>{entry.title}</Link> : entry.title}</strong>
+        <strong>{entry.type === 'deal' ? <RecordLink href={'/crm?opportunity=' + entry.id}>{entry.title}</RecordLink> : entry.title}</strong>
         {entry.notes && <p>{entry.notes}</p>}
         <span className="timeline-status">{entry.status === 'pending' ? 'Agendado' : entry.status === 'completed' || entry.status === 'done' ? 'Concluído' : entry.status === 'cancelled' ? 'Cancelado' : entry.status === 'won' ? 'Ganho' : entry.status === 'lost' ? 'Perdido' : entry.status === 'open' ? 'Em aberto' : 'Pendente'}</span>
       </div>

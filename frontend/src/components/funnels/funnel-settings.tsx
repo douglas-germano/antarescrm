@@ -1,6 +1,5 @@
-'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation';
 import { Copy, Trash2 } from 'lucide-react';
 import { Button, ConfirmDialog } from '@/components/ui';
 import { Card, CardBody, CardHeader } from '@/components/blocks';
@@ -11,7 +10,7 @@ import { FONT_LABELS } from '@/components/forms/theme';
 import type { Funnel, Theme } from './types';
 
 export function FunnelSettings({ funnel, onChange }: { funnel: Funnel; onChange: (values: Partial<Funnel>) => void }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { notify } = useNotify();
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);

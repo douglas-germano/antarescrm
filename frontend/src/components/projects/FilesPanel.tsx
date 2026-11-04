@@ -1,4 +1,3 @@
-'use client';
 import { useRef, useState } from 'react';
 import { Download, FileText, History, ImageIcon, Plus, ShieldCheck, Trash2, Upload } from 'lucide-react';
 import { api, refreshAll } from '@/lib/api';

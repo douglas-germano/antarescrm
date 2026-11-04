@@ -1,4 +1,3 @@
-'use client';
 import { useState } from 'react';
 import { KeyRound, Mail, Pencil, Plus, Users } from 'lucide-react';
 import { useSession, useNotify } from '@/components/providers';

@@ -31,3 +31,6 @@ output/playwright/
 .next-dev/
 .next-check/
 .next-ci/
+.output/
+.tanstack/
+frontend/dist/

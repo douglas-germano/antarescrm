@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 import { CalendarCheck, KanbanSquare, MessageCircle } from 'lucide-react';
 
 /** Split layout shared by the access screens: brand panel on the left (hidden on phones), form on the right. */
@@ -27,7 +27,7 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
           </header>
           {children}
           {footer && <div className="auth-footer">{footer}</div>}
-          <nav className="auth-legal" aria-label="Informações legais"><Link href="/privacidade">Privacidade</Link><Link href="/termos">Termos</Link><Link href="/exclusao-de-dados">Exclusão de dados</Link></nav>
+          <nav className="auth-legal" aria-label="Informações legais"><Link to="/privacidade">Privacidade</Link><Link to="/termos">Termos</Link><Link to="/exclusao-de-dados">Exclusão de dados</Link></nav>
         </div>
       </section>
     </main>

@@ -1,4 +1,3 @@
-'use client';
 import { BellRing } from 'lucide-react';
 import { useMessageNotifications } from '@/components/inbox/message-notifications';
 import { Card, CardBody, CardHeader } from '@/components/blocks';

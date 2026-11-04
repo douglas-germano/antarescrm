@@ -39,9 +39,9 @@ jobs:
       - run: ./scripts/check.sh
       - run: backend/.venv/bin/python scripts/verify-migrations.py
       - run: backend/.venv/bin/python scripts/verify-postgres.py
-      - run: NEXT_DIST_DIR=.next-ci npm run build
+      - run: npm run build
         working-directory: frontend
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - run: NEXT_DIST_DIR=.next-ci npm run test:browser
+      - run: npm run test:browser
         working-directory: frontend

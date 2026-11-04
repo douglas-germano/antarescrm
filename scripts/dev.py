@@ -42,7 +42,6 @@ def environment(overrides=None):
         ANTARES_ENV_FILE=str(config_file),
         SECRET_KEY=env.get('SECRET_KEY') or secrets.token_hex(32),
         JWT_SECRET_KEY=env.get('JWT_SECRET_KEY') or secrets.token_hex(32),
-        NEXT_DIST_DIR='.next-dev',
         FLASK_API_URL=f'http://127.0.0.1:{api}/api/v1',
         APP_URL=f'http://127.0.0.1:{web}',
         COOKIE_SECURE='false',
@@ -76,7 +75,7 @@ def main():
     try:
         for command, cwd in commands:
             children.append(subprocess.Popen(command, cwd=cwd, env=env, start_new_session=True))
-        print(f'Desenvolvimento: http://127.0.0.1:{web} (API {api}; build .next-dev)', flush=True)
+        print(f'Desenvolvimento: http://127.0.0.1:{web} (API {api}; Vite + TanStack Start)', flush=True)
         while all(child.poll() is None for child in children):
             time.sleep(0.25)
         return next((child.returncode for child in children if child.returncode), 0)

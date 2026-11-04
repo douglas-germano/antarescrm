@@ -1,4 +1,3 @@
-'use client';
 import { Link2, MessageSquareReply, Plus, X } from 'lucide-react';
 import { MAX_BUTTONS, MAX_QUICK_REPLIES, type LinkButton } from '@/components/automations/model';
 

@@ -1,4 +1,3 @@
-'use client';
 import { SelectInput, TextAreaInput, TextInput, ToggleInput, Section, Segmented } from '@/components/builder/controls';
 import { FIELD_TYPES, hasOptions, isLayout, type BaseFieldConfig, type CaptureField, type FieldType } from './types';
 

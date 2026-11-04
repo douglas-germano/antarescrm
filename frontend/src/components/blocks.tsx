@@ -1,4 +1,3 @@
-'use client';
 import type { DragEvent, ElementType, ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 

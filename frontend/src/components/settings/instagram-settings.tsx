@@ -1,4 +1,3 @@
-'use client';
 import { useEffect, useState } from 'react';
 import { Instagram } from 'lucide-react';
 import { initials } from '@/lib/format';

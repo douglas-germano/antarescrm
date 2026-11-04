@@ -1,4 +1,3 @@
-'use client';
 import { useState } from 'react';
 import { Eye, EyeOff, KeyRound, LogOut, Save } from 'lucide-react';
 import { patch } from '@/lib/api';

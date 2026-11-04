@@ -1,4 +1,3 @@
-'use client';
 import { useEffect, useState } from 'react';
 import { BookmarkPlus, Bookmark, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { Button, FormDialog, Popover, SearchInput } from '@/components/ui';

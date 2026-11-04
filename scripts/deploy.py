@@ -31,6 +31,9 @@ IGNORED = {
     '.ruff_cache',
     '.coverage',
     'output',
+    '.output',
+    '.tanstack',
+    'dist',
 }
 
 
@@ -73,7 +76,17 @@ def remap_definition(definition, release, persistent_root):
         env['PROJECT_FILES_DIR'] = str(Path(definition['WorkingDirectory']) / env['PROJECT_FILES_DIR'])
     env['ANTARES_ENV_FILE'] = str(persistent_root / 'backend/.env')
     if result['Label'] == 'com.antarescrm.frontend':
-        env['NEXT_DIST_DIR'] = '.next-public'
+        env.pop('NEXT_DIST_DIR', None)
+        env.pop('NEXT_BUILD_CPUS', None)
+        # Existing definitions invoke Next's CLI. Keep the Node executable and bind settings,
+        # but use the new runtime launcher in the prepared release.
+        arguments = result['ProgramArguments']
+        for flags, key in ((('--port', '-p'), 'PORT'), (('--hostname', '--host', '-H'), 'HOST')):
+            for flag in flags:
+                if flag in arguments:
+                    env[key] = arguments[arguments.index(flag) + 1]
+                    break
+        result['ProgramArguments'] = [arguments[0], str(release / 'frontend/scripts/start.mjs')]
     result['EnvironmentVariables'] = env
     return result
 
@@ -108,11 +121,9 @@ def prepare(source, releases, agents, persistent_root):
     env = {
         **os.environ,
         **definitions['frontend'].get('EnvironmentVariables', {}),
-        'NEXT_DIST_DIR': '.next-public',
-        'NEXT_BUILD_CPUS': '2',
     }
     env.setdefault('NODE_OPTIONS', '--max-old-space-size=1024')
-    # The service uses NODE_ENV=production; TypeScript is still required to build and load next.config.ts.
+    # The service uses NODE_ENV=production; Vite and TypeScript are still required for the build.
     run(['npm', 'ci', '--include=dev'], cwd=release / 'frontend', env=env)
     run(['npm', 'run', 'build'], cwd=release / 'frontend', env=env)
     # Verify factory/configuration using the same environment as the future backend.

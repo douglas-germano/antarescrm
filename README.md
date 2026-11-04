@@ -6,8 +6,10 @@ WhatsApp via Evolution API. Base de código reaproveitada do projeto *Minha Marc
 daquele domínio (projetos, financeiro, cobrança, assistente de IA).
 
 - **Backend** — Flask + SQLAlchemy + Alembic + PostgreSQL (`backend/`)
-- **Frontend** — Next.js 15 (App Router) + React 19 + SWR + Recharts (`frontend/`)
+- **Frontend** — React 19 + Vite + TanStack Start/Router + SWR + Recharts (`frontend/`)
 - Sem Docker: tudo roda localmente.
+
+Requer Node.js 22.22 ou superior. O SWR continua responsável pelos dados; TanStack Query não é necessário para esta migração.
 
 ## Primeira execução
 
@@ -20,7 +22,7 @@ cd frontend && npm ci
 ```
 
 Na raiz, execute `./scripts/dev.sh`. A interface abre em http://127.0.0.1:3003 e a API em :5003.
-O script aplica migrações apenas ao banco local `antares_test_*` ou terminado em `_dev`, usa `.next-dev`
+O script aplica migrações apenas ao banco local `antares_test_*` ou terminado em `_dev`, usa o servidor Vite
 e ignora as credenciais de produção. Portas 3002/5002 são recusadas. Ctrl+C encerra somente os processos iniciados pelo script.
 
 Para criar dados de demonstração no banco isolado (opcional):
@@ -43,13 +45,18 @@ backend/app/
   errors.py, security.py   handlers de erro JSON, callbacks JWT, headers e checagem de config de produção
   common.py, access.py, config.py, extensions.py, cli.py
 frontend/src/
-  app/         rotas Next.js (App Router)
+  routes/      rotas e endpoints TanStack Start (árvore gerada em routeTree.gen.ts)
+  screens/     telas React, separadas das declarações de rota
+  styles/      estilos globais e por módulo
+  router.tsx, server.ts   configuração do router e entrada HTTP com proteção de domínios
   components/  ui.tsx, blocks.tsx, fit.tsx, providers.tsx (compartilhados) + pastas por feature:
                auth, layout, contacts, settings, booking, automations, inbox, projects, whatsapp
   lib/         api, bff (gateway), format, types
 ```
 
 Convenção: rotas só validam a entrada e chamam um service; regra de negócio e consultas ficam em `services/`.
+
+Guia de responsabilidades, transações de envio, logs e contratos gerados: [Manutenção do backend](docs/MANUTENCAO-BACKEND.md).
 
 Qualidade (ruff, pytest com cobertura, typecheck e testes do gateway):
 
@@ -76,7 +83,7 @@ Em **Configurações → Domínios** cada conta cadastra domínios próprios (ex
 funis, formulários e agendas. Fluxo: o cliente cria um registro **TXT** (`_antares-verify.<domínio>`) que prova a
 posse e um **CNAME** (ou A, para domínio raiz) para a plataforma; **Verificar agora** consulta o DNS por DNS-over-HTTPS
 (sem dependência extra). O domínio só serve páginas depois de comprovada a posse, e só do próprio workspace: o gateway
-Next.js envia o `Host` ao Flask (`X-Custom-Domain`) e os endpoints públicos recusam conteúdo de outras contas.
+O servidor TanStack Start envia o `Host` ao Flask (`X-Custom-Domain`) e os endpoints públicos recusam conteúdo de outras contas.
 Em domínios de clientes só as páginas públicas respondem (`/p`, `/f`, `/agendar`, `/agendamento`, `/aprovacao`,
 `/api/public`); CRM, login e o gateway autenticado ficam apenas no domínio da plataforma. A raiz `/` mostra o funil
 escolhido para o domínio (`src/middleware.ts`).
@@ -117,13 +124,14 @@ URL: https://antares.douglasgermano.com
 
 Túnel dedicado `antarescrm` (`ab47299c-9f4f-4ac0-9758-058b489fc1e2`), com
 configuração em `~/.cloudflared/antarescrm.yml`. O hostname encaminha para
-`http://127.0.0.1:3002`; o Next.js acessa a API internamente em `127.0.0.1:5002`.
+`http://127.0.0.1:3002`; o servidor TanStack Start acessa a API internamente em `127.0.0.1:5002`.
 Credenciais ficam fora do repositório, em `~/.cloudflared/`.
 
 Os serviços `com.antarescrm.backend`, `com.antarescrm.frontend` e
 `com.antarescrm.tunnel` são LaunchAgents em `~/Library/LaunchAgents/`, com início
 automático no login do usuário e reinício em caso de falha. O backend usa Gunicorn;
-o frontend usa Next.js em produção, com build em `.next-public/`.
+o frontend migrado usa o servidor Node do Nitro, com build em `frontend/.output/`.
+A versão em execução só muda após uma publicação; editar este checkout não troca o serviço ativo.
 A URL e os cookies HTTPS ficam em `frontend/.env.production.local` (ignorado pelo Git)
 e nas variáveis do LaunchAgent. Logs em `.local-services/`.
 
@@ -137,7 +145,7 @@ Preparar uma versão para publicação, sem modificar os serviços ativos:
 ```
 
 A preparação cria uma pasta privada em `~/.antarescrm-releases/`, instala dependências próprias e compila
-`.next-public` nessa pasta. O comando imprime o caminho da versão. Para publicar a versão preparada:
+`frontend/.output/` nessa pasta. O comando imprime o caminho da versão. Para publicar a versão preparada:
 
 ```bash
 ./scripts/deploy-prod.sh activate /caminho/absoluto/da/release
@@ -194,3 +202,16 @@ backend/.venv/bin/python scripts/manage-services.py prepare
 
 Após aplicar as migrações e publicar a versão, substitua `prepare` por `install` para registrar
 worker e backup diário no macOS. O padrão instala o worker sem envio externo de mensagens.
+
+## Grafo de impacto do código
+
+O mapa de dependências, endpoints, testes candidatos e regras de negócio usa um Neo4j
+local e separado dos serviços do CRM:
+
+```bash
+python3 scripts/code-graph.py init
+python3 scripts/code-graph.py sync
+python3 scripts/code-graph.py impact backend/app/services/history.py
+```
+
+Veja [operação, consultas e limites do grafo](docs/GRAFO-DE-CODIGO.md).

@@ -1,4 +1,3 @@
-'use client';
 import { useState } from 'react';
 import { Copy, Globe, RefreshCw, Trash2 } from 'lucide-react';
 import { Badge, Button, ConfirmDialog, DataState, EmptyState } from '@/components/ui';

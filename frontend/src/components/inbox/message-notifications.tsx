@@ -1,9 +1,9 @@
-'use client';
+import { RecordLink } from '@/components/record-link';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 import { Bell, CheckCheck, MessageCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useAppRouter } from '@/lib/navigation';
 import { useNotify, useSession } from '@/components/providers';
 import { Button, DataState, EmptyState, Modal } from '@/components/ui';
 import { api, post } from '@/lib/api';
@@ -48,7 +48,7 @@ export function MessageNotificationProvider({ children }: { children: React.Reac
 function ScopedMessageNotificationProvider({ children }: { children: React.ReactNode }) {
   const { user, workspace } = useSession();
   const { notify, clearMessageNotices } = useNotify();
-  const router = useRouter();
+  const router = useAppRouter();
   const scope = `${workspace?.id || ''}.${user?.id || ''}`;
   const feed = useSWR<Feed>(user && workspace ? ['message-notifications', workspace.id, user.id] : null, () => api('/inbox/notifications'), { refreshInterval: 5000, refreshWhenHidden: true, revalidateOnFocus: true, shouldRetryOnError: false });
   const [open, setOpen] = useState(false);
@@ -159,12 +159,12 @@ function ScopedMessageNotificationProvider({ children }: { children: React.React
         {(error || (feed.error && feed.data && !denied)) && <p className="form-error" role="alert">{error || 'Não foi possível atualizar as notificações. A próxima consulta tentará novamente.'}</p>}
         <DataState loading={feed.isLoading} error={feed.error && (!feed.data || denied) ? { message: 'Não foi possível atualizar as notificações. Tente novamente em instantes.' } : undefined}>
           {notifications.length ? <ul className={styles.list}>{notifications.map(row => <li key={row.id}>
-            <Link href={conversationUrl(row)} onClick={() => setOpen(false)}><MessageCircle size={20} /><div><strong>{row.sender_name}<span>{row.unread_count}</span></strong><small>{names[row.channel]} · {new Date(row.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: getZone() })}</small><p>{row.preview || 'Nova mensagem recebida'}</p></div></Link>
+            <RecordLink href={conversationUrl(row)} onClick={() => setOpen(false)}><MessageCircle size={20} /><div><strong>{row.sender_name}<span>{row.unread_count}</span></strong><small>{names[row.channel]} · {new Date(row.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: getZone() })}</small><p>{row.preview || 'Nova mensagem recebida'}</p></div></RecordLink>
             <button type="button" className="icon-btn" aria-label={'Marcar mensagens de ' + row.sender_name + ' como lidas'} onClick={() => { void read(row.source, row.thread_id, row.message_id).catch(reason => setError((reason as Error).message)); }}><CheckCheck size={17} /></button>
           </li>)}</ul> : <EmptyState icon={<Bell />} title="Tudo em dia" description="Novas mensagens recebidas aparecerão aqui." />}
         </DataState>
         {(feed.data?.unread_threads || 0) > 20 && <small className="muted">Exibindo as 20 conversas mais recentes.</small>}
-        <Link href="/configuracoes?tab=notificacoes" onClick={() => setOpen(false)}>Preferências de notificações</Link>
+        <Link to="/configuracoes" search={{"tab": "notificacoes"}} onClick={() => setOpen(false)}>Preferências de notificações</Link>
       </div>
     </Modal>
   </NotificationContext.Provider>;

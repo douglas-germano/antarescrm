@@ -1,6 +1,5 @@
-'use client';
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 import { AlertCircle, ArrowRight, Check, CircleCheck, Eye, EyeOff, Link2Off, Loader2, MailCheck } from 'lucide-react';
 import { ACCOUNT_KEY, AuthShell, PREFILL_KEY, readStorage, writeStorage } from '@/components/auth/auth-shell';
 
@@ -55,7 +54,7 @@ function RequestAccess() {
   }
   if (sent) {
     return (
-      <AuthShell title="Verifique seu e-mail" footer={<Link href="/login">Voltar para entrar</Link>}>
+      <AuthShell title="Verifique seu e-mail" footer={<Link to="/login">Voltar para entrar</Link>}>
         <div className="auth-result">
           <span className="auth-result-icon"><MailCheck size={26} /></span>
           <p>Se <strong>{form.email}</strong> tiver acesso à conta <strong>{form.slug}</strong>, enviamos um link para definir uma nova senha. Ele vale por 24 horas.</p>
@@ -70,7 +69,7 @@ function RequestAccess() {
     );
   }
   return (
-    <AuthShell title="Recuperar acesso" subtitle="Enviaremos um link para você definir uma nova senha." footer={<Link href="/login">Voltar para entrar</Link>}>
+    <AuthShell title="Recuperar acesso" subtitle="Enviaremos um link para você definir uma nova senha." footer={<Link to="/login">Voltar para entrar</Link>}>
       <form className="auth-form" aria-busy={busy} onSubmit={send}>
         <div className="field"><label htmlFor="access-account">Conta</label>
           <input id="access-account" autoComplete="organization" autoCapitalize="none" spellCheck={false} maxLength={80} required disabled={busy} placeholder="Ex.: minhaempresa"
@@ -121,25 +120,25 @@ function AcceptAccess() {
         <div className="auth-result">
           <span className="auth-result-icon ok"><CircleCheck size={26} /></span>
           <p>Pronto! Sua senha foi salva. Use-a com a conta e o e-mail do convite para entrar.</p>
-          <Link href="/login" className="btn btn-primary auth-submit">Entrar agora<ArrowRight size={18} /></Link>
+          <Link to="/login" className="btn btn-primary auth-submit">Entrar agora<ArrowRight size={18} /></Link>
         </div>
       </AuthShell>
     );
   }
   if (ready && !token) {
     return (
-      <AuthShell title="Link incompleto" footer={<Link href="/login">Voltar para entrar</Link>}>
+      <AuthShell title="Link incompleto" footer={<Link to="/login">Voltar para entrar</Link>}>
         <div className="auth-result">
           <span className="auth-result-icon warn"><Link2Off size={26} /></span>
           <p>Este link não está completo ou já foi usado. Peça um novo link, ou um novo convite ao administrador da sua empresa.</p>
-          <Link href="/recuperar-acesso" className="btn btn-primary auth-submit">Solicitar novo link</Link>
+          <Link to="/recuperar-acesso" className="btn btn-primary auth-submit">Solicitar novo link</Link>
         </div>
       </AuthShell>
     );
   }
   const type = show ? 'text' : 'password';
   return (
-    <AuthShell title="Definir senha" subtitle="Escolha a senha que você vai usar para entrar no Antares." footer={<Link href="/login">Voltar para entrar</Link>}>
+    <AuthShell title="Definir senha" subtitle="Escolha a senha que você vai usar para entrar no Antares." footer={<Link to="/login">Voltar para entrar</Link>}>
       {!ready ? <p className="muted">Carregando…</p> : (
         <form className="auth-form" aria-busy={busy} onSubmit={submit}>
           <div className="field"><label htmlFor="access-password">Nova senha</label>
@@ -156,7 +155,7 @@ function AcceptAccess() {
             <li className={same ? 'ok' : ''}><Check size={14} />As duas senhas conferem</li>
           </ul>
           {error && (
-            <div className="form-error" role="alert"><AlertCircle size={18} /><span>{error} <Link href="/recuperar-acesso">Solicitar novo link</Link></span></div>
+            <div className="form-error" role="alert"><AlertCircle size={18} /><span>{error} <Link to="/recuperar-acesso">Solicitar novo link</Link></span></div>
           )}
           <button className="btn btn-primary auth-submit" type="submit" disabled={busy || !long || !same}>{busy ? <><Loader2 size={18} className="spin" />Salvando…</> : 'Salvar senha'}</button>
         </form>

@@ -1,7 +1,6 @@
-'use client';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Link } from '@tanstack/react-router';
+import { useAppRouter } from '@/lib/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Copy, Filter, GitBranch, LayoutGrid, Maximize2, Pencil, Plus, Trash2, X, Zap, ZoomIn, ZoomOut } from 'lucide-react';
 import { post, patch, refreshAll } from '@/lib/api';
 import { useNotify } from '@/components/providers';
@@ -79,7 +78,7 @@ function NodeFooter({ onAdd, onBranch, disabled, branchDisabled }: { onAdd: () =
 }
 
 export function FlowEditor({ initial, staff, templates, stages }: { initial: FlowDraft; staff: Row[]; templates: Row[]; stages: Row[] }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const { notify } = useNotify();
   const [draft, setDraft] = useState<FlowDraft>(initial);
   const [selected, setSelected] = useState<Selection>(initial.id ? null : 'trigger');
@@ -420,7 +419,7 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
   return (
     <div className="flow-editor">
       <header className="flow-topbar">
-        <Link href="/automacoes" className="flow-back" aria-label="Voltar para automações" data-tip="Voltar" data-tip-align="start"><ChevronLeft size={18} /></Link>
+        <Link to="/automacoes" className="flow-back" aria-label="Voltar para automações" data-tip="Voltar" data-tip-align="start"><ChevronLeft size={18} /></Link>
         {editingName ? (
           <input className="flow-name-input" autoFocus aria-label="Nome da automação" maxLength={150} value={draft.name} placeholder="Nome da automação"
             onChange={(e) => update({ name: e.target.value })} onBlur={() => draft.name.trim() && setEditingName(false)}

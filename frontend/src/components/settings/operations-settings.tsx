@@ -1,4 +1,3 @@
-'use client';
 import { useEffect, useState } from 'react';
 import { useData, useList, post, remove, refreshAll } from '@/lib/api';
 import { useSession, useNotify } from '@/components/providers';
