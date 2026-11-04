@@ -1,8 +1,6 @@
 from uuid import uuid4
 
 import pytest
-from test_growth import env
-
 from app.extensions import db
 from app.models import AuditLog, Company, Contact, InboxThread, Opportunity, StageHistory, WhatsAppConversation
 

@@ -1,20 +1,18 @@
 from datetime import timedelta
 from uuid import uuid4
 
-from test_growth import env
-from test_whatsapp_service import raw
-from test_instagram import configure_instagram, event, receive
 from app.extensions import db
 from app.models import (
-    Contact,
     InboxMessage,
     InboxThread,
     MessageNotification,
     NotificationReadState,
-    WhatsAppMessage,
     now,
 )
-from app.services import notifications, whatsapp, instagram
+from app.services import notifications, whatsapp
+from app.services.instagram import client as instagram_client
+from helpers.instagram import configure_instagram, event, receive
+from helpers.whatsapp import raw
 
 
 def notice(d, channel='email', workspace=None, thread=None, content='Nova mensagem'):
@@ -120,7 +118,7 @@ def test_whatsapp_live_receives_notify_once_but_history_and_outgoing_do_not(env)
 
 def test_instagram_received_dms_notify_once_and_echoes_do_not(env, monkeypatch):
     client, d = env
-    monkeypatch.setattr(instagram, 'fetch_profile', lambda *args: None)
+    monkeypatch.setattr(instagram_client, 'fetch_profile', lambda *args: None)
     configure_instagram(client, d)
     for _ in range(2):
         assert receive(client, event()).status_code == 200

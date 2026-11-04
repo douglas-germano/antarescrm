@@ -5,10 +5,6 @@ from datetime import timedelta
 from unittest.mock import Mock
 
 import pytest
-from test_growth import env
-from test_instagram import configure_instagram
-from test_whatsapp_service import raw
-
 from app.common import APIError
 from app.extensions import db
 from app.models import (
@@ -22,7 +18,10 @@ from app.models import (
     WhatsAppMessage,
     now,
 )
-from app.services import history, instagram, whatsapp
+from app.services import history, whatsapp
+from app.services.instagram import client as instagram_client
+from helpers.instagram import configure_instagram
+from helpers.whatsapp import raw
 
 
 def control(client, d, channel='whatsapp', action='start', user=None):
@@ -147,7 +146,9 @@ def test_controls_are_authorized_scoped_idempotent_and_private(env):
 def test_instagram_pagination_dates_dedup_and_no_side_effects(env, monkeypatch):
     client, d = env
     connection = configure_instagram(client, d)
-    monkeypatch.setattr(instagram, 'fetch_profile', Mock(side_effect=AssertionError('No profile requests for history')))
+    monkeypatch.setattr(
+        instagram_client, 'fetch_profile', Mock(side_effect=AssertionError('No profile requests for history'))
+    )
     occurred = (now() - timedelta(days=90)).replace(microsecond=0)
 
     def message(mid, outgoing=False):
@@ -177,7 +178,7 @@ def test_instagram_pagination_dates_dedup_and_no_side_effects(env, monkeypatch):
             return {'data': [message('out', True)]}
         return {'data': [message('in')], 'paging': {'next': 'ignored', 'cursors': {'after': 'messages2'}}}
 
-    monkeypatch.setattr(instagram, 'graph', graph)
+    monkeypatch.setattr(instagram_client, 'graph', graph)
     assert control(client, d, channel='instagram').status_code == 200
     drain()
     job = HistorySync.query.one()

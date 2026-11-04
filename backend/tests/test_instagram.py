@@ -1,84 +1,25 @@
 import hashlib
-import hmac
-import json
 from datetime import timedelta
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
-from cryptography.fernet import Fernet
-from test_growth import env
+
+import pytest
 from app.extensions import db
 from app.models import (
+    AutomationRule,
+    AutomationRun,
+    Contact,
+    InboxMessage,
+    InboxThread,
     InstagramConnection,
     InstagramEvent,
     InstagramOAuthState,
-    InboxThread,
-    InboxMessage,
-    Contact,
-    AutomationRule,
-    AutomationRun,
     now,
 )
 from app.services import instagram as service
-
-
-import pytest
-
-
-@pytest.fixture(autouse=True)
-def no_profile_lookup(monkeypatch):
-    monkeypatch.setattr(
-        service, 'fetch_profile', lambda connection, scoped_id: None
-    )  # Never reach the network in tests.
-
-
-def configure_instagram(client, d):
-    client.application.config.update(
-        INSTAGRAM_APP_ID='test-id',
-        INSTAGRAM_APP_SECRET='test-secret',
-        INSTAGRAM_ENCRYPTION_KEY=Fernet.generate_key().decode(),
-    )
-    row = InstagramConnection(
-        workspace_id=d['ws'].id,
-        instagram_id='1234',
-        username='testprofile',
-        encrypted_token=service.cipher().encrypt(b'private-token').decode(),
-    )
-    db.session.add(row)
-    db.session.commit()
-    return row
-
-
-def event(mid='mid1', age=0):
-    return {
-        'object': 'instagram',
-        'entry': [
-            {
-                'id': '1234',
-                'messaging': [
-                    {
-                        'sender': {'id': '5678'},
-                        'recipient': {'id': '1234'},
-                        'timestamp': int((now() - timedelta(hours=age)).timestamp() * 1000),
-                        'message': {'mid': mid, 'text': 'Hello'},
-                    }
-                ],
-            }
-        ],
-    }
-
-
-def receive(client, body, signature=True):
-    raw = json.dumps(body).encode()
-    return client.post(
-        '/api/v1/instagram/webhook',
-        data=raw,
-        content_type='application/json',
-        headers={
-            'X-Hub-Signature-256': 'sha256=' + hmac.new(b'test-secret', raw, hashlib.sha256).hexdigest()
-            if signature
-            else 'sha256=invalid'
-        },
-    )
+from app.services.instagram import client as instagram_client
+from app.services.instagram import comments as instagram_comments
+from helpers.instagram import comment_event, comment_rule, configure_instagram, event, receive
 
 
 def test_signed_receive_is_scoped_deduplicated_and_triggers_automation(env):
@@ -138,7 +79,7 @@ def test_reply_window_is_enforced_and_failed_sends_never_retry(env, monkeypatch)
         calls.append(args)
         raise TimeoutError('secret')
 
-    monkeypatch.setattr(service, 'graph', timeout)
+    monkeypatch.setattr(instagram_client, 'graph', timeout)
     for _ in range(2):
         result = client.post(path, headers=d['headers'](), json=payload)
         assert result.status_code == 200 and result.json['status'] == 'unknown'
@@ -159,7 +100,7 @@ def test_successful_reply_keeps_recipient_and_idempotency(env, monkeypatch):
         calls.append(path)
         return {'message_id': 'out-1'}
 
-    monkeypatch.setattr(service, 'graph', send)
+    monkeypatch.setattr(instagram_client, 'graph', send)
     key = str(uuid4())
     path = f'/api/v1/inbox/inbox/{thread.id}/messages'
     for _ in range(2):
@@ -181,7 +122,8 @@ def test_oauth_state_bound_to_user_account_expiry_and_single_use(env, monkeypatc
     data = {'state': state, 'code': 'auth-code'}
     assert client.post('/api/v1/instagram/complete', headers=d['headers'](d['outsider']), json=data).status_code == 409
     monkeypatch.setattr(service, 'oauth_tokens', lambda code: {'access_token': 'new-token', 'expires_in': 5000})
-    monkeypatch.setattr(service, 'profile', lambda token: {'user_id': '1234', 'username': 'updated'})
+    monkeypatch.setattr(instagram_client, 'profile', lambda token: {'user_id': '1234', 'username': 'updated'})
+    monkeypatch.setattr(instagram_client, 'graph', lambda *args, **kwargs: {'success': True})
     response = client.post('/api/v1/instagram/complete', headers=d['headers'](), json=data)
     assert response.status_code == 200 and response.json['username'] == 'updated'
     assert 'encrypted_token' not in response.json
@@ -204,9 +146,8 @@ def test_connection_cannot_cross_accounts_and_disconnect_keeps_history(env, monk
     client, d = env
     configure_instagram(client, d)
     receive(client, event())
-    monkeypatch.setattr(service, 'profile', lambda token: {'user_id': '1234', 'username': 'test'})
+    monkeypatch.setattr(instagram_client, 'profile', lambda token: {'user_id': '1234', 'username': 'test'})
     from app.common import APIError
-    import pytest
 
     with pytest.raises(APIError) as e:
         service.connect(d['other'].id, 'stolen')
@@ -222,13 +163,13 @@ def test_connecting_subscribes_to_messages_and_failure_does_not_break_connection
     configure_instagram(client, d)
     calls = []
     monkeypatch.setattr(service, 'oauth_tokens', lambda code: {'access_token': 'new-token', 'expires_in': 5000})
-    monkeypatch.setattr(service, 'profile', lambda token: {'user_id': '1234', 'username': 'testprofile'})
+    monkeypatch.setattr(instagram_client, 'profile', lambda token: {'user_id': '1234', 'username': 'testprofile'})
 
     def graph(path, token, method='GET', **kwargs):
         calls.append((path, method, kwargs.get('params')))
         return {'success': True}
 
-    monkeypatch.setattr(service, 'graph', graph)
+    monkeypatch.setattr(instagram_client, 'graph', graph)
 
     def finish():
         state = parse_qs(
@@ -244,7 +185,7 @@ def test_connecting_subscribes_to_messages_and_failure_does_not_break_connection
     def broken(*args, **kwargs):
         raise APIError('Recusado', 502)
 
-    monkeypatch.setattr(service, 'graph', broken)
+    monkeypatch.setattr(instagram_client, 'graph', broken)
     again = finish()
     assert again.status_code == 200 and again.json['subscribed'] is False
 
@@ -262,7 +203,7 @@ def test_verify_reports_and_repairs_the_subscription(env, monkeypatch):
             return {'success': True}
         return {'data': [{'id': 'test-id', 'subscribed_fields': state['fields']}] if state['fields'] else []}
 
-    monkeypatch.setattr(service, 'graph', graph)
+    monkeypatch.setattr(instagram_client, 'graph', graph)
     result = client.post('/api/v1/instagram/verify', headers=d['headers'](), json={})
     assert result.status_code == 200
     assert (
@@ -283,7 +224,9 @@ def test_new_contact_gets_name_and_username_from_the_instagram_profile(env, monk
     client, d = env
     configure_instagram(client, d)
     monkeypatch.setattr(
-        service, 'fetch_profile', lambda connection, scoped_id: {'name': 'Maria Souza', 'username': 'maria.souza'}
+        instagram_client,
+        'fetch_profile',
+        lambda connection, scoped_id: {'name': 'Maria Souza', 'username': 'maria.souza'},
     )
     assert receive(client, event()).status_code == 200
     contact = Contact.query.one()
@@ -296,14 +239,16 @@ def test_new_contact_gets_name_and_username_from_the_instagram_profile(env, monk
 def test_username_is_used_when_the_profile_has_no_name_and_failures_keep_the_placeholder(env, monkeypatch):
     client, d = env
     configure_instagram(client, d)
-    monkeypatch.setattr(service, 'fetch_profile', lambda connection, scoped_id: {'name': '', 'username': 'so.usuario'})
+    monkeypatch.setattr(
+        instagram_client, 'fetch_profile', lambda connection, scoped_id: {'name': '', 'username': 'so.usuario'}
+    )
     receive(client, event('a'))
     assert Contact.query.one().name == '@so.usuario'
     Contact.query.delete()
     InboxMessage.query.delete()
     InboxThread.query.delete()
     db.session.commit()
-    monkeypatch.setattr(service, 'fetch_profile', lambda connection, scoped_id: None)
+    monkeypatch.setattr(instagram_client, 'fetch_profile', lambda connection, scoped_id: None)
     receive(client, event('b'))
     assert Contact.query.one().name == 'Instagram 5678'
     assert client.get('/api/v1/inbox', headers=d['headers']()).json['items'][0]['display_address'] == 'Instagram'
@@ -315,7 +260,7 @@ def test_placeholder_contacts_are_renamed_on_the_next_message_but_typed_names_ar
     receive(client, event('first'))
     assert Contact.query.one().name == 'Instagram 5678'
     monkeypatch.setattr(
-        service, 'fetch_profile', lambda connection, scoped_id: {'name': 'Joana Lima', 'username': 'joana'}
+        instagram_client, 'fetch_profile', lambda connection, scoped_id: {'name': 'Joana Lima', 'username': 'joana'}
     )
     receive(client, event('second'))
     contact = Contact.query.one()
@@ -323,35 +268,13 @@ def test_placeholder_contacts_are_renamed_on_the_next_message_but_typed_names_ar
     contact.name = 'Joana (cliente)'
     db.session.commit()
     monkeypatch.setattr(
-        service, 'fetch_profile', lambda connection, scoped_id: {'name': 'Outro Nome', 'username': 'joana'}
+        instagram_client, 'fetch_profile', lambda connection, scoped_id: {'name': 'Outro Nome', 'username': 'joana'}
     )
     receive(client, event('third'))
     assert Contact.query.one().name == 'Joana (cliente)'
 
 
 # ---- comments as automation triggers ----
-def comment_event(cid='c1', text='Eu quero!', sender='9001', username='cliente.ig', parent=None, media='m1'):
-    value = {'id': cid, 'text': text, 'from': {'id': sender, 'username': username}, 'media': {'id': media}}
-    if parent:
-        value['parent_id'] = parent
-    return {'object': 'instagram', 'entry': [{'id': '1234', 'changes': [{'field': 'comments', 'value': value}]}]}
-
-
-def comment_rule(d, actions, conditions=None):
-    from app.models import AutomationRule
-
-    row = AutomationRule(
-        workspace_id=d['ws'].id,
-        name='Comentários',
-        event='instagram.comment',
-        task_title='t',
-        active=True,
-        actions=actions,
-        conditions=conditions or {},
-    )
-    db.session.add(row)
-    db.session.commit()
-    return row
 
 
 def test_comment_creates_contact_and_ignores_own_replies_and_duplicates(env):
@@ -410,7 +333,7 @@ def test_comment_actions_reply_publicly_and_by_private_message_once(env, monkeyp
         calls.append((path, kwargs))
         return {'id': 'r1', 'message_id': 'dm1'}
 
-    monkeypatch.setattr(service, 'graph', graph)
+    monkeypatch.setattr(instagram_client, 'graph', graph)
     receive(client, comment_event())
     process(d['ws'].id)
     assert [c[0] for c in calls] == ['c1/replies', '1234/messages']
@@ -434,9 +357,9 @@ def test_comment_actions_reply_publicly_and_by_private_message_once(env, monkeyp
 
 
 def test_hourly_limit_and_provider_failure_mark_the_step_failed(env, monkeypatch):
+    from app.common import APIError
     from app.models import AutomationJob
     from app.services.automations import process
-    from app.common import APIError
 
     client, d = env
     configure_instagram(client, d)
@@ -445,11 +368,11 @@ def test_hourly_limit_and_provider_failure_mark_the_step_failed(env, monkeypatch
     def refuse(*args, **kwargs):
         raise APIError('Recusado', 502)
 
-    monkeypatch.setattr(service, 'graph', refuse)
+    monkeypatch.setattr(instagram_client, 'graph', refuse)
     receive(client, comment_event())
     process(d['ws'].id)
     assert AutomationJob.query.one().status == 'failed'
-    monkeypatch.setattr(service, 'COMMENT_REPLIES_PER_HOUR', 0)
+    monkeypatch.setattr(instagram_comments, 'COMMENT_REPLIES_PER_HOUR', 0)
     receive(client, comment_event('c9', sender='9009', username='z'))
     process(d['ws'].id)
     assert AutomationJob.query.filter_by(status='failed').count() == 2
@@ -498,7 +421,7 @@ def test_connection_card_shows_name_username_and_picture_and_refreshes_when_stal
             'profile_picture_url': 'https://cdn.example/foto.jpg',
         }
 
-    monkeypatch.setattr(service, 'fetch_account', account)
+    monkeypatch.setattr(instagram_client, 'fetch_account', account)
     body = client.get('/api/v1/instagram/connection', headers=d['headers']()).json['connection']
     assert (
         body['name'] == 'Loja Exemplo'
@@ -517,7 +440,7 @@ def test_connection_card_shows_name_username_and_picture_and_refreshes_when_stal
 def test_connection_card_survives_an_instagram_outage(env, monkeypatch):
     client, d = env
     configure_instagram(client, d)
-    monkeypatch.setattr(service, 'fetch_account', lambda token: None)
+    monkeypatch.setattr(instagram_client, 'fetch_account', lambda token: None)
     result = client.get('/api/v1/instagram/connection', headers=d['headers']())
     assert (
         result.status_code == 200
@@ -546,7 +469,7 @@ def test_native_app_echo_is_outgoing_in_same_thread_without_automations(env, mon
 
     from app.services import automations
 
-    monkeypatch.setattr(service, 'graph', forbidden)
+    monkeypatch.setattr(instagram_client, 'graph', forbidden)
     monkeypatch.setattr(automations, 'received_reply', forbidden)
     body = echo_event()
     assert receive(client, body).status_code == 200
@@ -583,7 +506,7 @@ def test_echo_of_platform_reply_is_not_duplicated(env, monkeypatch):
     configure_instagram(client, d)
     receive(client, event())
     thread = InboxThread.query.one()
-    monkeypatch.setattr(service, 'graph', lambda *args, **kwargs: {'message_id': 'platform-mid'})
+    monkeypatch.setattr(instagram_client, 'graph', lambda *args, **kwargs: {'message_id': 'platform-mid'})
     response = client.post(
         f'/api/v1/inbox/inbox/{thread.id}/messages',
         headers=d['headers'](),
@@ -607,7 +530,7 @@ def test_echo_arriving_before_send_response_preserves_platform_idempotency(env, 
         db.session.commit()
         return {'message_id': 'fast-echo'}
 
-    monkeypatch.setattr(service, 'graph', send)
+    monkeypatch.setattr(instagram_client, 'graph', send)
     key = str(uuid4())
     response = client.post(
         f'/api/v1/inbox/inbox/{thread.id}/messages',
@@ -637,8 +560,8 @@ def test_echo_recovery_replays_preserved_events_once_without_sending(env, monkey
     def forbidden(*args, **kwargs):
         raise AssertionError('Recovery must not make provider calls or fetch profiles')
 
-    monkeypatch.setattr(service, 'graph', forbidden)
-    monkeypatch.setattr(service, 'fetch_profile', forbidden)
+    monkeypatch.setattr(instagram_client, 'graph', forbidden)
+    monkeypatch.setattr(instagram_client, 'fetch_profile', forbidden)
     from app.services import automations
 
     monkeypatch.setattr(automations, 'received_reply', forbidden)

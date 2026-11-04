@@ -32,6 +32,7 @@ from ..models import (
     Workspace,
     now,
 )
+from .delivery_transactions import commit_delivery
 
 
 def account_config(workspace_id, channel):
@@ -247,7 +248,9 @@ def dispatch(workspace_id=None, limit=20, message_ids=None):
             processed.append(message.to_dict())
             continue
         message.status = 'sending'
-        db.session.commit()  # Crash-safe claim before external I/O. Never automatically resend sending/unknown.
+        commit_delivery(
+            'claim', channel=thread.channel, workspace_id=message.workspace_id, resource_id=message.id
+        )  # Never resend sending/unknown.
         try:
             message.provider_id = deliver(thread, message)
             message.status, message.error = 'sent', None
@@ -267,6 +270,6 @@ def dispatch(workspace_id=None, limit=20, message_ids=None):
                 details={'status': message.status},
             )
         )
-        db.session.commit()
+        commit_delivery('outcome', channel=thread.channel, workspace_id=message.workspace_id, resource_id=message.id)
         processed.append(message.to_dict())
     return processed

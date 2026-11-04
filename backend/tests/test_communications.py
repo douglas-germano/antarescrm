@@ -1,31 +1,13 @@
+from helpers.communications import setup_channel
 import hashlib
 import hmac
 import json
 import time
 from uuid import uuid4
-from test_growth import env
+
 from app.extensions import db
-from app.models import Contact, InboxMessage, InboxThread, MessageTemplate, WhatsAppConversation, WhatsAppConnection
+from app.models import Contact, InboxMessage, InboxThread, MessageTemplate, WhatsAppConversation
 from app.services.communications import dispatch, enqueue
-
-
-def setup_channel(client, d):
-    client.application.config['COMMUNICATION_ACCOUNTS'] = {
-        d['ws'].id: {
-            'email': {
-                'host': 'smtp.example.test',
-                'from_address': 'agency@example.test',
-                'inbound_secret': 'test-inbound-secret',
-            }
-        }
-    }
-    contact = Contact(workspace_id=d['ws'].id, name='Lead', email='lead@example.test', phone='+5565999999999')
-    template = MessageTemplate(
-        workspace_id=d['ws'].id, name='Hello', channel='email', subject='Hello {{name}}', content='Welcome {{name}}'
-    )
-    db.session.add_all([contact, template])
-    db.session.commit()
-    return contact, template
 
 
 def test_broadcast_is_scoped_atomic_and_idempotent(env, monkeypatch):

@@ -1,10 +1,11 @@
 from pathlib import Path
-from flask_migrate import upgrade, downgrade
-from alembic.migration import MigrationContext
+
 from alembic.autogenerate import compare_metadata
+from alembic.migration import MigrationContext
 from app import create_app
 from app.extensions import db
 from app.models import Workspace
+from flask_migrate import downgrade, upgrade
 
 
 def test_migrations_preserve_existing_workspace_and_match_models(tmp_path):
@@ -72,7 +73,7 @@ def test_operations_upgrade_preserves_existing_form_and_rule(tmp_path):
         )
         db.session.commit()
         upgrade(directory=directory)
-        from app.models import LeadForm, AutomationRule
+        from app.models import AutomationRule, LeadForm
 
         form = db.session.get(LeadForm, 'form')
         rule = db.session.get(AutomationRule, 'rule')

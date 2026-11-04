@@ -1,13 +1,19 @@
 """Real PostgreSQL worker claims; all provider I/O is replaced by bounded test adapters."""
 
+import os
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from uuid import uuid4
-from test_postgres_integration import pg, pytestmark
+
+import pytest
 from app.extensions import db
-from app.models import Contact, AutomationRule, AutomationJob, Task, InboxMessage
+from app.models import AutomationJob, AutomationRule, Contact, InboxMessage, Task
 from app.services.automations import emit, process
-from app.services.communications import enqueue, dispatch
+from app.services.communications import dispatch, enqueue
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get('ANTARES_POSTGRES_TEST_URL'), reason='Disposable PostgreSQL database required'
+)
 
 
 def test_two_workers_do_not_skip_locked_predecessor(pg, monkeypatch):
@@ -98,8 +104,9 @@ def test_concurrent_dispatch_claims_one_message_once(pg, monkeypatch):
 
 def test_paginated_deals_keep_summary_with_attention_and_stale_sort(pg):
     from datetime import timedelta
-    from flask_jwt_extended import create_access_token
+
     from app.models import Opportunity, PipelineStage, now
+    from flask_jwt_extended import create_access_token
 
     app, workspace_id, _, user_id = pg
     contact = Contact(workspace_id=workspace_id, name='João da Silva', phone='+5566996499089', source='Site')
@@ -135,8 +142,9 @@ def test_concurrent_instagram_echo_is_recorded_once_without_a_lead(pg):
     import hmac
     import json
     from threading import Barrier
+
+    from app.models import InboxThread, InstagramConnection, InstagramEvent, now
     from cryptography.fernet import Fernet
-    from app.models import InstagramConnection, InstagramEvent, InboxThread, now
 
     app, workspace_id, _, _ = pg
     app.config.update(INSTAGRAM_APP_SECRET='echo-test-secret', INSTAGRAM_ENCRYPTION_KEY=Fernet.generate_key().decode())
@@ -189,6 +197,7 @@ def test_access_token_can_be_consumed_only_once_concurrently(pg):
     import hashlib
     from datetime import timedelta
     from threading import Barrier
+
     from app.models import User, UserAccessToken, now
 
     app, workspace_id, _, user_id = pg
@@ -222,9 +231,9 @@ def test_access_token_can_be_consumed_only_once_concurrently(pg):
 
 
 def test_campaign_send_claim_is_not_repeated_by_concurrent_requests(pg, monkeypatch):
-    from flask_jwt_extended import create_access_token
     from app.models import BrevoConnection, CampaignRecipient, EmailCampaign, now
     from app.services import brevo, campaigns
+    from flask_jwt_extended import create_access_token
 
     app, workspace_id, _, user_id = pg
     connection = BrevoConnection(

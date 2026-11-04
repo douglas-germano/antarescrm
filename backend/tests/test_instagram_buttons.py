@@ -1,11 +1,10 @@
 from datetime import timedelta
 
-from test_growth import env  # noqa: F401
-from test_instagram import comment_event, comment_rule, configure_instagram, no_profile_lookup, receive  # noqa: F401
 from app.extensions import db
 from app.models import AutomationJob, AutomationRule, AutomationRun, Contact, InboxMessage, now
-from app.services import instagram as service
 from app.services.automations import process
+from app.services.instagram import client as instagram_client
+from helpers.instagram import comment_event, comment_rule, configure_instagram, receive
 
 BUTTONS = [{'title': 'Ver proposta', 'url': 'https://exemplo.com/proposta'}]
 REPLIES = ['Sim, quero', 'Agora não']
@@ -38,7 +37,7 @@ def capture(monkeypatch):
         calls.append((path, kwargs))
         return {'id': 'r1', 'message_id': 'dm' + str(len(calls))}
 
-    monkeypatch.setattr(service, 'graph', graph)
+    monkeypatch.setattr(instagram_client, 'graph', graph)
     return calls
 
 

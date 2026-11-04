@@ -1,9 +1,9 @@
 import pytest
-from flask_jwt_extended import create_access_token
-from werkzeug.security import generate_password_hash
 from app import create_app
 from app.extensions import db
-from app.models import Workspace, User
+from app.models import User, Workspace
+from flask_jwt_extended import create_access_token
+from werkzeug.security import generate_password_hash
 
 
 @pytest.fixture()

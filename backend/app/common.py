@@ -16,6 +16,13 @@ class APIError(Exception):
         self.message, self.status, self.details, self.code = message, status, details, code
 
 
+def current_account():
+    """HTTP-to-service adapter. Only call after @require has authenticated the selected account."""
+    from .tenancy import AccountContext
+
+    return AccountContext(workspace_id=g.workspace_id, user_id=g.user.id)
+
+
 def require(*roles):
     """Authenticate and authorize the account selected in the signed session."""
 

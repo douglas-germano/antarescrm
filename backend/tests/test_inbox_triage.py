@@ -1,7 +1,5 @@
 from datetime import timedelta
 
-from test_growth import env  # noqa: F401
-from test_instagram import no_profile_lookup  # noqa: F401  (never reach Instagram in tests)
 from app.extensions import db
 from app.models import Contact, InboxMessage, InboxThread, Opportunity, WhatsAppConversation, WhatsAppMessage, now
 
@@ -70,7 +68,7 @@ def test_instagram_threads_can_be_closed_and_assigned(env):
 
 
 def test_a_new_instagram_message_reopens_a_closed_conversation(env):
-    from test_instagram import configure_instagram, event, receive
+    from helpers.instagram import configure_instagram, event, receive
 
     client, d = env
     configure_instagram(client, d)

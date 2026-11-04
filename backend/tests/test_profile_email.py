@@ -1,8 +1,6 @@
-from werkzeug.security import generate_password_hash
-
-from test_growth import env  # noqa: F401
 from app.extensions import db
 from app.models import AuditLog, User
+from werkzeug.security import generate_password_hash
 
 
 def test_changing_the_login_email_needs_the_current_password_and_a_free_address(env):

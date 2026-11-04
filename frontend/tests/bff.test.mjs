@@ -196,3 +196,11 @@ test('Evolution webhook rejects absent credentials and oversized callbacks; back
     assert.equal((await handleEvolutionWebhook(req,env)).status,401);
   });
 });
+
+test('backend request identifiers reach the browser without exposing private response headers', async () => {
+  await mockFetch(async () => new Response('{}', { headers: { 'Content-Type': 'application/json', 'X-Request-ID': 'operation-123', 'X-Private-Provider-Token': 'must-not-forward' } }), async () => {
+    const response = await handleBackend(request('/api/backend/tasks'), ['tasks'], env);
+    assert.equal(response.headers.get('X-Request-ID'), 'operation-123');
+    assert.equal(response.headers.get('X-Private-Provider-Token'), null);
+  });
+});

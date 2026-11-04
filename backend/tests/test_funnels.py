@@ -1,8 +1,6 @@
 from uuid import uuid4
 
 import pytest
-from test_growth import env  # noqa: F401  (shared fixture)
-
 from app.extensions import db
 from app.models import FormSubmission, LeadForm
 

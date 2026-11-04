@@ -21,6 +21,7 @@ from ..models import (
     now,
 )
 from ..utils.whatsapp_message import MEDIA_PLACEHOLDER_TEXT, normalize_raw_message
+from .delivery_transactions import commit_delivery
 from .evolution import EvolutionService
 
 
@@ -261,7 +262,9 @@ def send_outgoing(connection, conversation, content, idempotency_key, user_id=No
     if user_id and not conversation.assigned_to_id:
         conversation.assigned_to_id = user_id
     conversation.last_message_at, conversation.last_message_preview = now(), row.content[:255]
-    db.session.commit()  # Durable outbox BEFORE network; ambiguous sends are not blindly retried.
+    commit_delivery(
+        'claim', channel='whatsapp', workspace_id=connection.workspace_id, resource_id=row.id
+    )  # Durable outbox BEFORE network; ambiguous sends are not blindly retried.
     try:
         result = (
             gateway.send_media(conversation.phone, kind, base64.b64encode(data).decode(), mime, filename, content)
@@ -279,7 +282,7 @@ def send_outgoing(connection, conversation, content, idempotency_key, user_id=No
         if row.status not in ('sent', 'delivered', 'read'):
             row.status = 'unknown'  # Gateway could have accepted despite losing its HTTP response.
             row.error = error.message
-    db.session.commit()
+    commit_delivery('outcome', channel='whatsapp', workspace_id=connection.workspace_id, resource_id=row.id)
     return row, True
 
 

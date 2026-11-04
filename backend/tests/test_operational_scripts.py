@@ -2,10 +2,11 @@
 
 import importlib.util
 import json
-from pathlib import Path
 import plistlib
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
+
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,7 +34,7 @@ def test_dev_refuses_production_database_and_ports(tmp_path, monkeypatch):
         {'DATABASE_URL': 'postgresql:///antarescrm', 'EVOLUTION_API_KEY': 'production-secret'}
     )
     assert (api, web) == (5003, 3003) and env['DATABASE_URL'].endswith('/antares_test_dev')
-    assert 'EVOLUTION_API_KEY' not in env and env['NEXT_DIST_DIR'] == '.next-dev'
+    assert 'EVOLUTION_API_KEY' not in env and 'NEXT_DIST_DIR' not in env
     assert env['ANTARES_ENV_FILE'].endswith('.env.development')
 
 
@@ -55,6 +56,27 @@ def test_release_keeps_persistent_data_and_dispatch_policy():
     assert new['EnvironmentVariables']['PROJECT_FILES_DIR'] == '/private/files'
     assert new['EnvironmentVariables']['POLICY'] == 'preserved'
     assert old['WorkingDirectory'] == '/old/backend'
+
+
+def test_release_replaces_next_runtime_and_keeps_frontend_bind_settings():
+    deploy = module('deploy')
+    old = definition('frontend')
+    old['ProgramArguments'] = [
+        '/usr/local/bin/node',
+        '/old/frontend/node_modules/next/dist/bin/next',
+        'start',
+        '--hostname',
+        '127.0.0.1',
+        '--port',
+        '3002',
+    ]
+    old['EnvironmentVariables']['NEXT_DIST_DIR'] = '.next-public'
+    new = deploy.remap_definition(old, Path('/releases/v2'), Path('/persistent'))
+    assert new['ProgramArguments'] == ['/usr/local/bin/node', '/releases/v2/frontend/scripts/start.mjs']
+    assert new['EnvironmentVariables']['PORT'] == '3002'
+    assert new['EnvironmentVariables']['HOST'] == '127.0.0.1'
+    assert 'NEXT_DIST_DIR' not in new['EnvironmentVariables']
+    assert old['EnvironmentVariables']['NEXT_DIST_DIR'] == '.next-public'
 
 
 @pytest.mark.parametrize('schema_change', [False, True])
@@ -90,8 +112,8 @@ def test_failed_activation_never_restores_database(tmp_path, monkeypatch, schema
 
 
 def test_failed_release_health_restores_previous_code_and_dependencies(tmp_path, monkeypatch):
-    from contextlib import contextmanager
     import io
+    from contextlib import contextmanager
 
     deploy = module('deploy')
     release = tmp_path / 'release'

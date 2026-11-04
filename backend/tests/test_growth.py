@@ -1,107 +1,15 @@
-from uuid import uuid4
-from datetime import datetime, timezone, date
+from datetime import date, datetime, timezone
+
 import pytest
-from flask_jwt_extended import create_access_token
-from app import create_app
 from app.extensions import db
 from app.models import (
-    Workspace,
-    User,
+    AutomationRun,
     Contact,
-    PipelineStage,
+    FormSubmission,
     Opportunity,
     Task,
-    LeadForm,
-    FormSubmission,
-    AutomationRule,
-    AutomationRun,
 )
-
-
-@pytest.fixture()
-def env():
-    app = create_app(
-        {
-            'TESTING': True,
-            'SQLALCHEMY_DATABASE_URI': 'sqlite://',
-            'SQLALCHEMY_ENGINE_OPTIONS': {},
-            'JWT_SECRET_KEY': 'test-only-key-with-more-than-thirty-two-characters',
-            'RATELIMIT_ENABLED': False,
-        }
-    )
-    with app.app_context():
-        db.create_all()
-        ws = Workspace(name='Client', slug='client', timezone='America/Cuiaba')
-        other = Workspace(name='Other', slug='other')
-        db.session.add_all([ws, other])
-        db.session.flush()
-        user = User(workspace_id=ws.id, name='Owner', email='owner@example.com', role='owner', password_hash='unused')
-        member = User(
-            workspace_id=ws.id, name='Member', email='member@example.com', role='member', password_hash='unused'
-        )
-        outsider = User(
-            workspace_id=other.id, name='Other', email='other@example.com', role='owner', password_hash='unused'
-        )
-        stage = PipelineStage(workspace_id=ws.id, name='New', position=0)
-        other_stage = PipelineStage(workspace_id=other.id, name='Other stage', position=0)
-        db.session.add_all([user, member, outsider, stage, other_stage])
-        db.session.flush()
-        form = LeadForm(
-            workspace_id=ws.id,
-            name='Orçamento',
-            headline='Solicite uma proposta',
-            stage_id=stage.id,
-            source='Campanha',
-            active=True,
-        )
-        db.session.add(form)
-        db.session.commit()
-
-        def headers(u=user):
-            return {'Authorization': 'Bearer ' + create_access_token(identity=u.id, additional_claims={'ver': 0})}
-
-        yield (
-            app.test_client(),
-            {
-                'ws': ws,
-                'other': other,
-                'owner': user,
-                'member': member,
-                'outsider': outsider,
-                'stage': stage,
-                'other_stage': other_stage,
-                'form': form,
-                'headers': headers,
-            },
-        )
-        db.session.remove()
-        db.drop_all()
-
-
-def submit_body(**kw):
-    return dict(
-        submission_key=str(uuid4()),
-        name='Lead de teste',
-        email='lead@example.com',
-        phone='65999999999',
-        consent=True,
-        **kw,
-    )
-
-
-def rule(d, **kw):
-    row = AutomationRule(
-        workspace_id=kw.pop('workspace_id', d['ws'].id),
-        name='Primeiro atendimento',
-        event=kw.pop('event', 'form.submitted'),
-        task_title='Retornar ao lead',
-        active=kw.pop('active', True),
-        due_days=kw.pop('due_days', 0),
-        **kw,
-    )
-    db.session.add(row)
-    db.session.commit()
-    return row
+from helpers.growth import rule, submit_body
 
 
 def test_capture_creates_contact_opportunity_and_task_atomically(env, monkeypatch):

@@ -9,8 +9,9 @@ from ..extensions import db, limiter
 from ..models import Contact, WhatsAppConnection, WhatsAppConversation, WhatsAppMessage, now
 from ..schemas import StrictSchema, choice, ref, text
 from ..services.evolution import EvolutionService
-from ..services.whatsapp import connection_for, conversation_for, ingest, media_for, normalize_phone, send_outgoing
+from ..services.whatsapp import connection_for, conversation_for, ingest, media_for, normalize_phone
 from ..utils.whatsapp_message import normalize_raw_message
+from ._message_input import send_whatsapp_request
 
 bp = Blueprint('whatsapp', __name__)
 
@@ -26,11 +27,6 @@ class ConversationUpdate(StrictSchema):
     assigned_to_id = ref(nullable=True)
     contact_id = ref(nullable=True)
     contact_name = text(180)
-
-
-class SendSchema(StrictSchema):
-    content = text(20000, required=True)
-    idempotency_key = text(100, required=True)
 
 
 def connection_info(connection):
@@ -166,21 +162,7 @@ def messages(conversation_id):
 @require()
 @limiter.limit('30 per minute')
 def message_send(conversation_id):
-    row = get(WhatsAppConversation, conversation_id)
-    if row.status == 'closed':
-        raise APIError('Reabra a conversa antes de enviar.', 409)
-    file = None
-    if request.mimetype == 'multipart/form-data':
-        file = request.files.get('file')
-        content = request.form.get('content', '').strip()
-        key = request.form.get('idempotency_key', '')
-        if not file or not key or len(key) > 100 or len(content) > 20000:
-            raise APIError('Informe arquivo e chave de envio válidos.')
-    else:
-        data = payload(SendSchema)
-        content, key = data['content'], data['idempotency_key']
-    message, created = send_outgoing(connection_for(g.workspace_id), row, content, key, g.user.id, file)
-    return message.to_dict(), 201 if created else 200
+    return send_whatsapp_request(conversation_id)
 
 
 @bp.get('/whatsapp/messages/<uuid:message_id>/media')

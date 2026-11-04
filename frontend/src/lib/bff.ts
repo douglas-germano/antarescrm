@@ -13,7 +13,7 @@ function base(env: GatewayEnv) {
 function sameOrigin(request: Request, env: GatewayEnv) {
   if (['GET', 'HEAD'].includes(request.method)) return true;
   const origin = request.headers.get('origin');
-  // A reverse proxy may expose HTTPS while Next receives an internal HTTP URL.
+  // A reverse proxy may expose HTTPS while the frontend server receives an internal HTTP URL.
   const expected = env.APP_URL ? new URL(env.APP_URL).origin : new URL(request.url).origin;
   return !origin || origin === expected;
 }
@@ -174,7 +174,7 @@ export async function handleBackend(request: Request, path: string[], env: Gatew
       return response;
     }
     const headers = new Headers({ 'Cache-Control': 'no-store' });
-    for (const name of ['content-type', 'content-disposition', 'content-range', 'accept-ranges']) {
+    for (const name of ['content-type', 'content-disposition', 'content-range', 'accept-ranges', 'x-request-id']) {
       const value = upstream.headers.get(name);
       if (value) headers.set(name, value);
     }

@@ -1,8 +1,7 @@
-from datetime import datetime, timezone, timedelta
-from uuid import uuid4
-from test_growth import env
+from datetime import datetime, timedelta, timezone
+
 from app.extensions import db
-from app.models import Contact, MessageTemplate, AutomationJob, AutomationRun, Task, Activity, InboxMessage
+from app.models import Activity, AutomationJob, AutomationRun, InboxMessage, MessageTemplate, Task
 from app.services.automations import process
 
 

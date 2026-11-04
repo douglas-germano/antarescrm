@@ -1,9 +1,10 @@
 from datetime import date, datetime, timedelta, timezone
+
 import pytest
-from flask_jwt_extended import create_access_token
 from app import create_app
 from app.extensions import db
-from app.models import Workspace, User, Contact, PipelineStage, Opportunity, Activity, Task
+from app.models import Activity, Contact, Opportunity, PipelineStage, Task, User, Workspace
+from flask_jwt_extended import create_access_token
 
 
 @pytest.fixture()

@@ -1,7 +1,5 @@
 import pytest
 import requests
-from test_growth import env  # noqa: F401  (shared fixture)
-
 from app.extensions import db
 from app.models import CustomDomain, Funnel, now
 from app.services import dns_lookup, tls_provider

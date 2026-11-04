@@ -4,9 +4,6 @@ from datetime import timedelta
 from unittest.mock import Mock
 
 import pytest
-from test_growth import env
-from werkzeug.security import check_password_hash
-
 from app.common import APIError
 from app.extensions import db
 from app.models import (
@@ -20,7 +17,8 @@ from app.models import (
     UserAccessToken,
     now,
 )
-from app.services import access_email, brevo, campaigns
+from app.services import access_email, brevo
+from werkzeug.security import check_password_hash
 
 
 @pytest.fixture(autouse=True)

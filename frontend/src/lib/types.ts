@@ -1,3 +1,5 @@
+import type { ContactRecord, CompanyRecord, OpportunityRecord, PipelineStageRecord, TaskRecord, ActivityRecord } from './api.generated';
+
 /** @deprecated Use a domain contract for new API consumers. Legacy configurable UI only. */
 export interface Row {
   id: string;
@@ -59,32 +61,23 @@ export interface Field {
 
 /** API contracts for the CRM. These do not inherit the permissive legacy Row. */
 export interface Entity { id: string; created_at?: string; updated_at?: string }
-export interface Contact extends Entity {
-  name: string; email: string | null; phone: string | null; company_id: string | null;
-  owner_id: string | null; source: string | null; archived: boolean; position?: string | null;
-  notes?: string | null; tags: string[]; custom_fields: Record<string, string | number | boolean | null>;
-  company_name?: string | null;
+export interface Contact extends Entity, Pick<ContactRecord, 'name' | 'email' | 'phone' | 'company_id' | 'owner_id' | 'source' | 'archived'> {
+  position?: ContactRecord['position']; notes?: ContactRecord['notes']; tags: string[];
+  custom_fields: Record<string, string | number | boolean | null>; company_name?: string | null;
 }
-export interface Company extends Entity { name: string; email: string | null; phone: string | null; document?: string | null }
+export interface Company extends Entity, Pick<CompanyRecord, 'name' | 'email' | 'phone'> { document?: CompanyRecord['document'] }
 export interface Pipeline extends Entity { name: string }
-export interface PipelineStage extends Entity { name: string; color: string; position: number; probability: number | null; pipeline_id: string | null }
-export type DealStatus = 'open' | 'won' | 'lost';
-export interface Opportunity extends Entity {
-  title: string; status: DealStatus; amount: string; stage_id: string; pipeline_id?: string | null;
-  contact_id: string | null; company_id: string | null; owner_id: string | null;
-  expected_close_date: string | null; description: string | null; loss_reason: string | null;
-  stage_changed_at?: string | null; last_contact_at?: string | null;
+export interface PipelineStage extends Entity, Pick<PipelineStageRecord, 'name' | 'color' | 'position' | 'probability' | 'pipeline_id'> {}
+export type DealStatus = OpportunityRecord['status'];
+export interface Opportunity extends Entity, Pick<OpportunityRecord, 'title' | 'amount' | 'stage_id' | 'contact_id' | 'company_id' | 'owner_id' | 'expected_close_date' | 'description' | 'loss_reason'> {
+  status: DealStatus; pipeline_id?: string | null; stage_changed_at?: string | null; last_contact_at?: string | null;
   contact_name?: string | null; contact_phone?: string | null; contact_email?: string | null;
   company_name?: string | null; owner_name?: string | null;
   history?: { id: string; created_at: string; to_stage_id: string }[];
 }
-export interface Activity extends Entity {
-  title: string; kind: string; status: string; scheduled_at: string; notes: string | null;
-  owner_id: string | null; contact_id: string | null; company_id: string | null; opportunity_id: string | null;
-}
-export interface Task extends Entity {
-  title: string; status: 'todo' | 'doing' | 'done' | 'cancelled'; priority: string; due_date: string | null;
-  contact_id: string | null; assignee_id: string | null; description: string | null;
+export interface Activity extends Entity, Pick<ActivityRecord, 'title' | 'kind' | 'status' | 'scheduled_at' | 'notes' | 'owner_id' | 'contact_id' | 'company_id' | 'opportunity_id'> {}
+export interface Task extends Entity, Pick<TaskRecord, 'title' | 'due_date' | 'contact_id' | 'assignee_id' | 'description' | 'status'> {
+  priority: string;
   contact_name?: string | null; assignee_name?: string | null;
 }
 export interface OpportunityPage extends Page<Opportunity> {

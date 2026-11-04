@@ -16,6 +16,7 @@ from ..models import HistorySync, WhatsAppConnection, Workspace, now
 from ..utils.whatsapp_message import normalize_raw_message
 from . import instagram, whatsapp
 from .evolution import EvolutionService
+from .instagram import client as instagram_client
 
 BATCH_SIZE = 200
 
@@ -151,7 +152,7 @@ def instagram_step(job, connection):
         params = {'platform': 'instagram', 'fields': 'id', 'limit': 30}
         if cursor.get('after'):
             params['after'] = cursor['after']
-        body = instagram.graph(connection.instagram_id + '/conversations', token, params=params)
+        body = instagram_client.graph(connection.instagram_id + '/conversations', token, params=params)
         pending = [r['id'] for r in graph_records(body) if r.get('id')]
         after = next_cursor(body, cursor.get('after'))
         job.total += len(pending)
@@ -161,7 +162,7 @@ def instagram_step(job, connection):
     params = {'fields': 'id,created_time,from,to,message,attachments', 'limit': 100}
     if cursor.get('message_after'):
         params['after'] = cursor['message_after']
-    body = instagram.graph(pending[0] + '/messages', token, params=params)
+    body = instagram_client.graph(pending[0] + '/messages', token, params=params)
     for raw in graph_records(body):
         job.scanned += 1
         sender = str((raw.get('from') or {}).get('id', ''))

@@ -4,5 +4,5 @@ from flask import Blueprint
 
 bp = Blueprint('crm', __name__)
 
+from . import activities, companies, contacts, csv_io, opportunities, pipeline  # noqa: E402,F401
 from ._search import fold  # noqa: E402,F401  (re-exported for callers and tests)
-from . import companies, contacts, pipeline, opportunities, activities, csv_io  # noqa: E402,F401

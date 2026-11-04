@@ -1,64 +1,27 @@
 """Optional PostgreSQL concurrency and FK checks, restricted to disposable test databases."""
 
 import os
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from uuid import uuid4
-from urllib.parse import urlparse
+
 import pytest
-from flask_migrate import upgrade
-from flask_jwt_extended import create_access_token
-from app import create_app
 from app.extensions import db
 from app.models import (
-    Workspace,
-    User,
-    LeadForm,
-    PipelineStage,
-    AutomationRule,
-    Contact,
-    Opportunity,
-    Task,
-    FormSubmission,
     AutomationRun,
+    Contact,
+    FormSubmission,
+    LeadForm,
+    Opportunity,
+    PipelineStage,
+    Task,
 )
+from flask_jwt_extended import create_access_token
 
 URI = os.getenv('ANTARES_POSTGRES_TEST_URL')
 pytestmark = pytest.mark.skipif(
     not URI, reason='Set ANTARES_POSTGRES_TEST_URL to a disposable antares_test_* database.'
 )
-
-
-@pytest.fixture()
-def pg():
-    assert urlparse(URI).path.lstrip('/').startswith('antares_test_'), 'Refusing a non-test database'
-    app = create_app(
-        {
-            'TESTING': True,
-            'SQLALCHEMY_DATABASE_URI': URI,
-            'RATELIMIT_ENABLED': False,
-            'JWT_SECRET_KEY': 'postgres-test-only-key-longer-than-thirty-two-characters',
-        }
-    )
-    with app.app_context():
-        upgrade(directory=str(Path(__file__).resolve().parents[1] / 'migrations'))
-        ws = Workspace(name='Concurrency fixture', slug='fixture-' + str(uuid4()))
-        db.session.add(ws)
-        db.session.flush()
-        user = User(workspace_id=ws.id, name='Test', email='test@example.com', role='owner', password_hash='unused')
-        stage = PipelineStage(workspace_id=ws.id, name='New', position=0)
-        db.session.add_all([user, stage])
-        db.session.flush()
-        form = LeadForm(workspace_id=ws.id, name='Test', headline='Test', stage_id=stage.id, active=True)
-        rule = AutomationRule(
-            workspace_id=ws.id, name='Rule', event='form.submitted', task_title='Call lead', active=True
-        )
-        db.session.add_all([form, rule])
-        db.session.commit()
-        yield app, ws.id, form.id, user.id
-        db.session.remove()
-        db.engine.dispose()
 
 
 def test_concurrent_retries_create_exactly_one_submission_and_task(pg):
@@ -145,7 +108,8 @@ def test_concurrent_distinct_submissions_reuse_contact_across_forms(pg):
 
 def test_concurrent_booking_across_calendars_reserves_one_slot(pg, monkeypatch):
     from datetime import datetime, timezone
-    from app.models import BookingCalendar, Booking
+
+    from app.models import Booking, BookingCalendar
     from app.services import booking
 
     app, workspace_id, _, user_id = pg
@@ -187,7 +151,8 @@ def test_concurrent_booking_across_calendars_reserves_one_slot(pg, monkeypatch):
 
 
 def test_monthly_report_groups_sales_using_account_timezone(pg, monkeypatch):
-    from datetime import datetime, date, timezone
+    from datetime import date, datetime, timezone
+
     from app.models import PipelineStage
 
     app, workspace_id, _, user_id = pg
@@ -211,9 +176,10 @@ def test_monthly_report_groups_sales_using_account_timezone(pg, monkeypatch):
 
 
 def test_whatsapp_campaign_concurrent_confirmations_and_processing_do_not_duplicate(pg, monkeypatch):
-    from app.models import WhatsAppConnection, CampaignRecipient, InboxMessage
-    from app.services import communications
     from unittest.mock import Mock
+
+    from app.models import CampaignRecipient, InboxMessage, WhatsAppConnection
+    from app.services import communications
 
     app, workspace_id, _, user_id = pg
     db.session.add(
@@ -254,7 +220,7 @@ def test_whatsapp_campaign_concurrent_confirmations_and_processing_do_not_duplic
 
 
 def test_inbox_deal_retries_create_one_contact_one_deal_and_one_history(pg):
-    from app.models import WhatsAppConversation, StageHistory
+    from app.models import StageHistory, WhatsAppConversation
 
     app, workspace_id, _, user_id = pg
     stage = PipelineStage.query.filter_by(workspace_id=workspace_id).one()
@@ -294,7 +260,7 @@ def test_inbox_deal_retries_create_one_contact_one_deal_and_one_history(pg):
 
 
 def test_notification_concurrent_reads_are_user_scoped_and_keep_latest_cursor(pg):
-    from app.models import InboxThread, InboxMessage, NotificationReadState
+    from app.models import InboxMessage, InboxThread, NotificationReadState
     from app.services.notifications import record
 
     app, workspace_id, _, user_id = pg

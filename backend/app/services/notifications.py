@@ -1,11 +1,10 @@
 """Receive-time notifications, with account- and user-scoped monotonic read cursors."""
 
-from flask import g
 from sqlalchemy import and_, func, or_
 
-from ..common import get, query
 from ..extensions import db
 from ..models import Contact, InboxThread, MessageNotification, NotificationReadState, WhatsAppConversation
+from ..tenancy import AccountContext
 from .booking import lock
 
 
@@ -44,14 +43,14 @@ def at_or_before(timestamp, identifier):
     )
 
 
-def unread():
+def unread(account: AccountContext):
     return (
-        query(MessageNotification)
+        account.query(MessageNotification)
         .outerjoin(
             NotificationReadState,
             and_(
                 NotificationReadState.workspace_id == MessageNotification.workspace_id,
-                NotificationReadState.user_id == g.user.id,
+                NotificationReadState.user_id == account.user_id,
                 NotificationReadState.source == MessageNotification.source,
                 NotificationReadState.thread_id == MessageNotification.thread_id,
             ),
@@ -69,16 +68,16 @@ def unread():
     )
 
 
-def feed():
+def feed(account: AccountContext):
     # Freeze the upper bound before querying counts/items; arrivals during this request are picked up next time.
     latest = (
-        query(MessageNotification)
+        account.query(MessageNotification)
         .order_by(MessageNotification.created_at.desc(), MessageNotification.id.desc())
         .first()
     )
     if not latest:
         return {'items': [], 'total_unread': 0, 'unread_threads': 0, 'cursor': None}
-    q = unread().filter(at_or_before(latest.created_at, latest.id))
+    q = unread(account).filter(at_or_before(latest.created_at, latest.id))
     partition = (MessageNotification.source, MessageNotification.thread_id)
     ranked = q.with_entities(
         MessageNotification.id.label('identifier'),
@@ -108,19 +107,19 @@ def feed():
     }
 
 
-def advance(notification):
-    lock(f'notification-read:{g.workspace_id}:{g.user.id}:{notification.source}:{notification.thread_id}')
+def advance(account: AccountContext, notification):
+    lock(f'notification-read:{account.workspace_id}:{account.user_id}:{notification.source}:{notification.thread_id}')
     state = (
-        query(NotificationReadState)
-        .filter_by(user_id=g.user.id, source=notification.source, thread_id=notification.thread_id)
+        account.query(NotificationReadState)
+        .filter_by(user_id=account.user_id, source=notification.source, thread_id=notification.thread_id)
         .with_for_update()
         .first()
     )
     if not state:
         db.session.add(
             NotificationReadState(
-                workspace_id=g.workspace_id,
-                user_id=g.user.id,
+                workspace_id=account.workspace_id,
+                user_id=account.user_id,
                 source=notification.source,
                 thread_id=notification.thread_id,
                 read_at=notification.created_at,
@@ -131,18 +130,18 @@ def advance(notification):
         state.read_at, state.read_id = notification.created_at, notification.id
 
 
-def read_message(source, thread_id, message_id):
-    get(WhatsAppConversation if source == 'whatsapp' else InboxThread, thread_id)
+def read_message(account: AccountContext, source, thread_id, message_id):
+    account.get(WhatsAppConversation if source == 'whatsapp' else InboxThread, thread_id)
     notification = (
-        query(MessageNotification).filter_by(source=source, thread_id=thread_id, message_id=message_id).first()
+        account.query(MessageNotification).filter_by(source=source, thread_id=thread_id, message_id=message_id).first()
     )
     if notification:
-        advance(notification)
+        advance(account, notification)
 
 
-def read_all():
+def read_all(account: AccountContext):
     ranked = (
-        query(MessageNotification)
+        account.query(MessageNotification)
         .with_entities(
             MessageNotification.id.label('identifier'),
             func.row_number()
@@ -162,20 +161,20 @@ def read_all():
         .all()
     )
     for row in rows:
-        advance(row)
+        advance(account, row)
 
 
-def thread_counts():
+def thread_counts(account: AccountContext):
     counts = {
         (source, thread_id): 0
-        for source, thread_id in query(MessageNotification)
+        for source, thread_id in account.query(MessageNotification)
         .with_entities(MessageNotification.source, MessageNotification.thread_id)
         .distinct()
     }
     counts.update(
         {
             (source, thread_id): count
-            for source, thread_id, count in unread()
+            for source, thread_id, count in unread(account)
             .with_entities(MessageNotification.source, MessageNotification.thread_id, func.count())
             .group_by(MessageNotification.source, MessageNotification.thread_id)
         }

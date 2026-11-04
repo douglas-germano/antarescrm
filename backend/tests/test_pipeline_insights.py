@@ -1,8 +1,8 @@
 import pytest
-from flask_jwt_extended import create_access_token
 from app import create_app
 from app.extensions import db
-from app.models import Workspace, User, PipelineStage, Opportunity, StageHistory
+from app.models import Opportunity, PipelineStage, StageHistory, User, Workspace
+from flask_jwt_extended import create_access_token
 
 
 @pytest.fixture()

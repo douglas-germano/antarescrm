@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
-from test_automation_workflows import contact_for
-from test_growth import env, rule  # noqa: F401
 from app.extensions import db
 from app.models import AutomationJob, AutomationRule, AutomationRun, Contact, Task
 from app.services.automations import process
+from helpers.automations import contact_for
+from helpers.growth import rule
 
 VIP = {'mode': 'all', 'items': [{'field': 'tag', 'operator': 'equals', 'value': 'vip'}]}
 BASE = {'name': 'Fluxo', 'event': 'contact.created', 'task_title': 'Fallback', 'due_days': 0}

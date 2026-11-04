@@ -1,10 +1,9 @@
-from datetime import datetime, timezone
-from test_growth import env, rule
-from test_automation_workflows import contact_for
-from app.extensions import db
-from app.models import AutomationRun, AutomationJob, Opportunity, PipelineStage, StageHistory
 import app.services.automations as module
+from app.extensions import db
+from app.models import AutomationJob, AutomationRun, Opportunity, PipelineStage, StageHistory
 from app.services.automations import process
+from helpers.automations import contact_for
+from helpers.growth import rule
 
 
 def deal_for(d, contact, stage=None):

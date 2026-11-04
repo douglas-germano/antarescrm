@@ -1,16 +1,11 @@
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
-from test_growth import env, rule
+
 from app.extensions import db
-from app.models import AutomationRun, AutomationJob, Contact, Task, Activity, InboxMessage, MessageTemplate
+from app.models import Activity, AutomationJob, AutomationRun, InboxMessage, MessageTemplate, Task
 from app.services.automations import process
-
-
-def contact_for(d, **kw):
-    row = Contact(workspace_id=d['ws'].id, name=kw.pop('name', 'Lead'), tags=kw.pop('tags', []), **kw)
-    db.session.add(row)
-    db.session.commit()
-    return row
+from helpers.automations import contact_for
+from helpers.growth import rule
 
 
 def template_for(d, **kw):

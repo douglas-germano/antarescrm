@@ -4,4 +4,4 @@ from flask import Blueprint
 
 bp = Blueprint('projects', __name__)
 
-from . import stages, crud, files, approvals  # noqa: E402,F401
+from . import approvals, crud, files, stages  # noqa: E402,F401

@@ -1,14 +1,18 @@
 """Real PostgreSQL lock regression; disposable database only."""
 
+import os
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
-from test_postgres_integration import pg, pytestmark
-from test_whatsapp_service import raw
-
+import pytest
 from app.extensions import db
 from app.models import HistorySync, WhatsAppMessage
 from app.services import history, whatsapp
+from helpers.whatsapp import raw
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get('ANTARES_POSTGRES_TEST_URL'), reason='Disposable PostgreSQL database required'
+)
 
 
 def test_two_workers_do_not_process_the_same_history_batch(pg, monkeypatch):

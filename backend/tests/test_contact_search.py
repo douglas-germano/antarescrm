@@ -1,6 +1,5 @@
-from test_growth import env
 from app.extensions import db
-from app.models import Contact, Company
+from app.models import Company, Contact
 
 
 def seed(d):

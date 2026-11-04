@@ -1,5 +1,5 @@
 from datetime import timedelta
-from test_growth import env
+
 from app.extensions import db
 from app.models import Contact, Opportunity, PipelineStage, Task, now
 

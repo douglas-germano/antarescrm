@@ -1,9 +1,8 @@
 import csv
 import io
 import json
-from test_growth import env
-from app.extensions import db
-from app.models import AuditLog, Contact, Company
+
+from app.models import Company, Contact
 
 
 def test_metadata_csv_scope_and_audit(env):

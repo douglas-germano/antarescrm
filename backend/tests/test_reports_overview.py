@@ -1,7 +1,7 @@
-from datetime import datetime, timedelta, timezone
-from test_growth import env
+from datetime import timedelta
+
 from app.extensions import db
-from app.models import Contact, Opportunity, StageHistory, Task, Activity, now
+from app.models import Activity, Contact, Opportunity, StageHistory, Task, now
 
 
 def seed(d):

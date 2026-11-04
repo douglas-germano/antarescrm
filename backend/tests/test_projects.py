@@ -1,7 +1,7 @@
 import io
-from test_growth import env
+
 from app.extensions import db
-from app.models import Contact, Opportunity, Project, ProjectFile, ProjectApproval
+from app.models import Contact, Opportunity, Project, ProjectApproval
 
 PNG = b'\x89PNG\r\n\x1a\n' + b'0' * 64
 
@@ -161,6 +161,7 @@ def test_public_approval_flow_is_single_use_and_records_who_decided(env, tmp_pat
 
 def test_expired_cancelled_and_internal_approvals(env, tmp_path):
     from datetime import timedelta
+
     from app.models import now
 
     client, d = env

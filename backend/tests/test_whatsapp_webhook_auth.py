@@ -2,7 +2,6 @@ import hashlib
 import hmac
 import json
 
-from test_growth import env
 from app.extensions import db
 from app.models import WhatsAppConnection
 from app.services.evolution import EvolutionService

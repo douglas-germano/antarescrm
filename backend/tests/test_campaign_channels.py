@@ -1,8 +1,6 @@
 from unittest.mock import Mock
 
 import pytest
-from test_growth import env
-
 from app.extensions import db
 from app.models import (
     CampaignRecipient,

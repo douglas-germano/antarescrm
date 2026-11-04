@@ -1,23 +1,22 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from uuid import uuid4
+
 import pytest
-from test_growth import env, submit_body, rule
 from app.extensions import db
 from app.models import (
+    Activity,
+    AutomationJob,
+    AutomationRun,
+    Booking,
+    BookingCalendar,
     Contact,
     FormSubmission,
-    Opportunity,
-    BookingCalendar,
-    Booking,
-    Activity,
-    WorkerHeartbeat,
-    AutomationRun,
-    AutomationJob,
     InboxMessage,
 )
 from app.services import booking
 from app.services.automations import process, received_reply
-from app.services.communications import enqueue, dispatch
+from app.services.communications import enqueue
+from helpers.growth import rule, submit_body
 
 
 def test_dynamic_fields_are_validated_mapped_and_snapshotted(env):
@@ -374,8 +373,9 @@ def test_inbound_message_cancels_queued_automation_message(env):
     import hmac
     import json
     import time
-    from test_communications import setup_channel
+
     from app.services.automations import emit
+    from helpers.communications import setup_channel
 
     client, d = env
     contact, template = setup_channel(client, d)

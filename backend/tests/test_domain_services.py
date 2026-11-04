@@ -4,8 +4,6 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from test_growth import env  # noqa: F401  (shared fixture)
-
 from app import create_app
 from app.extensions import db
 from app.models import Contact, Opportunity, PipelineStage, StageHistory

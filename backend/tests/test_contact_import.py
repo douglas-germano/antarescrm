@@ -1,6 +1,5 @@
-from test_growth import env
 from app.extensions import db
-from app.models import Contact, Company, AutomationRule
+from app.models import AutomationRule, Company, Contact
 from app.services import contact_import as ci
 
 GOOGLE = (
