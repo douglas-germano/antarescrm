@@ -26,18 +26,18 @@ import { useMessageNotifications } from '@/components/inbox/message-notification
 import { DataState } from '@/components/ui';
 const links = [
   { href: '/', label: 'Visão geral', icon: House },
+  { href: '/mensagens', label: 'Caixa de entrada', icon: MessageCircle },
+  { href: '/automacoes', label: 'Automações', icon: Workflow },
+  { href: '/campanhas', label: 'Campanhas', icon: Mail },
+  { href: '/formularios', label: 'Formulários', icon: FileInput },
+  { href: '/funis', label: 'Funis de páginas', icon: Filter },
   { href: '/contatos', label: 'Contatos', icon: Users },
   { href: '/empresas', label: 'Empresas', icon: Building2 },
   { href: '/crm', label: 'Funil de vendas', icon: KanbanSquare },
   { href: '/projetos', label: 'Projetos', icon: FolderKanban },
-  { href: '/mensagens', label: 'Caixa de entrada', icon: MessageCircle },
-  { href: '/campanhas', label: 'Campanhas', icon: Mail },
   { href: '/tarefas', label: 'Tarefas', icon: CheckSquare },
   { href: '/agenda', label: 'Atividades', icon: CalendarDays },
-  { href: '/formularios', label: 'Formulários', icon: FileInput },
-  { href: '/funis', label: 'Funis de páginas', icon: Filter },
   { href: '/pesca', label: 'Pesca', icon: Fish },
-  { href: '/automacoes', label: 'Automações', icon: Workflow },
   { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
 ];
 export function AppShell({ children }: { children: React.ReactNode }) {
