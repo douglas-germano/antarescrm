@@ -6,6 +6,7 @@ import { Badge, Button, ConfirmDialog, DataState } from '@/components/ui';
 import { Card, CardHeader, CardBody } from '@/components/blocks';
 import { useConnection } from '@/components/whatsapp/hooks';
 import { InstagramSettings } from '@/components/settings/instagram-settings';
+import { AtlasConnectionSettings } from '@/components/settings/atlas-settings';
 import { BrevoSettings } from '@/components/settings/brevo-settings';
 
 import { HistorySync } from '@/components/settings/history-sync';
@@ -122,6 +123,7 @@ export function ConnectionsSettings() {
       <WhatsAppConnection />
       <InstagramSettings />
       <BrevoSettings />
+      <AtlasConnectionSettings />
       <Card as="section">
         <CardHeader title="E-mail e SMS" description="Novos canais de envio e recebimento para a Caixa de entrada." />
         <CardBody>

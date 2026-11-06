@@ -24,6 +24,7 @@ services:
     env_file: ["${ANTARES_RUNTIME_DIR:?Set ANTARES_RUNTIME_DIR}/backend.env"]
     environment: &backend_environment
       APP_ENV: production
+      ATLAS_CALLBACK_PORT: ${BACKEND_PORT:-5102}
       DATABASE_URL: ${DATABASE_URL:?Set private DATABASE_URL}
       EVOLUTION_API_URL: http://evolution-api:8080
       PROJECT_FILES_DIR: /data/project-files

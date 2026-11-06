@@ -47,10 +47,18 @@ def log(workspace_id, action, row, details=None):
     )
 
 
+def task_defaults(assignee_id, context):
+    handoff = (context or {}).get('atlas_handoff') or {}
+    return {
+        'assignee_id': assignee_id or handoff.get('assignee_id'),
+        'description': handoff.get('summary'),
+    }
+
+
 def emit(workspace_id, event, event_key, contact, opportunity_id=None, source=None, context=None):
     """`context` carries event data for conditions (e.g. the Instagram comment text) and is never stored in rules."""
     workspace = db.session.get(Workspace, workspace_id)
-    if not workspace or not workspace.active or contact.workspace_id != workspace_id:
+    if not workspace or not workspace.active or not contact or contact.workspace_id != workspace_id:
         return
     deal = Opportunity.query.filter_by(id=opportunity_id, workspace_id=workspace_id).first() if opportunity_id else None
     rules = AutomationRule.query.filter_by(workspace_id=workspace_id, event=event, active=True).all()
@@ -80,6 +88,8 @@ def emit(workspace_id, event, event_key, contact, opportunity_id=None, source=No
         if rule.actions:
             event_data = {
                 'opportunity_id': opportunity_id,
+                'trigger_event': event,
+                **{key: context[key] for key in ('inbound_channel', 'atlas_handoff') if context and key in context},
                 **({'comment_id': context['comment_id']} if context and context.get('comment_id') else {}),
             }
             schedule(run, rule.actions, 0, now(), event_data)
@@ -90,7 +100,7 @@ def emit(workspace_id, event, event_key, contact, opportunity_id=None, source=No
                 title=rule.task_title,
                 contact_id=contact.id,
                 opportunity_id=opportunity_id,
-                assignee_id=rule.assignee_id,
+                **task_defaults(rule.assignee_id, context),
                 due_date=now().astimezone(ZoneInfo(workspace.timezone)).date() + timedelta(days=rule.due_days),
             )
             db.session.add(task)
@@ -154,7 +164,11 @@ def follow_branch(job, run, contact, workspace):
     deal, comment = subject(action, workspace)
     context = condition_context(comment, run, contact)
     path = 'yes' if matches(action.get('conditions', {}), contact, deal, context) else 'no'
-    event_data = {key: action[key] for key in ('opportunity_id', 'comment_id') if key in action}
+    event_data = {
+        key: action[key]
+        for key in ('opportunity_id', 'comment_id', 'trigger_event', 'inbound_channel', 'atlas_handoff')
+        if key in action
+    }
     schedule(run, action.get(path) or [], job.position + 1, now(), event_data)
     log(workspace.id, 'automation_branch', run, {'job_id': job.id, 'path': path})
     return path
@@ -165,6 +179,10 @@ def execute(job, rule, run, contact, workspace):
     deal, comment = subject(action, workspace)
     if not matches(action.get('conditions', {}), contact, deal, condition_context(comment, run, contact)):
         return None
+    if action['kind'] == 'atlas_assign':
+        from .atlas_automations import queue
+
+        return queue(job, run, contact, workspace, deal)
     if action['kind'] in ('reply_comment', 'private_reply'):
         from .instagram import comment_action
 
@@ -247,7 +265,7 @@ def execute(job, rule, run, contact, workspace):
             workspace_id=workspace.id,
             contact_id=contact.id,
             opportunity_id=action.get('opportunity_id'),
-            assignee_id=rule.assignee_id,
+            **task_defaults(rule.assignee_id, action),
             title=action['title'],
             due_date=now().astimezone(ZoneInfo(workspace.timezone)).date() + timedelta(days=action.get('due_days', 0)),
         )
@@ -317,7 +335,8 @@ def process(workspace_id=None, limit=50):
                         job.result_id = execute(job, rule, run, contact, workspace)
                         job.status, job.detail = (
                             'completed',
-                            ('Ação concluída.' if job.result_id else 'Condição não atendida; etapa dispensada.'),
+                            job.detail
+                            or ('Ação concluída.' if job.result_id else 'Condição não atendida; etapa dispensada.'),
                         )
             except Exception as error:  # action boundary: one failed step must not stop the queue
                 current_app.logger.warning('Falha na etapa %s: %s', job.id, type(error).__name__)
@@ -340,7 +359,7 @@ def process(workspace_id=None, limit=50):
     return processed
 
 
-def received_reply(workspace_id, contact, event_key):
+def received_reply(workspace_id, contact, event_key, *, whatsapp_message=None, instagram_supported=False):
     """Cancel only future actions; completed tasks and historical messages stay intact."""
 
     runs = AutomationRun.query.filter_by(workspace_id=workspace_id, contact_id=contact.id).all()
@@ -364,11 +383,16 @@ def received_reply(workspace_id, contact, event_key):
         if changed:
             run.status, run.detail = 'cancelled', 'Contato respondeu; ações futuras canceladas.'
             log(workspace_id, 'automation_stopped_on_reply', run)
-    message = InboxMessage.query.filter_by(id=str(event_key), workspace_id=workspace_id).first()
+    message = whatsapp_message or InboxMessage.query.filter_by(id=str(event_key), workspace_id=workspace_id).first()
+    context = {'reply_text': message.content} if message else {}
+    if whatsapp_message:
+        context['inbound_channel'] = 'whatsapp'
+    elif instagram_supported:
+        context['inbound_channel'] = 'instagram'
     emit(
         workspace_id,
         'message.received',
         event_key,
         contact,
-        context={'reply_text': message.content} if message else None,
+        context=context,
     )

@@ -27,6 +27,9 @@ def create_app(config=None):
     from . import models  # noqa: F401  (registers the tables with SQLAlchemy)
 
     register_blueprints(app)
+    from .routes.atlas import oauth_callback
+
+    app.add_url_rule('/auth/callback', view_func=oauth_callback)
     register_error_handlers(app)
     register_jwt_callbacks()
     register_security_headers(app)
@@ -43,6 +46,7 @@ def create_app(config=None):
 def register_blueprints(app):
     from .routes import (
         agency,
+        atlas,
         auth,
         booking,
         brevo,
@@ -63,6 +67,7 @@ def register_blueprints(app):
     )
 
     for module in (
+        atlas,
         auth,
         fishing,
         crm,

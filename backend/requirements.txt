@@ -10,3 +10,5 @@ python-dotenv==1.0.0
 gunicorn==23.0.0
 requests==2.34.2
 cryptography==46.0.7
+PyJWT==2.15.1
+faster-whisper==1.2.1

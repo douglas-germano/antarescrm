@@ -8,14 +8,16 @@ MAX_STEPS = 30  # Across every path of the flow.
 MAX_DEPTH = 5  # Branches inside branches.
 
 
-def validate_rule(data):
+def validate_rule(data, current=None):
     user_ref(data.get('assignee_id'))
+    event = data.get('event', current.event if current else None)
     if 'actions' in data:
-        counter = [0]
-        data['actions'] = validate_steps(data['actions'], counter, 0)
+        data['actions'] = validate_steps(data['actions'], [0], 0, event)
+    elif 'event' in data and current:
+        validate_steps(current.actions or [], [0], 0, event)
 
 
-def validate_steps(steps, counter, depth):
+def validate_steps(steps, counter, depth, event):
     loaded = []
     for index, action in enumerate(steps):
         action = ActionSchema().load(action)
@@ -23,16 +25,16 @@ def validate_steps(steps, counter, depth):
         if counter[0] > MAX_STEPS:
             raise APIError(f'Uma automação aceita até {MAX_STEPS} passos somando todos os caminhos.', 422)
         if action['kind'] == 'branch':
-            validate_branch(action, index, len(steps), counter, depth)
+            validate_branch(action, index, len(steps), counter, depth, event)
         else:
             action.pop('yes', None)
             action.pop('no', None)
-            validate_action(action)
+            validate_action(action, event)
         loaded.append(action)
     return loaded
 
 
-def validate_branch(action, index, total, counter, depth):
+def validate_branch(action, index, total, counter, depth, event):
     if index != total - 1:
         raise APIError(
             'A ramificação precisa ser o último passo do caminho; os passos seguintes ficam dentro dela.', 422
@@ -41,14 +43,14 @@ def validate_branch(action, index, total, counter, depth):
         raise APIError(f'Use no máximo {MAX_DEPTH} ramificações uma dentro da outra.', 422)
     if not (action.get('conditions') or {}).get('items'):
         raise APIError('Defina ao menos uma condição para a ramificação.', 422)
-    action['yes'] = validate_steps(action.get('yes', []), counter, depth + 1)
-    action['no'] = validate_steps(action.get('no', []), counter, depth + 1)
+    action['yes'] = validate_steps(action.get('yes', []), counter, depth + 1, event)
+    action['no'] = validate_steps(action.get('no', []), counter, depth + 1, event)
 
 
 INSTAGRAM_DMS = ('private_reply', 'instagram_message')
 
 
-def validate_action(action):
+def validate_action(action, event):
     if action['kind'] not in INSTAGRAM_DMS:
         action.pop('buttons', None)
         action.pop('quick_replies', None)
@@ -76,5 +78,14 @@ def validate_action(action):
             raise APIError('Selecione a etapa de destino.', 422)
         action['stage_id'] = str(action['stage_id'])
         get(PipelineStage, action['stage_id'])
+    elif action['kind'] == 'atlas_assign':
+        if event not in ('message.received', 'form.submitted', 'opportunity.stage_changed'):
+            raise APIError(
+                'Selecione mensagem recebida, formulário recebido ou mudança de etapa para acionar o Atlas.', 422
+            )
+        if event == 'message.received':
+            action.pop('atlas_channel', None)
+        elif not action.get('atlas_channel') or not (action.get('content') or '').strip():
+            raise APIError('Escolha o canal e informe o objetivo do Atlas.', 422)
     elif not action.get('title'):
         raise APIError('Informe o título da tarefa ou retorno.', 422)

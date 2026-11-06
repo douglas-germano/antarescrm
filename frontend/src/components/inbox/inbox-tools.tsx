@@ -1,5 +1,7 @@
 import { ArrowLeft, Check, ChevronDown, Clock, Handshake, Link2, MessageSquareText, MoreVertical, PanelRight, RefreshCw, RotateCcw, UserPlus } from 'lucide-react';
-import { useList } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { api, useData, useList } from '@/lib/api';
+import { useNotify, useSession } from '@/components/providers';
 import { Popover } from '@/components/ui';
 import { initials } from '@/lib/format';
 import type { Row } from '@/lib/types';
@@ -47,6 +49,34 @@ export function ConversationHeader({ thread, name, address, staff, panelOpen, on
   onUpdate: (data: Record<string, unknown>) => void; onCreateOpportunity?: () => void; onDetails?: () => void; onSync?: () => void;
   syncing?: boolean; canSync?: boolean; extra?: React.ReactNode;
 }) {
+  const { user } = useSession();
+  const { notify } = useNotify();
+  const [assigning, setAssigning] = useState(false);
+  const canAssignAtlas = user?.role === 'owner' || user?.role === 'admin';
+  const assignmentPath = ['whatsapp', 'instagram'].includes(thread.channel) ? `/atlas/conversations/${thread.channel}/${thread.id}` : null;
+  const { data: atlas, mutate: updateAtlas } = useData<{
+    active: boolean;
+    memory?: string;
+    insight?: { handoff?: string; suggestion?: { kind: 'deal' | 'task'; title: string; reason: string } };
+  }>(assignmentPath);
+  useEffect(() => {
+    if (!atlas?.active) return;
+    const timer = window.setInterval(() => { void updateAtlas(); }, 5000);
+    return () => window.clearInterval(timer);
+  }, [atlas?.active, updateAtlas]);
+  async function toggleAtlas() {
+    if (!canAssignAtlas || !assignmentPath || !atlas || assigning) return;
+    setAssigning(true);
+    try {
+      const result = await api<{ active: boolean }>(assignmentPath, { method: atlas.active ? 'DELETE' : 'POST' });
+      await updateAtlas(result, { revalidate: false });
+      notify(result.active ? 'Conversa atribuída ao Atlas.' : 'Atendimento do Atlas pausado.');
+    } catch (error) {
+      notify((error as Error).message, 'error');
+    } finally {
+      setAssigning(false);
+    }
+  }
   const closed = thread.status === 'closed';
   return (
     <header className="wa-chat-head tips-below">
@@ -60,14 +90,31 @@ export function ConversationHeader({ thread, name, address, staff, panelOpen, on
         </div>
       </div>
       <div className="wa-chat-actions">
-        <label className="owner-select" data-tip={thread.assigned_to_id ? 'Responsável: ' + (staff.find((u) => u.id === thread.assigned_to_id)?.name || '') : 'Sem responsável · clique para atribuir'}>
+        {(atlas?.memory || atlas?.insight) && <Popover label={atlas.insight?.handoff && !atlas.active ? 'Resumo do repasse' : 'Contexto Atlas'}
+          icon={<MessageSquareText size={15} />} variant="ghost" align="end">
+          {(close) => <div className="field" style={{ width: 'min(22rem, 70vw)', padding: 12, overflowWrap: 'anywhere' }}>
+            {atlas.insight?.handoff && <><strong>Resumo para a equipe</strong><p>{atlas.insight.handoff}</p></>}
+            {atlas.memory && <><strong>Contexto guardado</strong><p>{atlas.memory}</p></>}
+            {atlas.insight?.suggestion && <>
+              <strong>{atlas.insight.suggestion.kind === 'deal' ? 'Negócio sugerido' : 'Tarefa sugerida'}</strong>
+              <p>{atlas.insight.suggestion.title}</p><p className="muted">{atlas.insight.suggestion.reason}</p>
+              {atlas.insight.suggestion.kind === 'deal' && onCreateOpportunity &&
+                <button type="button" className="btn btn-soft" onClick={() => { close(); onCreateOpportunity(); }}>Criar negócio</button>}
+            </>}
+          </div>}
+        </Popover>}
+
+        {canAssignAtlas && atlas && <button type="button" className="btn btn-soft" disabled={assigning || (closed && !atlas.active)} onClick={toggleAtlas}>
+          {atlas.active ? 'Pausar Atlas' : 'Atribuir ao Atlas'}
+        </button>}
+        {atlas?.active ? <span className="wa-state open">Responsável: Atlas</span> : <label className="owner-select" data-tip={thread.assigned_to_id ? 'Responsável: ' + (staff.find((u) => u.id === thread.assigned_to_id)?.name || '') : 'Sem responsável · clique para atribuir'}>
           <span className="owner-avatar">{thread.assigned_to_id ? initials(staff.find((u) => u.id === thread.assigned_to_id)?.name) : <UserPlus size={13} />}</span>
           <ChevronDown size={13} />
           <select aria-label="Responsável pela conversa" value={thread.assigned_to_id || ''} onChange={(e) => onUpdate({ assigned_to_id: e.target.value || null })}>
             <option value="">Sem responsável</option>
             {staff.filter((u) => u.active || u.id === thread.assigned_to_id).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
-        </label>
+        </label>}
         <button type="button" className="btn btn-soft" onClick={() => onUpdate({ status: closed ? 'open' : 'closed' })}>
           {closed ? <><RotateCcw size={15} />Reabrir</> : <><Check size={15} />Encerrar</>}
         </button>

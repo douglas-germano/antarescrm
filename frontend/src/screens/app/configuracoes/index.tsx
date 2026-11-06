@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from '@/lib/navigation';
-import { KanbanSquare, FolderKanban, Plug, UserCircle, Users, Building2, Activity, Globe, Briefcase, Bell, CalendarClock, RefreshCw } from 'lucide-react';
+import { KanbanSquare, FolderKanban, Plug, UserCircle, Users, Building2, Activity, Globe, Briefcase, Bell, CalendarClock, RefreshCw, Bot, FishSymbol } from 'lucide-react';
+import { AtlasSettings } from '@/components/settings/atlas-settings';
 import { FishingSettings } from '@/components/fishing/settings';
 import { ConnectionsSettings } from '@/components/settings/connections-settings';
 import { DomainsSettings } from '@/components/settings/domains-settings';
@@ -44,9 +45,12 @@ export default function SettingsPage() {
       { key: 'projetos', label: 'Projetos', icon: <FolderKanban size={16} />, description: 'Etapas dos projetos' },
       { key: 'agendamento', label: 'Agendamento', icon: <CalendarClock size={16} />, description: 'Links públicos de agendamento' },
     ] },
+    { title: 'IA', items: [
+      { key: 'atlas', label: 'Atlas', icon: <Bot size={16} />, description: 'Roteiro de atendimento do Atlas', show: canManage },
+      { key: 'pesca', label: 'Pesca', icon: <FishSymbol size={16} />, description: 'Marca, IA e limites do Copiloto de prospecção', show: canManage },
+    ] },
     { title: 'Integrações', items: [
-      { key: 'pesca', label: 'Pesca', icon: <Plug size={16} />, description: 'Marca, IA e limites do Copiloto de prospecção', show: canManage },
-      { key: 'conexoes', label: 'Conexões', icon: <Plug size={16} />, description: 'WhatsApp, Instagram e e-mail', show: canManage },
+      { key: 'conexoes', label: 'Conexões', icon: <Plug size={16} />, description: 'WhatsApp, Instagram, e-mail e ChatGPT', show: canManage },
       { key: 'dominios', label: 'Domínios', icon: <Globe size={16} />, description: 'Domínios próprios das páginas', show: canManage },
     ] },
     { title: 'Sistema', items: [
@@ -104,6 +108,7 @@ export default function SettingsPage() {
           {tab === 'funis' && <PipelineSettings />}
           {tab === 'projetos' && <ProjectStageSettings />}
           {tab === 'agendamento' && <BookingSettings />}
+          {tab === 'atlas' && canManage && <AtlasSettings key={workspace?.id} />}
           {tab === 'pesca' && canManage && <FishingSettings key={workspace?.id} />}
           {tab === 'conexoes' && canManage && <ConnectionsSettings />}
           {tab === 'dominios' && canManage && <DomainsSettings />}

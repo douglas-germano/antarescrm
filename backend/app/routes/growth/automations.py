@@ -56,7 +56,7 @@ def rule_create():
 def rule_update(rule_id):
     row = get(AutomationRule, rule_id)
     data = payload(RuleSchema, partial=True)
-    validate_rule(data)
+    validate_rule(data, row)
     update(row, data)
     return commit(row)
 

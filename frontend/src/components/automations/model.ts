@@ -11,6 +11,7 @@ export const EVENTS: Record<string, { label: string; hint: string }> = {
   'opportunity.created': { label: 'Negócio criado', hint: 'Um negócio é aberto no funil.' },
   'opportunity.stage_changed': { label: 'Etapa do negócio alterada', hint: 'Um negócio muda de etapa.' },
   'opportunity.won': { label: 'Negócio ganho', hint: 'Uma venda é fechada.' },
+  'atlas.handoff': { label: 'Atlas encaminhou para a equipe', hint: 'Quando o Atlas repassar uma conversa, a ação Criar tarefa inclui o resumo e usa o responsável da conversa se nenhum for escolhido.' },
   'opportunity.lost': { label: 'Negócio perdido', hint: 'Um negócio é encerrado como perdido.' },
 };
 
@@ -23,9 +24,11 @@ export const ACTIONS: Record<string, string> = {
   reply_comment: 'Responder o comentário (Instagram)',
   private_reply: 'Enviar DM ao autor do comentário',
   instagram_message: 'Enviar direct no Instagram',
+  atlas_assign: 'Atribuir conversa ao Atlas',
 };
 
-/** Instagram direct messages can carry link buttons and quick replies; other actions cannot. */
+export const ATLAS_EVENTS = ['message.received', 'form.submitted', 'opportunity.stage_changed'];
+/** Instagram direct messages can carry link buttons and quick replies. */
 export const INSTAGRAM_DMS = ['private_reply', 'instagram_message'];
 export const MAX_BUTTONS = 3;
 export const MAX_QUICK_REPLIES = 13;
@@ -38,6 +41,7 @@ export type Step = {
   template_id?: string;
   tag?: string;
   content?: string;
+  atlas_channel?: string;
   stage_id?: string;
   delay_minutes: number;
   due_days: number;
@@ -85,12 +89,12 @@ export const countSteps = (steps: Step[]): number =>
   steps.reduce((total, step) => total + 1 + countSteps(step.yes || []) + countSteps(step.no || []), 0);
 
 /** The first step that cannot be saved yet, depth first, so the editor can open it. */
-export function firstProblem(steps: Step[], listPath: StepPath = []): { path: StepPath; problem: string } | null {
+export function firstProblem(steps: Step[], event?: string, listPath: StepPath = []): { path: StepPath; problem: string } | null {
   for (let i = 0; i < steps.length; i += 1) {
-    const problem = stepProblem(steps[i]);
+    const problem = stepProblem(steps[i], event);
     if (problem) return { path: [...listPath, i], problem };
     for (const side of ['yes', 'no'] as const) {
-      const nested = firstProblem(steps[i][side] || [], [...listPath, i, side]);
+      const nested = firstProblem(steps[i][side] || [], event, [...listPath, i, side]);
       if (nested) return nested;
     }
   }
@@ -132,6 +136,7 @@ export function describeStep(step: Step, lookups: { template: (id?: string) => s
     case 'reply_comment': return `Responder o comentário: ${step.content || ''}`;
     case 'private_reply': return `Enviar DM ao autor: ${step.content || ''}`;
     case 'instagram_message': return `Enviar direct: ${step.content || ''}`;
+    case 'atlas_assign': return step.content ? `Atlas · ${step.content}` : 'Atribuir conversa ao Atlas';
     case 'add_tag': return `Adicionar a tag “${step.tag || ''}”`;
     case 'move_stage': return `Mover o negócio para ${lookups.stage(step.stage_id) || 'etapa indisponível'}`;
     case 'follow_up': return `Agendar retorno${step.title ? ': ' + step.title : ''}${step.due_days ? ` (em ${step.due_days} d)` : ''}`;
@@ -158,7 +163,7 @@ export const RECIPES = [
 ] as { name: string; event: string; steps: Step[]; conditions?: Conditions }[];
 
 /** Fields each action needs before the rule can be saved; returns the first problem or null. */
-export function stepProblem(step: Step): string | null {
+export function stepProblem(step: Step, event?: string): string | null {
   if (step.kind === 'branch' && !step.conditions?.items?.length) return 'Defina a condição que divide os caminhos.';
   if (step.kind === 'send_message' && !step.template_id) return 'Escolha o modelo de mensagem.';
   if ((step.kind === 'reply_comment' || INSTAGRAM_DMS.includes(step.kind)) && !step.content?.trim()) return 'Escreva o texto da mensagem.';
@@ -168,6 +173,10 @@ export function stepProblem(step: Step): string | null {
     const replies = (step.quick_replies || []).map((q) => q.trim());
     if (replies.some((q) => !q)) return 'Preencha ou remova as respostas rápidas vazias.';
     if (new Set(replies).size !== replies.length) return 'As respostas rápidas precisam ser diferentes.';
+  }
+  if (step.kind === 'atlas_assign' && event) {
+    if (!ATLAS_EVENTS.includes(event)) return 'Selecione mensagem recebida, formulário recebido ou mudança de etapa para acionar o Atlas.';
+    if (event !== 'message.received' && (!step.atlas_channel || !step.content?.trim())) return 'Escolha o canal e informe o objetivo do Atlas.';
   }
   if (step.kind === 'add_tag' && !step.tag?.trim()) return 'Informe a tag.';
   if (step.kind === 'move_stage' && !step.stage_id) return 'Escolha a etapa de destino.';
@@ -193,6 +202,7 @@ export function stepPayload(step: Step): Record<string, unknown> {
         ...(step.buttons?.length ? { buttons: step.buttons.map((b) => ({ title: b.title.trim(), url: b.url.trim() })) } : {}),
         ...(step.quick_replies?.length ? { quick_replies: step.quick_replies.map((q) => q.trim()) } : {}),
       }
+      : step.kind === 'atlas_assign' ? { content: step.content, atlas_channel: step.atlas_channel || undefined }
       : step.kind === 'reply_comment' ? { content: step.content }
       : step.kind === 'add_tag' ? { tag: step.tag }
       : step.kind === 'move_stage' ? { stage_id: step.stage_id }

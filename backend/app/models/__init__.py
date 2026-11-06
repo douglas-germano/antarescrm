@@ -1,5 +1,6 @@
 """Modelos SQLAlchemy organizados por domínio; reexportados aqui para `from app.models import X`."""
 
+from .atlas import AtlasConnection, AtlasCredential, AtlasJob, AtlasTarget
 from .automation import AutomationJob, AutomationRule, AutomationRun, FormSubmission, LeadForm, WorkerHeartbeat
 from .base import Base, TenantBase, UTCDateTime, now, uid
 from .booking import Booking, BookingCalendar
@@ -17,6 +18,10 @@ from .tenancy import AuditLog, User, Workspace, WorkspaceAccess
 from .whatsapp import WhatsAppConnection, WhatsAppConversation, WhatsAppMedia, WhatsAppMessage
 
 __all__ = [
+    'AtlasConnection',
+    'AtlasCredential',
+    'AtlasJob',
+    'AtlasTarget',
     'FishingDraft',
     'FishingPost',
     'FishingSettings',

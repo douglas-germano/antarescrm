@@ -82,11 +82,12 @@ class LinkButtonSchema(StrictSchema):
 class ActionSchema(StrictSchema):
     conditions = f.Nested(ConditionsSchema)
     kind = choice(
-        'create_task send_message follow_up add_tag move_stage reply_comment private_reply instagram_message branch',
+        'create_task send_message follow_up add_tag move_stage reply_comment private_reply instagram_message atlas_assign branch',
         required=True,
     )
     title = text(180)
     content = text(1000)
+    atlas_channel = choice('whatsapp instagram')
     template_id = ref()
     tag = text(80)
     stage_id = ref()
@@ -108,7 +109,7 @@ class RuleSchema(StrictSchema):
     actions = f.List(f.Nested(ActionSchema), validate=validate.Length(max=10))
     name = text(150, required=True)
     event = choice(
-        'contact.created form.submitted message.received booking.created booking.cancelled opportunity.created instagram.comment opportunity.stage_changed opportunity.won opportunity.lost',
+        'contact.created form.submitted message.received booking.created booking.cancelled opportunity.created instagram.comment opportunity.stage_changed opportunity.won opportunity.lost atlas.handoff',
         required=True,
     )
     source = text(100, allow_none=True)

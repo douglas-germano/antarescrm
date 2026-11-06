@@ -16,6 +16,8 @@ def normalize_database_url(value):
 
 
 class Config:
+    ATLAS_ENCRYPTION_KEY = os.getenv('ATLAS_ENCRYPTION_KEY')
+    ATLAS_CALLBACK_PORT = os.getenv('ATLAS_CALLBACK_PORT', '5002')
     OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
     FISHING_TRIAGE_MODEL = os.getenv('FISHING_TRIAGE_MODEL', '')
     FISHING_DRAFT_MODEL = os.getenv('FISHING_DRAFT_MODEL', '')
@@ -74,6 +76,7 @@ class Config:
 
 
 class TestingConfig(Config):
+    ATLAS_ENCRYPTION_KEY = None
     OPENROUTER_API_KEY = None
     FISHING_TRIAGE_MODEL = ''
     FISHING_DRAFT_MODEL = ''

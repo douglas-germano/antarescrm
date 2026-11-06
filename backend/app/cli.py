@@ -6,6 +6,7 @@ import click
 from flask import g
 from werkzeug.security import generate_password_hash
 
+from .atlas_cli import register_atlas
 from .common import add, today
 from .extensions import db
 from .models import Activity, Company, Contact, Opportunity, PipelineStage, Task, User, Workspace
@@ -13,6 +14,8 @@ from .routes.auth import DEFAULT_STAGES
 
 
 def register_commands(app):
+    register_atlas(app)
+
     @app.cli.command('run-worker')
     @click.option('--once', is_flag=True, help='Execute one pass and exit.')
     @click.option('--interval', default=10, type=click.IntRange(1, 300))
@@ -23,6 +26,7 @@ def register_commands(app):
         import time
 
         from .models import WorkerHeartbeat, now
+        from .services.atlas_runner import process as process_atlas
         from .services.automations import process
         from .services.communications import dispatch as dispatch_messages
         from .services.fishing import process as process_fishing
@@ -35,6 +39,7 @@ def register_commands(app):
                 actions, messages = process(limit=50), (dispatch_messages(limit=20) if dispatch else [])
                 history_batches = process_history(limit=2)
                 process_fishing(limit=1)
+                process_atlas()
                 if actions or messages or once:
                     click.echo(f'{len(actions)} etapa(s), {len(messages)} mensagem(ns).')
             except Exception as error:  # worker boundary: keep the loop alive and report

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ArrowRightLeft, CalendarClock, CalendarPlus, CalendarX, FileInput, Instagram, KanbanSquare, ListChecks, MessageCircle, Reply, Send, Tag, Trophy, UserPlus, XCircle, Zap } from 'lucide-react';
+import { ArrowRightLeft, Bot, CalendarClock, CalendarPlus, CalendarX, FileInput, Instagram, KanbanSquare, ListChecks, MessageCircle, Reply, Send, Tag, Trophy, UserPlus, XCircle, Zap } from 'lucide-react';
 
 const EVENT_ICONS: Record<string, ReactNode> = {
   'contact.created': <UserPlus size={15} />,
@@ -11,9 +11,11 @@ const EVENT_ICONS: Record<string, ReactNode> = {
   'opportunity.created': <KanbanSquare size={15} />,
   'opportunity.stage_changed': <ArrowRightLeft size={15} />,
   'opportunity.won': <Trophy size={15} />,
+  'atlas.handoff': <Bot size={15} />,
   'opportunity.lost': <XCircle size={15} />,
 };
 const ACTION_ICONS: Record<string, ReactNode> = {
+  atlas_assign: <Bot size={15} />,
   create_task: <ListChecks size={15} />,
   send_message: <Send size={15} />,
   follow_up: <CalendarPlus size={15} />,

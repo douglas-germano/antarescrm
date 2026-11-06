@@ -7,7 +7,7 @@ import { useNotify } from '@/components/providers';
 import { Button, ConfirmDialog } from '@/components/ui';
 import { ConditionsEditor, emptyConditions, type Conditions } from '@/components/automations/conditions-editor';
 import {
-  ACTIONS, BRANCH_LABEL, DELAY_UNITS, EVENTS, INSTAGRAM_DMS, MAX_DEPTH, MAX_PATH_STEPS, MAX_STEPS, countSteps, describeStep, editList, firstProblem,
+  ACTIONS, ATLAS_EVENTS, BRANCH_LABEL, DELAY_UNITS, EVENTS, INSTAGRAM_DMS, MAX_DEPTH, MAX_PATH_STEPS, MAX_STEPS, countSteps, describeStep, editList, firstProblem,
   formatDelay, listAt, newBranch, newStep, pathKey, splitDelay, stepAt, stepPayload, stepProblem, type Step, type StepPath,
 } from '@/components/automations/model';
 import { actionIcon, eventIcon, isInstagram } from '@/components/automations/icons';
@@ -145,7 +145,7 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
     if (busy) return;
     if (!draft.name.trim()) { setEditingName(true); setFailure('Dê um nome à automação.'); return; }
     if (!draft.steps.length) { setFailure('Adicione ao menos um passo depois do gatilho.'); return; }
-    const broken = firstProblem(draft.steps);
+    const broken = firstProblem(draft.steps, draft.event);
     if (broken) { setSelected(broken.path); setFailure(broken.problem); return; }
     setBusy(true);
     setFailure('');
@@ -221,7 +221,7 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
     panel = <>
       <div className="field"><label htmlFor="flow-action">Ação</label>
         <select id="flow-action" value={step.kind} onChange={(e) => updateStep(path, { kind: e.target.value })}>
-          {Object.entries(ACTIONS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          {Object.entries(ACTIONS).map(([value, label]) => <option key={value} value={value} disabled={value === 'atlas_assign' && !ATLAS_EVENTS.includes(draft.event)}>{label}</option>)}
         </select></div>
       <DelayField key={pathKey(path)} minutes={step.delay_minutes} onChange={(minutes) => updateStep(path, { delay_minutes: minutes })} />
       {step.kind === 'send_message' && (
@@ -240,6 +240,21 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
           <textarea rows={4} maxLength={1000} aria-label="Texto da mensagem" value={step.content || ''} onChange={(e) => updateStep(path, { content: e.target.value })} placeholder="Ex.: Oi, {{name}}! Quer receber os detalhes?" />
           <small>Vai para a conversa do contato no Instagram. Pelas regras do Instagram, só é enviada se o contato escreveu nas últimas 24 horas; fora disso, o passo é dispensado.</small></div>
       )}
+      {step.kind === 'atlas_assign' && <>
+        {draft.event !== 'message.received' && <div className="field">
+          <label htmlFor="flow-atlas-channel">Canal</label>
+          <select id="flow-atlas-channel" value={step.atlas_channel || ''} onChange={(e) => updateStep(path, { atlas_channel: e.target.value })}>
+            <option value="">Selecione…</option><option value="whatsapp">WhatsApp</option><option value="instagram">Instagram</option>
+          </select>
+        </div>}
+        <div className="field">
+          <label htmlFor="flow-atlas-goal">Objetivo do Atlas{draft.event === 'message.received' ? ' (opcional)' : ''}</label>
+          <textarea id="flow-atlas-goal" rows={4} maxLength={1000} value={step.content || ''} onChange={(e) => updateStep(path, { content: e.target.value })} placeholder="Ex.: pergunte se o contato tem alguma dúvida sobre a proposta." />
+          <small>{draft.event === 'message.received'
+            ? 'O Atlas assume a conversa do WhatsApp ou Instagram que recebeu a mensagem.'
+            : 'O Atlas usa os dados do formulário ou da etapa para escrever. O envio exige uma conversa vinculada com mensagem recebida nas últimas 24 horas.'}</small>
+        </div>
+      </>}
       {INSTAGRAM_DMS.includes(step.kind) && (
         <InstagramButtons buttons={step.buttons || []} quickReplies={step.quick_replies || []} onChange={(patchStep) => updateStep(path, patchStep)} />
       )}

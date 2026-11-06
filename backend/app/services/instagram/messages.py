@@ -7,6 +7,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from ...common import APIError
 from ...extensions import db
 from ...models import Contact, InboxMessage, InboxThread, InstagramComment, InstagramEvent, Workspace, now
+from ..atlas_audio import INSTAGRAM_AUDIO, instagram_audio_url
 from . import client, profiles
 
 
@@ -27,10 +28,15 @@ def ingest_message(connection, item, key, historical=False):
         peer = sender
     if not peer.isdigit() or peer == connection.instagram_id:
         return False
-    content = message.get('text') or (
-        ('[Anexo enviado no Instagram]' if outgoing else '[Anexo recebido no Instagram]')
-        if message.get('attachments')
-        else '[Mensagem do Instagram]'
+    audio = not outgoing and bool(instagram_audio_url(message))
+    content = (
+        message.get('text')
+        or (INSTAGRAM_AUDIO if audio else None)
+        or (
+            ('[Anexo enviado no Instagram]' if outgoing else '[Anexo recebido no Instagram]')
+            if message.get('attachments')
+            else '[Mensagem do Instagram]'
+        )
     )
     try:
         occurred = datetime.fromtimestamp(float(item.get('timestamp')) / 1000, timezone.utc)
@@ -111,11 +117,17 @@ def ingest_message(connection, item, key, historical=False):
         from ..notifications import record
 
         record(thread, row, 'inbox')
+        from ..atlas import received
+
+        if message.get('text') or audio:
+            received('instagram', thread, row)
         contact = db.session.get(Contact, thread.contact_id)
         if contact and not contact.archived:
             from ..automations import received_reply
 
-            received_reply(connection.workspace_id, contact, row.id)
+            received_reply(
+                connection.workspace_id, contact, row.id, instagram_supported=bool(message.get('text') or audio)
+            )
     return True
 
 

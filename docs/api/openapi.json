@@ -4,6 +4,13 @@
       "Action": {
         "additionalProperties": false,
         "properties": {
+          "atlas_channel": {
+            "enum": [
+              "whatsapp",
+              "instagram"
+            ],
+            "type": "string"
+          },
           "buttons": {
             "items": {
               "$ref": "#/components/schemas/LinkButton"
@@ -42,6 +49,7 @@
               "reply_comment",
               "private_reply",
               "instagram_message",
+              "atlas_assign",
               "branch"
             ],
             "type": "string"
@@ -457,6 +465,56 @@
         "required": [
           "workspace_id"
         ],
+        "type": "object"
+      },
+      "AtlasAtlasPlaybookInput": {
+        "additionalProperties": false,
+        "properties": {
+          "handoff": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "offer": {
+            "maxLength": 3000,
+            "type": "string"
+          },
+          "questions": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "rules": {
+            "maxLength": 2000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "handoff",
+          "offer",
+          "questions",
+          "rules"
+        ],
+        "type": "object"
+      },
+      "AtlasAtlasPlaybookPatchInput": {
+        "additionalProperties": false,
+        "properties": {
+          "handoff": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "offer": {
+            "maxLength": 3000,
+            "type": "string"
+          },
+          "questions": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "rules": {
+            "maxLength": 2000,
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "Audience": {
@@ -2937,7 +2995,8 @@
               "instagram.comment",
               "opportunity.stage_changed",
               "opportunity.won",
-              "opportunity.lost"
+              "opportunity.lost",
+              "atlas.handoff"
             ],
             "type": "string"
           },
@@ -3015,7 +3074,8 @@
               "instagram.comment",
               "opportunity.stage_changed",
               "opportunity.won",
-              "opportunity.lost"
+              "opportunity.lost",
+              "atlas.handoff"
             ],
             "type": "string"
           },
@@ -5002,6 +5062,444 @@
         ],
         "tags": [
           "agency"
+        ]
+      }
+    },
+    "/atlas/connection": {
+      "get": {
+        "operationId": "atlas_get_connection_get_atlas_connection",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "atlas"
+        ]
+      },
+      "post": {
+        "operationId": "atlas_connect_post_atlas_connection",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "atlas"
+        ]
+      }
+    },
+    "/atlas/conversations/{channel}/{identifier}": {
+      "delete": {
+        "operationId": "atlas_conversation_assignment_delete_atlas_conversations_channel_identifier",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "atlas"
+        ]
+      },
+      "get": {
+        "operationId": "atlas_conversation_assignment_get_atlas_conversations_channel_identifier",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "atlas"
+        ]
+      },
+      "post": {
+        "operationId": "atlas_conversation_assignment_post_atlas_conversations_channel_identifier",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "atlas"
+        ]
+      }
+    },
+    "/atlas/playbook": {
+      "get": {
+        "operationId": "atlas_playbook_get_atlas_playbook",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "atlas"
+        ]
+      },
+      "patch": {
+        "operationId": "atlas_playbook_patch_atlas_playbook",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtlasAtlasPlaybookPatchInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "atlas"
         ]
       }
     },

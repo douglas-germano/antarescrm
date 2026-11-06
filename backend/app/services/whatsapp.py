@@ -183,12 +183,18 @@ def ingest(connection, raw, historical=False):
         from .notifications import record
 
         record(conversation, row, 'whatsapp')
+        from .atlas import received
+
+        if row.kind in ('text', 'audio'):
+            received('whatsapp', conversation, row)
         conversation.unread_count += 1
         conversation.status = 'open'
         if conversation.contact_id:
             from .automations import received_reply
 
-            received_reply(connection.workspace_id, db.session.get(Contact, conversation.contact_id), row.id)
+            received_reply(
+                connection.workspace_id, db.session.get(Contact, conversation.contact_id), row.id, whatsapp_message=row
+            )
     return row, True
 
 
