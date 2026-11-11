@@ -8,13 +8,20 @@ from ..services.history import source
 bp = Blueprint('history', __name__)
 
 
+def public(row):
+    if not row:
+        return None
+    # Instagram workspaces may hold several accounts; the screen shows which one is being imported.
+    return {**row.public(), **({'connection_id': row.connection_id} if row.channel == 'instagram' else {})}
+
+
 @bp.get('/history-sync/<channel>')
 @require('owner', 'admin')
 def status(channel):
     if channel not in ('whatsapp', 'instagram'):
         raise APIError('Canal inválido.', 404)
     row = query(HistorySync).filter_by(channel=channel).first()
-    return {'sync': row.public() if row else None}
+    return {'sync': public(row)}
 
 
 @bp.post('/history-sync/<channel>')
@@ -34,9 +41,14 @@ def change(channel):
         if row and row.status in ('queued', 'running'):
             row.status = 'cancelled'
     else:
-        connection, identity = source(channel, g.workspace_id)
+        requested = data.get('connection_id') if channel == 'instagram' else None
+        if requested is not None and not isinstance(requested, str):
+            raise APIError('Conta inválida.', 422)
+        if action == 'resume' and row and not requested:
+            requested = row.connection_id if channel == 'instagram' else None
+        connection, identity = source(channel, g.workspace_id, requested)
         if row and row.status in ('queued', 'running'):
-            return {'sync': row.public()}
+            return {'sync': public(row)}
         if action == 'resume':
             if not row or row.status not in ('failed', 'cancelled'):
                 raise APIError('Não há sincronização para retomar.', 409)
@@ -56,4 +68,4 @@ def change(channel):
         db.session.flush()
         audit('history.' + action, row, {'channel': channel})
     db.session.commit()
-    return {'sync': row.public() if row else None}
+    return {'sync': public(row)}

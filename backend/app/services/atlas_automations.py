@@ -29,7 +29,7 @@ from ..models import (
 from ..tenancy import AccountContext
 from . import atlas, atlas_oauth
 from .booking import lock
-from .instagram.connections import active_connection
+from .instagram.connections import active_connections, thread_connection
 from .whatsapp import normalize_phone, phone_variants
 
 DEFAULT_GOAL = 'Atenda o contato usando o contexto da conversa. Se faltar informação, faça uma pergunta breve.'
@@ -63,10 +63,15 @@ def open_conversation(workspace_id, contact_id, channel):
             .order_by(WhatsAppConversation.last_message_at.desc().nulls_last(), WhatsAppConversation.id)
             .first()
         )
-    connection = active_connection(workspace_id)
+    accounts = [row.instagram_id for row in active_connections(workspace_id)]
+    if not accounts:
+        raise APIError('Reconecte o Instagram desta conta.', 409)
     return (
         InboxThread.query.filter_by(workspace_id=workspace_id, contact_id=contact_id, channel='instagram')
-        .filter(InboxThread.status != 'closed', InboxThread.address.startswith(connection.instagram_id + ':'))
+        .filter(
+            InboxThread.status != 'closed',
+            db.or_(*[InboxThread.address.startswith(key + ':') for key in accounts]),
+        )
         .order_by(InboxThread.updated_at.desc(), InboxThread.id)
         .first()
     )
@@ -94,8 +99,8 @@ def validate_channel(row, channel):
     if channel == 'whatsapp':
         if not WhatsAppConnection.query.filter_by(workspace_id=row.workspace_id, state='open').first():
             raise APIError('Conecte o WhatsApp deste workspace.', 409)
-    elif not row.address.startswith(active_connection(row.workspace_id).instagram_id + ':'):
-        raise APIError('A conversa pertence a outra conexão do Instagram.', 409)
+    else:
+        thread_connection(row)  # Raises when the account that owns the conversation is no longer connected.
 
 
 def event_details(run, action, contact, deal, row, channel):

@@ -1,4 +1,5 @@
 from flask import request
+from marshmallow import fields as f
 from sqlalchemy import func
 
 from ...common import APIError, add, commit, get, page, payload, query, require, update
@@ -8,8 +9,11 @@ from ...models import (
     AutomationRule,
     AutomationRun,
     Contact,
+    Opportunity,
 )
+from ...schemas.base import StrictSchema, ref
 from ...schemas.growth import RuleSchema
+from ...services.conditions import matches
 from ...services.rules import validate_rule
 from . import bp
 
@@ -105,3 +109,57 @@ def run_cancel(run_id):
 
 
 # Keep each template lookup within the selected account, including nested workflow actions.
+
+
+class PreviewSchema(StrictSchema):
+    rule = f.Nested(RuleSchema, required=True)
+    opportunity_id = ref(required=True)
+    reply_received = f.Boolean(load_default=False)
+
+
+@bp.post('/automations/preview')
+@require('owner', 'admin')
+def rule_preview():
+    data = payload(PreviewSchema)
+    rule = data['rule']
+    validate_rule(rule)
+    deal = get(Opportunity, data['opportunity_id'])
+    if not deal.contact_id:
+        raise APIError('Escolha um negócio vinculado a um contato.', 422)
+    contact = get(Contact, deal.contact_id)
+    eligible = (
+        not contact.archived
+        and (not rule.get('source') or rule['source'].casefold() == (contact.source or '').casefold())
+        and (not rule.get('required_tag') or rule['required_tag'] in (contact.tags or []))
+        and matches(rule.get('conditions', {}), contact, deal)
+        and (rule['event'] != 'opportunity.stage_idle' or deal.status == 'open')
+    )
+    steps = []
+    actions = rule.get('actions') or []
+    while eligible and actions:
+        for action in actions:
+            kind = action['kind']
+            if kind == 'branch':
+                waiting = bool(action.get('wait_reply_minutes'))
+                matched = data['reply_received'] if waiting else matches(action.get('conditions', {}), contact, deal)
+                steps.append(
+                    {
+                        'kind': kind,
+                        'outcome': ('Resposta recebida' if matched else 'Prazo venceu')
+                        if waiting
+                        else ('Sim' if matched else 'Não'),
+                    }
+                )
+                actions = action['yes' if matched else 'no']
+                break
+            applies = matches(action.get('conditions', {}), contact, deal)
+            steps.append(
+                {
+                    'kind': kind,
+                    'title': action.get('title'),
+                    'outcome': 'Executaria' if applies else 'Condição não atendida',
+                }
+            )
+        else:
+            break
+    return {'eligible': eligible, 'steps': steps}

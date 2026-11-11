@@ -14,15 +14,19 @@ from . import client, connections, messages
 def automation_message(contact, content, workspace, key, buttons=None, quick_replies=None):
     """An automated direct message in the contact's Instagram conversation. Returns None when there is no
     conversation or Instagram's 24-hour window has closed: those steps are dismissed, not failed."""
-    connection = connections.active_connection(workspace.id)
+    accounts = {row.instagram_id: row for row in connections.active_connections(workspace.id)}
+    if not accounts:
+        raise APIError('Reconecte o Instagram desta conta.', 409)
+    # The contact's most recent conversation on any connected account answers through that same account.
     thread = (
         InboxThread.query.filter_by(workspace_id=workspace.id, channel='instagram', contact_id=contact.id)
-        .filter(InboxThread.address.startswith(connection.instagram_id + ':'))
+        .filter(db.or_(*[InboxThread.address.startswith(key + ':') for key in accounts]))
         .order_by(InboxThread.updated_at.desc())
         .first()
     )
     if not thread:
         return None
+    connection = accounts[thread.address.split(':')[0]]
     last = (
         InboxMessage.query.filter_by(workspace_id=workspace.id, thread_id=thread.id, direction='in')
         .order_by(InboxMessage.created_at.desc())
@@ -71,9 +75,7 @@ def automation_message(contact, content, workspace, key, buttons=None, quick_rep
 def send_reply(thread, content, key, user_id):
     if len(content) > 1000:
         raise APIError('A resposta do Instagram aceita até 1.000 caracteres.', 422)
-    connection = connections.active_connection(thread.workspace_id)
-    if thread.address.split(':')[0] != connection.instagram_id:
-        raise APIError('Perfil da conversa não corresponde à conexão.', 409)
+    connection = connections.thread_connection(thread)
     existing = InboxMessage.query.filter_by(workspace_id=thread.workspace_id, idempotency_key=key).first()
     if existing:
         if existing.thread_id != thread.id or existing.direction != 'out' or existing.content != content:

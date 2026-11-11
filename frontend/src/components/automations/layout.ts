@@ -12,7 +12,7 @@ export type FlowNode =
   | { kind: 'trigger'; key: string; x: number; y: number }
   | { kind: 'step'; key: string; x: number; y: number; step: Step; path: StepPath; listPath: StepPath; index: number; last: boolean }
   | { kind: 'add'; key: string; x: number; y: number; listPath: StepPath; side?: 'yes' | 'no' };
-export type FlowEdge = { key: string; from: Point; to: Point; delay?: number; insert?: { listPath: StepPath; index: number }; side?: 'yes' | 'no'; dashed?: boolean };
+export type FlowEdge = { key: string; from: Point; to: Point; delay?: number; insert?: { listPath: StepPath; index: number }; side?: 'yes' | 'no'; waitReply?: boolean; dashed?: boolean };
 
 /** How many rows a path needs: a branch at its end stacks its "Sim" rows above its "Não" rows. */
 function rows(list: Step[]): number {
@@ -30,11 +30,11 @@ export function layoutFlow(steps: Step[]) {
   const link = (from: Point, to: Point, extra: Omit<FlowEdge, 'key' | 'from' | 'to'>, key: string) =>
     edges.push({ key, from: { x: from.x + NODE_W, y: from.y + PORT_Y }, to: { x: to.x, y: to.y + PORT_Y }, ...extra });
 
-  function place(list: Step[], listPath: StepPath, parent: Point, x: number, y: number, side?: 'yes' | 'no') {
+  function place(list: Step[], listPath: StepPath, parent: Point, x: number, y: number, side?: 'yes' | 'no', waitReply = false) {
     if (!list.length) {
       const key = 'add:' + listPath.join('.');
       nodes.push({ kind: 'add', key, x, y, listPath, side });
-      link(parent, { x, y }, { side, dashed: true }, key);
+      link(parent, { x, y }, { side, waitReply, dashed: true }, key);
       return;
     }
     let previous = parent;
@@ -44,11 +44,11 @@ export function layoutFlow(steps: Step[]) {
       const at = { x: auto.x + (step.offset?.x || 0), y: auto.y + (step.offset?.y || 0) };
       const key = path.join('.');
       nodes.push({ kind: 'step', key, ...at, step, path, listPath, index, last: index === list.length - 1 });
-      link(previous, at, { delay: step.delay_minutes, insert: { listPath, index }, side: index === 0 ? side : undefined }, key);
+      link(previous, at, { delay: step.delay_minutes, insert: { listPath, index }, side: index === 0 ? side : undefined, waitReply }, key);
       if (step.kind === 'branch') {
         const next = auto.x + COLUMN;
-        place(step.yes || [], [...path, 'yes'], at, next, auto.y, 'yes');
-        place(step.no || [], [...path, 'no'], at, next, auto.y + rows(step.yes || []) * ROW, 'no');
+        place(step.yes || [], [...path, 'yes'], at, next, auto.y, 'yes', !!step.wait_reply_minutes);
+        place(step.no || [], [...path, 'no'], at, next, auto.y + rows(step.yes || []) * ROW, 'no', !!step.wait_reply_minutes);
       }
       previous = at;
     });

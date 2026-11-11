@@ -1,7 +1,15 @@
 """Read models for the unified inbox. Account scope is explicit, independent of HTTP globals."""
 
 from ..extensions import db
-from ..models import Contact, InboxMessage, InboxThread, Opportunity, WhatsAppConversation, WhatsAppMessage
+from ..models import (
+    Contact,
+    InboxMessage,
+    InboxThread,
+    InstagramConnection,
+    Opportunity,
+    WhatsAppConversation,
+    WhatsAppMessage,
+)
 from ..tenancy import AccountContext
 from . import notifications
 
@@ -72,12 +80,21 @@ def list_threads(account: AccountContext):
         else set()
     )
     counts = notifications.thread_counts(account)
+    accounts = (
+        {row.instagram_id: row.username for row in account.query(InstagramConnection)}
+        if any(item['channel'] == 'instagram' for item in items)
+        else {}
+    )
     for item in items:
         contact = contacts.get(item.get('contact_id'))
         item['has_open_deal'] = item.get('contact_id') in open_deals
         if item['channel'] == 'instagram':
             username = (contact.custom_fields or {}).get('instagram_username') if contact else None
             item['display_address'] = '@' + username if username else 'Instagram'
+            # With several connected profiles, the inbox shows which one received the conversation.
+            receiver = accounts.get(str(item.get('address') or '').split(':')[0])
+            if receiver and len(accounts) > 1:
+                item['instagram_account'] = receiver
         key = (item['source'], item['id'])
         if key in counts:
             item['unread_count'] = counts[key]

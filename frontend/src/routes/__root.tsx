@@ -9,12 +9,14 @@ import '@/styles/modules.css';
 import '@/styles/inbox.css';
 import '@/styles/automations.css';
 import '@/styles/reports.css';
+import '@/styles/instagram.css';
 import '@/styles/projects.css';
 import '@/styles/forms.css';
 import '@/styles/builder.css';
 import '@/styles/funnels.css';
 import '@/styles/native-navigation.css';
 import { Providers } from '@/components/providers';
+import { ActionTooltip } from '@/components/layout/action-tooltip';
 import { NavigationProgress } from '@/components/layout/navigation-progress';
 
 export const Route = createRootRoute({
@@ -30,7 +32,7 @@ export const Route = createRootRoute({
   shellComponent: ({ children }) => (
     <html lang="pt-BR">
       <head><HeadContent /></head>
-      <body><Providers><NavigationProgress />{children}</Providers><Scripts /></body>
+      <body><Providers><NavigationProgress />{children}</Providers><ActionTooltip /><Scripts /></body>
     </html>
   ),
   component: Outlet,

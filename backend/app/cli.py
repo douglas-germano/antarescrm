@@ -31,6 +31,8 @@ def register_commands(app):
         from .services.communications import dispatch as dispatch_messages
         from .services.fishing import process as process_fishing
         from .services.history import process as process_history
+        from .services.instagram.insights import process as process_insights
+        from .services.instagram.publishing import process as process_posts
 
         while True:
             failed = False
@@ -38,6 +40,8 @@ def register_commands(app):
             try:
                 actions, messages = process(limit=50), (dispatch_messages(limit=20) if dispatch else [])
                 history_batches = process_history(limit=2)
+                process_posts(limit=5)
+                process_insights()
                 process_fishing(limit=1)
                 process_atlas()
                 if actions or messages or once:

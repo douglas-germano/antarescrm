@@ -112,6 +112,7 @@ export function ThreadList({
                   <time>{listTime(thread.last_message_at || thread.updated_at)}</time>
                 </span>
                 {thread.channel === 'instagram' && thread.display_address && thread.display_address !== 'Instagram' && thread.display_address !== name && <small className="wa-item-handle">{thread.display_address}</small>}
+                {thread.instagram_account && <small className="wa-item-handle">via @{thread.instagram_account}</small>}
                 <span className="wa-item-bottom">
                   <span className="wa-item-preview">{thread.preview || 'Conversa iniciada'}</span>
                   {thread.has_open_deal && <span className="wa-item-deal" data-tip="Tem negócio em aberto" aria-label="Tem negócio em aberto"><Handshake size={12} /></span>}

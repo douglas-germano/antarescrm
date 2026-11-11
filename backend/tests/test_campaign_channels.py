@@ -215,3 +215,39 @@ def test_campaign_and_template_permissions_and_channel_immutability(env):
         client.post('/api/v1/campaigns', headers=d['headers'](), json={'name': 'Email', 'content': 'Hello'}).status_code
         == 422
     )
+
+
+def test_campaign_archive_preserves_audience_and_blocks_further_send(env):
+    client, d = env
+    row = prepared(client, d)
+    headers = d['headers']()
+    path = '/api/v1/campaigns'
+    assert client.delete(f'{path}/{row["id"]}', headers=headers).status_code == 409
+
+    for _ in range(2):
+        response = action(client, d, row, 'archive')
+        assert response.status_code == 200
+        assert response.json['archived'] is True
+
+    assert client.get(path, headers=headers).json['total'] == 0
+    archived = client.get(path + '?archived=true', headers=headers).json['items']
+    assert [(item['id'], item['status'], item['recipient_count']) for item in archived] == [(row['id'], 'ready', 1)]
+    assert (
+        action(client, d, row, 'send', {'audience_hash': row['audience_hash'], 'consent_confirmed': True}).status_code
+        == 409
+    )
+    assert CampaignRecipient.query.filter_by(campaign_id=row['id']).count() == 1
+
+
+def test_campaign_management_requires_access_and_blocks_archive_during_delivery(env):
+    client, d = env
+    sending = queued(client, d)
+    assert action(client, d, sending, 'archive').status_code == 409
+    draft = create(client, d, channel='email', subject='Assunto')
+    path = f'/api/v1/campaigns/{draft["id"]}'
+    for who, status in [('member', 403), ('outsider', 404)]:
+        headers = d['headers'](d[who])
+        assert client.post(path + '/archive', headers=headers, json={}).status_code == status
+        assert client.delete(path, headers=headers).status_code == status
+    assert client.delete(path, headers=d['headers']()).status_code == 204
+    assert action(client, d, draft, 'archive').status_code == 404

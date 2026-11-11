@@ -20,6 +20,7 @@ import {
   Workflow,
   Filter,
   Mail,
+  Instagram,
 } from 'lucide-react';
 import { useSession } from '@/components/providers';
 import { useMessageNotifications } from '@/components/inbox/message-notifications';
@@ -27,13 +28,14 @@ import { DataState } from '@/components/ui';
 const links = [
   { href: '/', label: 'Visão geral', icon: House },
   { href: '/mensagens', label: 'Caixa de entrada', icon: MessageCircle },
+  { href: '/crm', label: 'Funil de vendas', icon: KanbanSquare },
   { href: '/automacoes', label: 'Automações', icon: Workflow },
   { href: '/campanhas', label: 'Campanhas', icon: Mail },
+  { href: '/instagram', label: 'Instagram', icon: Instagram },
   { href: '/formularios', label: 'Formulários', icon: FileInput },
   { href: '/funis', label: 'Funis de páginas', icon: Filter },
   { href: '/contatos', label: 'Contatos', icon: Users },
   { href: '/empresas', label: 'Empresas', icon: Building2 },
-  { href: '/crm', label: 'Funil de vendas', icon: KanbanSquare },
   { href: '/projetos', label: 'Projetos', icon: FolderKanban },
   { href: '/tarefas', label: 'Tarefas', icon: CheckSquare },
   { href: '/agenda', label: 'Atividades', icon: CalendarDays },

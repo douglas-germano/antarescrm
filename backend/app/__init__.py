@@ -59,6 +59,7 @@ def register_blueprints(app):
         growth,
         history,
         instagram,
+        instagram_content,
         operations,
         projects,
         reports,
@@ -84,6 +85,7 @@ def register_blueprints(app):
         operations,
         contact_views,
         instagram,
+        instagram_content,
         history,
         projects,
     ):

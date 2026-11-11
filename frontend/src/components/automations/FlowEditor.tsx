@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, ty
 import { Link } from '@tanstack/react-router';
 import { useAppRouter } from '@/lib/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Copy, Filter, GitBranch, LayoutGrid, Maximize2, Pencil, Plus, Trash2, X, Zap, ZoomIn, ZoomOut } from 'lucide-react';
-import { post, patch, refreshAll } from '@/lib/api';
+import { post, patch, refreshAll, useList } from '@/lib/api';
 import { useNotify } from '@/components/providers';
 import { Button, ConfirmDialog } from '@/components/ui';
 import { ConditionsEditor, emptyConditions, type Conditions } from '@/components/automations/conditions-editor';
@@ -19,6 +19,7 @@ import type { Row } from '@/lib/types';
 export type FlowDraft = {
   id?: string; name: string; event: string; source: string; required_tag: string; assignee_id: string;
   active: boolean; stop_on_reply: boolean; conditions: Conditions; steps: Step[];
+  stageDays?: number; bookingBefore?: number;
 };
 type Selection = 'trigger' | StepPath | null;
 type View = { x: number; y: number; z: number };
@@ -53,7 +54,7 @@ function EdgeControls({ edge, onInsert, disabled }: { edge: FlowEdge; onInsert?:
   return <>
     {edge.side && (
       <span className={'flow-branch-label ' + edge.side} style={{ left: edge.from.x + 18, top: edge.from.y + (edge.side === 'yes' ? -26 : 6) }}>
-        {edge.side === 'yes' ? <><Check size={11} />Sim</> : <><X size={11} />Não</>}
+        {edge.side === 'yes' ? <><Check size={11} />{edge.waitReply ? 'Respondeu' : 'Sim'}</> : <><X size={11} />{edge.waitReply ? 'Prazo venceu' : 'Não'}</>}
       </span>
     )}
     {!!edge.delay && <span className="flow-delay" style={{ left: mid.x, top: mid.y - 32 }}><Clock size={12} />Esperar {formatDelay(edge.delay)}</span>}
@@ -92,13 +93,20 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
   const [dirty, setDirty] = useState(!initial.id);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewDeal, setPreviewDeal] = useState('');
+  const [previewSearch, setPreviewSearch] = useState('');
+  const [previewReply, setPreviewReply] = useState(false);
+  const [preview, setPreview] = useState<{ eligible: boolean; steps: { kind: string; outcome: string; title?: string }[] } | null>(null);
+  const deals = useList(previewOpen ? '/opportunities?search=' + encodeURIComponent(previewSearch) : null);
+  const bookingTrigger = ['booking.created', 'booking.rescheduled'].includes(draft.event);
   const [editingName, setEditingName] = useState(!initial.id && !initial.name);
   const [removingBranch, setRemovingBranch] = useState<StepPath | null>(null);
   const lookups = {
     template: (id?: string) => templates.find((t) => t.id === id)?.name,
     stage: (id?: string) => stages.find((s) => s.id === id)?.name,
   };
-  const update = (patchDraft: Partial<FlowDraft>) => { setDraft((d) => ({ ...d, ...patchDraft })); setDirty(true); setFailure(''); };
+  const update = (patchDraft: Partial<FlowDraft>) => { setDraft((d) => ({ ...d, ...patchDraft })); setDirty(true); setFailure(''); setPreview(null); };
   const total = countSteps(draft.steps);
   const setSteps = (listPath: StepPath, edit: (list: Step[]) => Step[]) => update({ steps: editList(draft.steps, listPath, edit) });
   const updateStep = (path: StepPath, patchStep: Partial<Step>) => {
@@ -141,28 +149,39 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
     setSelected([...listPath, index + 1]);
   };
 
-  async function save() {
+  async function save(simulate = false) {
     if (busy) return;
-    if (!draft.name.trim()) { setEditingName(true); setFailure('Dê um nome à automação.'); return; }
+    if (!simulate && !draft.name.trim()) { setEditingName(true); setFailure('Dê um nome à automação.'); return; }
     if (!draft.steps.length) { setFailure('Adicione ao menos um passo depois do gatilho.'); return; }
+    if (draft.event === 'opportunity.stage_idle' && !draft.stageDays) { setSelected('trigger'); setFailure('Informe o prazo de permanência na etapa.'); return; }
     const broken = firstProblem(draft.steps, draft.event);
     if (broken) { setSelected(broken.path); setFailure(broken.problem); return; }
     setBusy(true);
     setFailure('');
     const body = {
       conditions: draft.conditions,
-      name: draft.name.trim(),
+      name: draft.name.trim() || 'Simulação',
       event: draft.event,
       source: draft.source.trim() || null,
       required_tag: draft.required_tag.trim() || null,
       assignee_id: draft.assignee_id || null,
       active: draft.active,
       stop_on_reply: draft.stop_on_reply,
-      task_title: draft.steps.find((step) => step.title)?.title || draft.name.trim(),
+      task_title: draft.steps.find((step) => step.title)?.title || draft.name.trim() || 'Simulação',
       due_days: 0,
-      actions: draft.steps.map(stepPayload),
+      actions: draft.steps.map((step, index) => ({
+        ...stepPayload(step),
+        ...(index === 0 && draft.event === 'opportunity.stage_idle' ? { stage_days: draft.stageDays } : {}),
+        ...(index === 0 && bookingTrigger && draft.bookingBefore !== undefined ? { booking_before_minutes: draft.bookingBefore } : {}),
+      })),
     };
     try {
+      if (simulate) {
+        setPreview(await post<NonNullable<typeof preview>>('/automations/preview', {
+          rule: body, opportunity_id: previewDeal, reply_received: previewReply,
+        }));
+        return;
+      }
       if (draft.id) await patch('/automations/' + draft.id, body);
       const created = draft.id ? null : await post<{ id: string }>('/automations', body);
       await refreshAll();
@@ -193,6 +212,13 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
           {Object.entries(EVENTS).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
         </select>
         <small>{EVENTS[draft.event]?.hint}</small></div>
+      {draft.event === 'opportunity.stage_idle' && <label className="field">Dias na mesma etapa
+        <input type="number" min={1} max={365} value={draft.stageDays || ''} onChange={(e) => update({ stageDays: Number(e.target.value) })} />
+      </label>}
+      {bookingTrigger && <label className="field">Minutos antes da reunião
+        <input type="number" min={0} max={43200} value={draft.bookingBefore ?? ''} placeholder="Opcional" onChange={(e) => update({ bookingBefore: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        <small>Se preencher, o fluxo começa em relação ao horário da reunião. Em branco, começa no evento.</small>
+      </label>}
       <div className="field"><label htmlFor="flow-source">Somente desta origem</label><input id="flow-source" maxLength={100} value={draft.source} placeholder="Opcional" onChange={(e) => update({ source: e.target.value })} /></div>
       <div className="field"><label htmlFor="flow-tag">Somente contatos com a tag</label><input id="flow-tag" maxLength={80} value={draft.required_tag} placeholder="Opcional" onChange={(e) => update({ required_tag: e.target.value })} /></div>
       <ConditionsEditor value={draft.conditions} onChange={(conditions) => update({ conditions })} />
@@ -206,9 +232,27 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
   } else if (step && stepPath && step.kind === 'branch') {
     const path = stepPath;
     panel = <>
-      <p className="muted">Quando o fluxo chegar aqui, o contato é avaliado. Se atender às condições, segue pelo caminho <b>Sim</b>; senão, pelo <b>Não</b>.</p>
+      <label className="field">Como decidir o caminho
+        <select value={step.wait_reply_minutes ? 'reply' : 'condition'} onChange={(e) => updateStep(path, {
+          wait_reply_minutes: e.target.value === 'reply' ? 2880 : undefined,
+          reply_channel: e.target.value === 'reply' ? 'whatsapp' : undefined,
+        })}>
+          <option value="condition">Avaliar condição</option><option value="reply">Aguardar resposta com prazo</option>
+        </select>
+      </label>
+      {!!step.wait_reply_minutes && <>
+        <label className="field">Canal da resposta
+          <select value={step.reply_channel || ''} onChange={(e) => updateStep(path, { reply_channel: e.target.value })}>
+            <option value="whatsapp">WhatsApp</option><option value="instagram">Instagram</option><option value="email">E-mail</option>
+          </select>
+        </label>
+        <label className="field">Prazo máximo em minutos
+          <input type="number" min={1} max={10080} value={step.wait_reply_minutes} onChange={(e) => updateStep(path, { wait_reply_minutes: Math.max(1, Number(e.target.value)) })} />
+          <small>O fluxo procura uma conversa única no canal escolhido. Desative a opção de interromper ao responder.</small>
+        </label>
+      </>}
       <DelayField key={pathKey(path)} minutes={step.delay_minutes} onChange={(minutes) => updateStep(path, { delay_minutes: minutes })} />
-      <ConditionsEditor label="Condições do caminho Sim" value={{ ...emptyConditions(), ...step.conditions }} onChange={(value) => updateStep(path, { conditions: value })} />
+      {!step.wait_reply_minutes && <ConditionsEditor label="Condições do caminho Sim" value={{ ...emptyConditions(), ...step.conditions }} onChange={(value) => updateStep(path, { conditions: value })} />}
       <div className="flow-panel-tools">
         <span className="spacer" />
         <Button variant="ghost" onClick={() => (countSteps([step]) > 1 ? setRemovingBranch(path) : removeStep(path))}><Trash2 size={15} />Excluir ramificação</Button>
@@ -269,6 +313,8 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
           <small>Só atua em negócios em aberto ligados ao evento.</small></div>
       )}
       {(step.kind === 'create_task' || step.kind === 'follow_up') && <>
+        <label className="checkbox-label"><input type="checkbox" checked={!!step.assign_deal_owner} onChange={(e) => updateStep(path, { assign_deal_owner: e.target.checked })} />Atribuir ao dono do negócio</label>
+        {step.assign_deal_owner && <small>Se o negócio estiver sem dono ativo, usa o responsável configurado no gatilho.</small>}
         <div className="field"><label>Título</label><input maxLength={180} aria-label="Título" value={step.title || ''} onChange={(e) => updateStep(path, { title: e.target.value })} /></div>
         <div className="field"><label>{step.kind === 'follow_up' ? 'Retorno em (dias)' : 'Prazo da tarefa (dias)'}</label><input type="number" min={0} max={365} aria-label="Dias" value={step.due_days} onChange={(e) => updateStep(path, { due_days: Number(e.target.value) })} /></div>
       </>}
@@ -410,7 +456,7 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
           <header>
             {branch ? <span className="flow-row-icon branch"><GitBranch size={15} /></span>
               : <span className={'flow-row-icon' + (isInstagram(s.kind) ? ' ig' : '')}>{actionIcon(s.kind)}</span>}
-            <strong>{branch ? 'Ramificação' : ACTIONS[s.kind] || s.kind}</strong>
+            <strong>{branch ? (s.wait_reply_minutes ? 'Aguardar resposta' : 'Ramificação') : ACTIONS[s.kind] || s.kind}</strong>
             {!branch && <small className="flow-index">{index + 1}</small>}
           </header>
           <div className="flow-node-body">
@@ -451,10 +497,29 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
               className={'switch' + (draft.active ? ' on' : '')} onClick={() => update({ active: !draft.active })}><span /></button>
             {draft.active ? 'Ativa' : 'Inativa'}
           </label>
-          <Button disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar'}</Button>
+          <Button variant="secondary" onClick={() => setPreviewOpen(!previewOpen)}>Testar fluxo</Button>
+          <Button disabled={busy} onClick={() => save()}>{busy ? 'Salvando…' : 'Salvar'}</Button>
         </div>
       </header>
       {failure && <p className="flow-error" role="alert">{failure}<button type="button" aria-label="Fechar aviso" onClick={() => setFailure('')}><X size={14} /></button></p>}
+
+      {previewOpen && <section className="flow-preview" aria-label="Testar fluxo">
+        <label className="field">Buscar negócio
+          <input value={previewSearch} onChange={(e) => { setPreviewSearch(e.target.value); setPreviewDeal(''); setPreview(null); }} />
+        </label>
+        <label className="field">Negócio para simulação
+          <select value={previewDeal} onChange={(e) => { setPreviewDeal(e.target.value); setPreview(null); }}>
+            <option value="">{deals.isLoading ? 'Carregando…' : 'Selecione um negócio'}</option>
+            {(deals.data || []).filter((deal) => deal.contact_id).map((deal) => <option key={deal.id} value={deal.id}>{deal.title}</option>)}
+          </select>
+        </label>
+        <label className="checkbox-label"><input type="checkbox" checked={previewReply} onChange={(e) => { setPreviewReply(e.target.checked); setPreview(null); }} />Simular resposta dentro do prazo</label>
+        <Button variant="secondary" disabled={!previewDeal || busy} onClick={() => save(true)}>Simular</Button>
+        <small>Usa os dados atuais do negócio. Nenhuma ação é executada.</small>
+        {preview && <div role="status">{preview.eligible
+          ? <ol>{preview.steps.map((item, index) => <li key={index}>{item.title || ACTIONS[item.kind] || 'Ramificação'} · {item.outcome}</li>)}</ol>
+          : 'O negócio e o contato não atendem aos filtros do gatilho.'}</div>}
+      </section>}
 
       <div className="flow-body">
         {panel && (

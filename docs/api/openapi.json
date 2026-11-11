@@ -4,12 +4,20 @@
       "Action": {
         "additionalProperties": false,
         "properties": {
+          "assign_deal_owner": {
+            "type": "boolean"
+          },
           "atlas_channel": {
             "enum": [
               "whatsapp",
               "instagram"
             ],
             "type": "string"
+          },
+          "booking_before_minutes": {
+            "maximum": 43200,
+            "minimum": 0,
+            "type": "integer"
           },
           "buttons": {
             "items": {
@@ -74,6 +82,19 @@
             "maxItems": 13,
             "type": "array"
           },
+          "reply_channel": {
+            "enum": [
+              "whatsapp",
+              "instagram",
+              "email"
+            ],
+            "type": "string"
+          },
+          "stage_days": {
+            "maximum": 365,
+            "minimum": 1,
+            "type": "integer"
+          },
           "stage_id": {
             "format": "uuid",
             "type": "string"
@@ -93,6 +114,11 @@
             "minLength": 1,
             "pattern": "\\S",
             "type": "string"
+          },
+          "wait_reply_minutes": {
+            "maximum": 10080,
+            "minimum": 1,
+            "type": "integer"
           },
           "yes": {
             "items": {
@@ -2829,6 +2855,27 @@
         ],
         "type": "object"
       },
+      "GrowthAutomationsPreviewInput": {
+        "additionalProperties": false,
+        "properties": {
+          "opportunity_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reply_received": {
+            "default": false,
+            "type": "boolean"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/GrowthRuleInput"
+          }
+        },
+        "required": [
+          "opportunity_id",
+          "rule"
+        ],
+        "type": "object"
+      },
       "GrowthFormInput": {
         "additionalProperties": false,
         "properties": {
@@ -2991,7 +3038,10 @@
               "message.received",
               "booking.created",
               "booking.cancelled",
+              "booking.rescheduled",
+              "task.completed",
               "opportunity.created",
+              "opportunity.stage_idle",
               "instagram.comment",
               "opportunity.stage_changed",
               "opportunity.won",
@@ -3070,7 +3120,10 @@
               "message.received",
               "booking.created",
               "booking.cancelled",
+              "booking.rescheduled",
+              "task.completed",
               "opportunity.created",
+              "opportunity.stage_idle",
               "instagram.comment",
               "opportunity.stage_changed",
               "opportunity.won",
@@ -3587,7 +3640,7 @@
         "additionalProperties": false,
         "properties": {
           "field": {
-            "pattern": "^(source|name|email|phone|tag|deal\\.(?:stage_id|status|amount)|comment\\.(?:text|media_id)|reply\\.text|custom\\.[a-z][a-z0-9_]{0,39})$",
+            "pattern": "^(source|name|email|phone|tag|deal\\.(?:stage_id|status|amount)|comment\\.(?:text|media_id)|reply\\.text|task\\.title|custom\\.[a-z][a-z0-9_]{0,39})$",
             "type": "string"
           },
           "operator": {
@@ -6407,6 +6460,71 @@
         ]
       }
     },
+    "/automations/preview": {
+      "post": {
+        "operationId": "growth_rule_preview_post_automations_preview",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrowthAutomationsPreviewInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "growth"
+        ]
+      }
+    },
     "/automations/process": {
       "post": {
         "operationId": "growth_process_jobs_post_automations_process",
@@ -7484,6 +7602,68 @@
       }
     },
     "/campaigns/{identifier}": {
+      "delete": {
+        "operationId": "brevo_delete_campaign_delete_campaigns_identifier",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "brevo"
+        ]
+      },
       "patch": {
         "operationId": "brevo_edit_patch_campaigns_identifier",
         "parameters": [
@@ -12200,6 +12380,189 @@
         ]
       }
     },
+    "/instagram/accounts": {
+      "get": {
+        "operationId": "instagram_accounts_get_instagram_accounts",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram"
+        ]
+      }
+    },
+    "/instagram/accounts/{connection_id}/insights": {
+      "get": {
+        "operationId": "instagram_content_account_insights_get_instagram_accounts_connection_id_insights",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram_content"
+        ]
+      }
+    },
+    "/instagram/accounts/{connection_id}/publishing-limit": {
+      "get": {
+        "operationId": "instagram_content_publishing_limit_get_instagram_accounts_connection_id_publishing_limit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram_content"
+        ]
+      }
+    },
     "/instagram/complete": {
       "post": {
         "operationId": "instagram_complete_post_instagram_complete",
@@ -12417,6 +12780,551 @@
         ],
         "tags": [
           "instagram"
+        ]
+      }
+    },
+    "/instagram/media": {
+      "post": {
+        "operationId": "instagram_content_media_upload_post_instagram_media",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram_content"
+        ]
+      }
+    },
+    "/instagram/media/{media_id}": {
+      "delete": {
+        "operationId": "instagram_content_media_delete_delete_instagram_media_media_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "media_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram_content"
+        ]
+      }
+    },
+    "/instagram/media/{media_id}/file": {
+      "get": {
+        "operationId": "instagram_content_media_file_get_instagram_media_media_id_file",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "media_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram_content"
+        ]
+      }
+    },
+    "/instagram/posts": {
+      "get": {
+        "operationId": "instagram_content_posts_get_instagram_posts",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram_content"
+        ]
+      },
+      "post": {
+        "operationId": "instagram_content_post_create_post_instagram_posts",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram_content"
+        ]
+      }
+    },
+    "/instagram/posts/{post_id}": {
+      "delete": {
+        "operationId": "instagram_content_post_delete_delete_instagram_posts_post_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram_content"
+        ]
+      },
+      "patch": {
+        "operationId": "instagram_content_post_update_patch_instagram_posts_post_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram_content"
+        ]
+      }
+    },
+    "/instagram/posts/{post_id}/cancel": {
+      "post": {
+        "operationId": "instagram_content_post_cancel_post_instagram_posts_post_id_cancel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram_content"
+        ]
+      }
+    },
+    "/instagram/posts/{post_id}/schedule": {
+      "post": {
+        "operationId": "instagram_content_post_schedule_post_instagram_posts_post_id_schedule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "post_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "instagram_content"
         ]
       }
     },
@@ -15652,6 +16560,55 @@
         },
         "tags": [
           "funnels"
+        ]
+      }
+    },
+    "/public/instagram-media/{token}": {
+      "get": {
+        "operationId": "instagram_content_media_public_get_public_instagram_media_token",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "instagram_content"
         ]
       }
     },

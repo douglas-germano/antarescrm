@@ -429,3 +429,33 @@ def test_calendar_shows_each_booking_once_and_tracks_reschedule_and_cancel(env, 
     assert len(events) == 1 and events[0]['date'].startswith('2030-01-08T14:00:00')
     assert client.post('/api/v1/public/bookings/' + token + '/cancel', json={}).status_code == 200
     assert client.get(path, headers=d['headers']()).json['items'] == []
+
+
+def test_booking_automation_moves_reminder_and_cancels_open_task(env, monkeypatch):
+    from app.models import Task
+    from app.services import automations
+
+    client, d = env
+    calendar = setup_calendar(d, monkeypatch)
+    clock = datetime(2030, 1, 7, 12, tzinfo=timezone.utc)
+    monkeypatch.setattr(booking, 'now', lambda: clock)
+    monkeypatch.setattr(automations, 'now', lambda: clock)
+    rule(
+        d, event='booking.created', actions=[{'kind': 'create_task', 'title': 'Preparar', 'booking_before_minutes': 60}]
+    )
+    rule(d, event='booking.rescheduled', actions=[{'kind': 'add_tag', 'tag': 'Reagendou'}])
+    booked = client.post('/api/v1/public/calendars/' + calendar.id + '/book', json=reserve_body())
+    assert booked.status_code == 200, booked.json
+    path = '/api/v1/public/bookings/' + booked.json['token']
+    reminder = AutomationJob.query.one()
+    assert reminder.scheduled_at.hour == 12
+    moved = client.post(path + '/reschedule', json={'starts_at': '2030-01-08T14:00:00+00:00'})
+    assert moved.status_code == 200, moved.json
+    assert reminder.scheduled_at.hour == 13
+    process()
+    assert 'Reagendou' in Contact.query.one().tags
+    clock = reminder.scheduled_at
+    process()
+    assert Task.query.one().status == 'todo'
+    assert client.post(path + '/cancel', json={}).status_code == 200
+    assert Task.query.one().status == 'cancelled'

@@ -11,10 +11,23 @@ MAX_DEPTH = 5  # Branches inside branches.
 def validate_rule(data, current=None):
     user_ref(data.get('assignee_id'))
     event = data.get('event', current.event if current else None)
+    actions = data.get('actions', current.actions if current else [])
+    if event == 'opportunity.stage_idle' and (not actions or not actions[0].get('stage_days')):
+        raise APIError('Informe quantos dias o negócio deve permanecer na etapa.', 422)
+    stop_on_reply = data.get('stop_on_reply', current.stop_on_reply if current else False)
+    if stop_on_reply and has_reply_wait(actions):
+        raise APIError('Desative a interrupção ao responder para usar a espera com dois caminhos.', 422)
     if 'actions' in data:
         data['actions'] = validate_steps(data['actions'], [0], 0, event)
     elif 'event' in data and current:
         validate_steps(current.actions or [], [0], 0, event)
+
+
+def has_reply_wait(steps):
+    return any(
+        step.get('wait_reply_minutes') or has_reply_wait(step.get('yes', [])) or has_reply_wait(step.get('no', []))
+        for step in steps
+    )
 
 
 def validate_steps(steps, counter, depth, event):
@@ -24,6 +37,16 @@ def validate_steps(steps, counter, depth, event):
         counter[0] += 1
         if counter[0] > MAX_STEPS:
             raise APIError(f'Uma automação aceita até {MAX_STEPS} passos somando todos os caminhos.', 422)
+        if 'stage_days' in action and (depth or index or event != 'opportunity.stage_idle'):
+            raise APIError('Configure o prazo de permanência no gatilho de negócio parado.', 422)
+        if 'booking_before_minutes' in action and (
+            depth or index or event not in ('booking.created', 'booking.rescheduled')
+        ):
+            raise APIError('Configure a antecedência no gatilho de agendamento.', 422)
+        if action.get('wait_reply_minutes') and action['kind'] != 'branch':
+            raise APIError('A espera por resposta precisa de dois caminhos.', 422)
+        if action.get('assign_deal_owner') and action['kind'] not in ('create_task', 'follow_up'):
+            raise APIError('Atribua ao dono do negócio em uma tarefa ou retorno.', 422)
         if action['kind'] == 'branch':
             validate_branch(action, index, len(steps), counter, depth, event)
         else:
@@ -41,7 +64,9 @@ def validate_branch(action, index, total, counter, depth, event):
         )
     if depth >= MAX_DEPTH:
         raise APIError(f'Use no máximo {MAX_DEPTH} ramificações uma dentro da outra.', 422)
-    if not (action.get('conditions') or {}).get('items'):
+    if action.get('wait_reply_minutes') and not action.get('reply_channel'):
+        raise APIError('Escolha o canal em que a resposta deve chegar.', 422)
+    if not action.get('wait_reply_minutes') and not (action.get('conditions') or {}).get('items'):
         raise APIError('Defina ao menos uma condição para a ramificação.', 422)
     action['yes'] = validate_steps(action.get('yes', []), counter, depth + 1, event)
     action['no'] = validate_steps(action.get('no', []), counter, depth + 1, event)

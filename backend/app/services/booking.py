@@ -2,6 +2,7 @@
 
 import hashlib
 from datetime import datetime, time, timedelta, timezone
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from flask import current_app
@@ -189,7 +190,7 @@ def reserve(calendar, data):
 
     if created:
         emit(calendar.workspace_id, 'contact.created', contact.id, contact)
-    emit(calendar.workspace_id, 'booking.created', row.id, contact)
+    emit(calendar.workspace_id, 'booking.created', row.id, contact, context={'booking_id': row.id})
     db.session.add(
         AuditLog(workspace_id=calendar.workspace_id, action='public_booking', resource='bookings', resource_id=row.id)
     )
@@ -205,8 +206,9 @@ def cancel(row):
     if row.status != 'cancelled':
         row.status = 'cancelled'
         db.session.get(Activity, row.activity_id).status = 'cancelled'
-        from .automations import emit
+        from .automations import emit, sync_booking_jobs
 
+        sync_booking_jobs(row)
         emit(row.workspace_id, 'booking.cancelled', row.id, db.session.get(Contact, row.contact_id))
         db.session.add(
             AuditLog(workspace_id=row.workspace_id, action='cancel_booking', resource='bookings', resource_id=row.id)
@@ -229,9 +231,20 @@ def reschedule(row, starts_at):
     db.session.flush()
     if not slot_available(calendar, starts_at):
         raise APIError('Este horário não está mais disponível.', 409)
+    previous_start = row.starts_at
     row.starts_at, row.ends_at = starts_at, starts_at + timedelta(minutes=calendar.duration_minutes)
     row.buffer_minutes, row.status = calendar.buffer_minutes, 'confirmed'
     activity.scheduled_at, activity.status = starts_at, 'pending'
+    from .automations import emit, sync_booking_jobs
+
+    sync_booking_jobs(row, previous_start)
+    emit(
+        row.workspace_id,
+        'booking.rescheduled',
+        str(uuid4()),
+        db.session.get(Contact, row.contact_id),
+        context={'booking_id': row.id},
+    )
     db.session.add(
         AuditLog(workspace_id=row.workspace_id, action='reschedule_booking', resource='bookings', resource_id=row.id)
     )

@@ -237,17 +237,8 @@ html:has(.activities-page) { scrollbar-gutter: stable; }
   .kanban-card .deal-actions { max-height: 0; margin-top: 0; padding-top: 0; border-top-color: transparent; overflow: hidden; opacity: 0; transition: max-height .18s var(--ease), opacity .15s, margin .18s, padding .18s; }
   .kanban-card:hover .deal-actions, .kanban-card:focus-within .deal-actions { max-height: 40px; margin-top: var(--space-1); padding-top: var(--space-1); border-top-color: #f0f0f0; opacity: 1; overflow: visible; }
 }
-/* Deal tooltips: the first action and the meta indicators sit at the card edges. */
-.kanban-card-meta [data-tip] { overflow: visible; }
-.deal-actions > [data-tip]:first-child::after { left: 0; transform: translateY(4px); }
-.deal-actions .spacer ~ [data-tip]::after, .kanban-card-meta [data-tip]::after { left: auto; right: 0; transform: translateY(4px); }
-.deal-actions > [data-tip]:first-child:is(:hover,:focus-visible,:focus-within)::after,
-.deal-actions .spacer ~ [data-tip]:is(:hover,:focus-visible,:focus-within)::after,
-.kanban-card-meta [data-tip]:is(:hover,:focus-visible,:focus-within)::after { transform: translateY(0); }
 /* Projetos board: owner initials, done state and a title row with the check. */
 .owner-avatar { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #ececec; color: var(--foreground); font-size: 9px; font-weight: 700; letter-spacing: .02em; flex-shrink: 0; }
-.kanban-card-meta .owner-avatar::after { left: auto; right: 0; transform: translateY(4px); }
-.kanban-card-meta .owner-avatar:hover::after { transform: translateY(0); }
 .project-card-title { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
 .project-card-title .kanban-card-title { flex: 1; min-width: 0; }
 .project-done { display: inline-flex; color: #2e7d4f; flex-shrink: 0; }
@@ -315,9 +306,6 @@ html:has(.activities-page) { scrollbar-gutter: stable; }
 .calendar-event > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-event.late { background: var(--mint); }
 .calendar-event.late > span, .calendar-event.late time { color: var(--primary-hover); }
-.calendar-cell:nth-child(7n+1) [data-tip]::after { left: 0; transform: translateY(4px); }
-.calendar-cell:nth-child(7n) [data-tip]::after { left: auto; right: 0; transform: translateY(4px); }
-.calendar-cell:nth-child(7n+1) [data-tip]:hover::after, .calendar-cell:nth-child(7n) [data-tip]:hover::after { transform: translateY(0); }
 .calendar-more { align-self: flex-start; padding: 2px 6px; border-radius: 6px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; }
 .calendar-more:hover { background: #ececee; color: var(--foreground); }
 .kind-label { --kind: #9a9c9e; display: inline-flex; align-items: center; gap: 6px; }

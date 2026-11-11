@@ -1,5 +1,6 @@
 """Public Instagram service API; implementation is divided by responsibility."""
 
+from .client import GraphError as GraphError
 from .client import cipher as cipher
 from .client import configured as configured
 from .client import fetch_account as fetch_account
@@ -12,9 +13,13 @@ from .comments import comment_action as comment_action
 from .comments import process_comment as process_comment
 from .connections import SUBSCRIBED_FIELDS as SUBSCRIBED_FIELDS
 from .connections import active_connection as active_connection
+from .connections import active_connections as active_connections
 from .connections import connect as connect
 from .connections import subscribe as subscribe
 from .connections import subscription as subscription
+from .connections import thread_connection as thread_connection
+from .connections import token as token
+from .connections import usable as usable
 from .connections import verify_delivery as verify_delivery
 from .events import process_event as process_event
 from .events import receive as receive

@@ -371,6 +371,51 @@ test('campaigns offer both channels and models while inbox keeps only conversati
   await context.close();
 });
 
+test('shared tooltips stay visible above table headers and work with keyboard focus', async () => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  try {
+    await context.addCookies([{ name: 'crm_access', value: 'fixture-session', url: origin }]);
+    await context.route('**/api/backend/campaigns?*', route => route.fulfill({ json: {
+      items: [{ id: 'campaign', name: 'Campanha teste', channel: 'email', status: 'draft', archived: false, audience: {}, metrics: {}, recipient_count: 0 }],
+      page: 1, per_page: 25, pages: 1, total: 1,
+    } }));
+    const page = await context.newPage();
+    page.setDefaultTimeout(5000);
+    await page.goto(origin + '/campanhas');
+    const remove = page.getByRole('button', { name: 'Apagar Campanha teste' });
+    const tooltip = page.getByRole('tooltip');
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await remove.hover();
+      await tooltip.waitFor();
+      assert.equal(await tooltip.textContent(), 'Apagar rascunho');
+      const bounds = await tooltip.boundingBox();
+      assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
+      assert.ok(await tooltip.evaluate(element => {
+        const { left, top, width, height } = element.getBoundingClientRect();
+        element.style.pointerEvents = 'auto';
+        const visible = document.elementFromPoint(left + width / 2, top + height / 2) === element;
+        element.style.removeProperty('pointer-events');
+        return visible;
+      }));
+      await page.keyboard.press('Escape');
+      await tooltip.waitFor({ state: 'hidden' });
+      await page.mouse.move(0, 0);
+    }
+    await page.goto(origin + '/tarefas');
+    const edit = page.getByRole('button', { name: 'Editar Tarefa 01', exact: true });
+    await page.keyboard.press('Tab');
+    await edit.focus();
+    await tooltip.waitFor();
+    assert.equal(await tooltip.textContent(), 'Editar');
+    await page.keyboard.press('Tab');
+    await tooltip.waitFor();
+    assert.equal(await tooltip.textContent(), 'Duplicar');
+  } finally {
+    await context.close();
+  }
+});
+
 test('inbox creates deals for linked contacts, selected contacts and new contacts without leaving the chat', async () => {
   const context = await browser.newContext();
   await context.addCookies([{ name: 'crm_access', value: 'fixture-session', url: origin }]);

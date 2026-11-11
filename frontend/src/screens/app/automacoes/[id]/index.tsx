@@ -29,6 +29,8 @@ function fromRule(rule: Row, copy = false): FlowDraft {
     stop_on_reply: rule.stop_on_reply || false,
     conditions: { ...emptyConditions(), ...rule.conditions },
     steps: stepsOf(rule),
+    stageDays: rule.actions?.[0]?.stage_days,
+    bookingBefore: rule.actions?.[0]?.booking_before_minutes,
   };
 }
 

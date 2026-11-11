@@ -17,9 +17,25 @@ def validate_task(data):
 
 
 def sync_completion(row, data):
-    if 'status' in data:
+    if 'status' in data and (row is None or row.status != data['status']):
         data['completed_at'] = now() if data['status'] == 'done' else None
     return data
+
+
+def emit_completion(row):
+    from ..services.automations import emit
+
+    deal = get(Opportunity, row.opportunity_id) if row.opportunity_id else None
+    contact_id = row.contact_id or (deal.contact_id if deal else None)
+    if contact_id:
+        emit(
+            g.workspace_id,
+            'task.completed',
+            row.id,
+            get(Contact, contact_id),
+            row.opportunity_id,
+            context={'task_title': row.title},
+        )
 
 
 @bp.get('/tasks')
@@ -36,16 +52,22 @@ def task_create():
     data = payload(TaskSchema)
     validate_task(data)
     data.setdefault('assignee_id', g.user.id)
-    return commit(add(Task, sync_completion(None, data)), 201)
+    row = add(Task, sync_completion(None, data))
+    if row.status == 'done':
+        emit_completion(row)
+    return commit(row, 201)
 
 
 @bp.patch('/tasks/<uuid:task_id>')
 @require()
 def task_update(task_id):
-    row = get(Task, task_id)
+    row = get(Task, task_id, lock=True)
     data = payload(TaskSchema, partial=True)
     validate_task(data)
+    completed = data.get('status') == 'done' and row.status != 'done'
     update(row, sync_completion(row, data))
+    if completed:
+        emit_completion(row)
     return commit(row)
 
 

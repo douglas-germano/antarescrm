@@ -6,6 +6,9 @@ export const EVENTS: Record<string, { label: string; hint: string }> = {
   'form.submitted': { label: 'Formulário recebido', hint: 'Alguém preenche um formulário público.' },
   'message.received': { label: 'Mensagem recebida', hint: 'O contato responde por qualquer canal.' },
   'booking.created': { label: 'Agendamento recebido', hint: 'Um horário é reservado na agenda pública.' },
+  'booking.rescheduled': { label: 'Agendamento reagendado', hint: 'O horário de uma reserva muda.' },
+  'task.completed': { label: 'Tarefa concluída', hint: 'Uma tarefa vinculada a um contato ou negócio é concluída pela primeira vez.' },
+  'opportunity.stage_idle': { label: 'Negócio parado na etapa', hint: 'Um negócio permanece aberto na mesma etapa pelo prazo definido. Use uma condição para selecionar a etapa.' },
   'booking.cancelled': { label: 'Agendamento cancelado', hint: 'Uma reserva é cancelada.' },
   'instagram.comment': { label: 'Comentário no Instagram', hint: 'Alguém comenta em uma publicação da conta conectada. Respostas a comentários e comentários da própria conta são ignorados.' },
   'opportunity.created': { label: 'Negócio criado', hint: 'Um negócio é aberto no funil.' },
@@ -36,6 +39,11 @@ export type LinkButton = { title: string; url: string };
 
 export type Step = {
   conditions?: Conditions;
+  wait_reply_minutes?: number;
+  reply_channel?: string;
+  stage_days?: number;
+  booking_before_minutes?: number;
+  assign_deal_owner?: boolean;
   kind: string;
   title?: string;
   template_id?: string;
@@ -129,6 +137,7 @@ export function stepsOf(rule: Record<string, any>): Step[] {
 export function describeStep(step: Step, lookups: { template: (id?: string) => string | undefined; stage: (id?: string) => string | undefined }) {
   switch (step.kind) {
     case 'branch': {
+      if (step.wait_reply_minutes) return `Aguardar resposta por até ${formatDelay(step.wait_reply_minutes)}`;
       const count = step.conditions?.items?.length || 0;
       return `Se ${count === 1 ? 'a condição for atendida' : `${step.conditions?.mode === 'any' ? 'alguma das' : 'as'} ${count} condições forem atendidas`}, segue pelo Sim; senão, pelo Não.`;
     }
@@ -164,7 +173,8 @@ export const RECIPES = [
 
 /** Fields each action needs before the rule can be saved; returns the first problem or null. */
 export function stepProblem(step: Step, event?: string): string | null {
-  if (step.kind === 'branch' && !step.conditions?.items?.length) return 'Defina a condição que divide os caminhos.';
+  if (step.kind === 'branch' && step.wait_reply_minutes && !step.reply_channel) return 'Escolha o canal da resposta.';
+  if (step.kind === 'branch' && !step.wait_reply_minutes && !step.conditions?.items?.length) return 'Defina a condição que divide os caminhos.';
   if (step.kind === 'send_message' && !step.template_id) return 'Escolha o modelo de mensagem.';
   if ((step.kind === 'reply_comment' || INSTAGRAM_DMS.includes(step.kind)) && !step.content?.trim()) return 'Escreva o texto da mensagem.';
   if (INSTAGRAM_DMS.includes(step.kind)) {
@@ -190,7 +200,7 @@ const offsetOf = (step: Step) =>
 /** The API payload for one step: only the fields its action uses. */
 export function stepPayload(step: Step): Record<string, unknown> {
   if (step.kind === 'branch') {
-    return { kind: 'branch', conditions: step.conditions || emptyConditions(), delay_minutes: step.delay_minutes, due_days: 0,
+    return { kind: 'branch', ...(step.wait_reply_minutes ? { wait_reply_minutes: step.wait_reply_minutes, reply_channel: step.reply_channel } : {}), conditions: step.conditions || emptyConditions(), delay_minutes: step.delay_minutes, due_days: 0,
       yes: (step.yes || []).map(stepPayload), no: (step.no || []).map(stepPayload), ...offsetOf(step) };
   }
   return {
@@ -206,6 +216,6 @@ export function stepPayload(step: Step): Record<string, unknown> {
       : step.kind === 'reply_comment' ? { content: step.content }
       : step.kind === 'add_tag' ? { tag: step.tag }
       : step.kind === 'move_stage' ? { stage_id: step.stage_id }
-      : { title: step.title }),
+      : { title: step.title, ...(step.assign_deal_owner ? { assign_deal_owner: true } : {}) }),
   };
 }

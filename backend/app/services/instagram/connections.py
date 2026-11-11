@@ -12,25 +12,25 @@ from . import client, profiles
 SUBSCRIBED_FIELDS = 'messages'
 
 
-def connect(workspace_id, token, expires_in=None):
+def connect(workspace_id, token, expires_in=None, scopes=None):
+    """Links (or re-authorizes) a professional account. A workspace may hold several accounts; one account
+    belongs to a single workspace, so client data never mixes."""
     data = client.profile(token)
     identifier = str(data['user_id'])
-    other = InstagramConnection.query.filter_by(instagram_id=identifier).first()
-    if other and other.workspace_id != workspace_id:
+    row = InstagramConnection.query.filter_by(instagram_id=identifier).first()
+    if row and row.workspace_id != workspace_id:
         raise APIError('Este Instagram já está vinculado a outra conta de cliente.', 409)
-    row = InstagramConnection.query.filter_by(workspace_id=workspace_id).first()
-    if row and row.instagram_id != identifier and row.active:
-        raise APIError('Desvincule o perfil atual antes de conectar outro Instagram.', 409)
     if not row:
         row = InstagramConnection(workspace_id=workspace_id, instagram_id=identifier)
         db.session.add(row)
-    row.instagram_id = identifier
     row.username, row.encrypted_token, row.active = (
         data['username'],
         client.cipher().encrypt(token.encode()).decode(),
         True,
     )
     row.expires_at = now() + timedelta(seconds=int(expires_in)) if expires_in else None
+    if scopes:
+        row.scopes = ','.join(sorted({s.strip() for s in str(scopes).split(',') if s.strip()}))[:2000]
     profiles.apply_account(row, data)
     db.session.flush()
     return row
@@ -82,8 +82,40 @@ def verify_delivery(connection):
     }
 
 
-def active_connection(workspace_id):
-    row = InstagramConnection.query.filter_by(workspace_id=workspace_id, active=True).first()
-    if not row or (row.expires_at and row.expires_at <= now()):
+def usable(row):
+    return bool(row and row.active and row.encrypted_token and (not row.expires_at or row.expires_at > now()))
+
+
+def active_connections(workspace_id):
+    rows = (
+        InstagramConnection.query.filter_by(workspace_id=workspace_id, active=True)
+        .order_by(InstagramConnection.created_at, InstagramConnection.id)
+        .all()
+    )
+    return [row for row in rows if usable(row)]
+
+
+def active_connection(workspace_id, connection_id=None):
+    """The requested account, or the oldest usable one when none is named (single-account callers)."""
+    query = InstagramConnection.query.filter_by(workspace_id=workspace_id, active=True)
+    if connection_id:
+        row = query.filter_by(id=str(connection_id)).first()
+    else:
+        row = next(iter(active_connections(workspace_id)), None)
+    if not usable(row):
         raise APIError('Reconecte o Instagram desta conta.', 409)
     return row
+
+
+def thread_connection(thread):
+    """The account that owns an Instagram conversation (its address is `<instagram_id>:<peer>`)."""
+    row = InstagramConnection.query.filter_by(
+        workspace_id=thread.workspace_id, instagram_id=(thread.address or '').split(':')[0], active=True
+    ).first()
+    if not usable(row):
+        raise APIError('Reconecte o Instagram que recebeu esta conversa.', 409)
+    return row
+
+
+def token(connection):
+    return client.cipher().decrypt(connection.encrypted_token.encode()).decode()

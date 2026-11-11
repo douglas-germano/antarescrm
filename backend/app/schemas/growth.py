@@ -92,6 +92,11 @@ class ActionSchema(StrictSchema):
     tag = text(80)
     stage_id = ref()
     delay_minutes = f.Integer(validate=validate.Range(min=0, max=525600), load_default=0)
+    wait_reply_minutes = f.Integer(validate=validate.Range(min=1, max=10080))
+    reply_channel = choice('whatsapp instagram email')
+    stage_days = f.Integer(validate=validate.Range(min=1, max=365))
+    booking_before_minutes = f.Integer(validate=validate.Range(min=0, max=43200))
+    assign_deal_owner = f.Boolean()
     due_days = f.Integer(validate=validate.Range(min=0, max=365), load_default=0)
     # A branch splits the flow: `yes` runs when its conditions match, `no` otherwise.
     yes = f.List(f.Nested(lambda: ActionSchema()), validate=validate.Length(max=10))
@@ -109,7 +114,7 @@ class RuleSchema(StrictSchema):
     actions = f.List(f.Nested(ActionSchema), validate=validate.Length(max=10))
     name = text(150, required=True)
     event = choice(
-        'contact.created form.submitted message.received booking.created booking.cancelled opportunity.created instagram.comment opportunity.stage_changed opportunity.won opportunity.lost atlas.handoff',
+        'contact.created form.submitted message.received booking.created booking.cancelled booking.rescheduled task.completed opportunity.created opportunity.stage_idle instagram.comment opportunity.stage_changed opportunity.won opportunity.lost atlas.handoff',
         required=True,
     )
     source = text(100, allow_none=True)

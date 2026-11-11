@@ -132,6 +132,9 @@
 .flow-topbar-actions { display: flex; align-items: center; gap: var(--space-4); margin-left: auto; }
 .flow-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin: 0; padding: 10px var(--page-pad-x); background: #fbeeea; color: #8f2a2a; font-size: 13px; font-weight: 600; flex-shrink: 0; }
 .flow-error button { display: grid; background: transparent; color: inherit; padding: 4px; }
+.flow-preview { display: grid; gap: var(--space-2); padding: var(--space-3); max-height: 40vh; overflow: auto; }
+.flow-preview .field { max-width: 420px; }
+.flow-preview > button { justify-self: start; }
 .flow-body { position: relative; flex: 1; min-height: 0; display: flex; }
 .flow-canvas { position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; background-color: #f7f7f8; background-image: radial-gradient(#d9d9de 1px, transparent 1px); background-size: 18px 18px; }
 .flow-canvas.dragging, .flow-canvas.dragging * { cursor: grabbing !important; }

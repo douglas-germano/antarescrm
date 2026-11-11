@@ -10,7 +10,7 @@ class PredicateSchema(StrictSchema):
     field = f.String(
         required=True,
         validate=validate.Regexp(
-            r'^(source|name|email|phone|tag|deal\.(?:stage_id|status|amount)|comment\.(?:text|media_id)|reply\.text|custom\.[a-z][a-z0-9_]{0,39})$'
+            r'^(source|name|email|phone|tag|deal\.(?:stage_id|status|amount)|comment\.(?:text|media_id)|reply\.text|task\.title|custom\.[a-z][a-z0-9_]{0,39})$'
         ),
     )
     operator = choice('equals not_equals contains exists gte lt', required=True)
@@ -29,6 +29,8 @@ def matches(conditions, contact, deal=None, context=None):
         actual = (
             (context or {}).get(key[8:])
             if key.startswith('comment.')
+            else (context or {}).get('task_title')
+            if key == 'task.title'
             else (context or {}).get('reply_text')
             if key == 'reply.text'
             else getattr(deal, key[5:], None)

@@ -14,18 +14,59 @@ from ..services import instagram as service
 
 bp = Blueprint('instagram', __name__)
 
+SCOPES = (
+    'instagram_business_basic',
+    'instagram_business_manage_messages',
+    'instagram_business_manage_comments',
+    'instagram_business_content_publish',
+    'instagram_business_manage_insights',
+)
+
+
+def chosen(data=None):
+    """The account a request acts on: `connection_id` from the body or query, else the oldest usable one."""
+    data = data if data is not None else (request.get_json(silent=True) or {})
+    identifier = data.get('connection_id') or request.args.get('connection_id')
+    if identifier is not None and not isinstance(identifier, str):
+        raise APIError('Conta inválida.', 422)
+    return identifier
+
+
+def describe(row):
+    return {**row.to_dict(), 'connected': service.usable(row)}
+
 
 @bp.get('/instagram/connection')
 @require('owner', 'admin')
 def connection():
-    row = query(InstagramConnection).first()
+    """All Instagram profiles of this workspace. `connection` keeps the first one for older screens."""
+    rows = query(InstagramConnection).order_by(InstagramConnection.created_at, InstagramConnection.id).all()
+    rows = [row for row in rows if row.active] + [row for row in rows if not row.active]
     if service.configured():
-        service.refresh_account(row)
+        for row in rows:
+            service.refresh_account(row)
+    items = [describe(row) for row in rows]
+    first = next((item for item in items if item['connected']), items[0] if items else None)
     return {
         'configured': service.configured(),
-        'connection': row.to_dict() if row else None,
-        'connected': bool(row and row.active and (not row.expires_at or row.expires_at > now())),
+        'connection': first,
+        'connections': items,
+        'connected': any(item['connected'] for item in items),
     }
+
+
+@bp.get('/instagram/accounts')
+@require()
+def accounts():
+    """Connected profiles for the publishing and metrics screens, available to the whole team."""
+    rows = (
+        query(InstagramConnection)
+        .filter_by(active=True)
+        .order_by(InstagramConnection.created_at, InstagramConnection.id)
+        .all()
+    )
+    keys = ('id', 'username', 'name', 'profile_picture_url', 'expires_at', 'can_publish', 'can_read_insights')
+    return {'items': [{key: describe(row)[key] for key in (*keys, 'connected')} for row in rows]}
 
 
 @bp.post('/instagram/connect')
@@ -50,7 +91,7 @@ def start():
             {
                 'client_id': current_app.config['INSTAGRAM_APP_ID'],
                 'redirect_uri': current_app.config['INSTAGRAM_REDIRECT_URI'],
-                'scope': 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments',
+                'scope': ','.join(SCOPES),
                 'response_type': 'code',
                 'state': state,
                 'enable_fb_login': '0',
@@ -79,7 +120,10 @@ def complete():
     row.consumed = True
     db.session.commit()  # Consume even on failed exchange; do not reuse provider authorization codes.
     result = service.oauth_tokens(code)
-    connection = service.connect(g.workspace_id, result['access_token'], result['expires_in'])
+    # Instagram Login grants the requested set as a whole; record it when the response omits it.
+    connection = service.connect(
+        g.workspace_id, result['access_token'], result['expires_in'], result.get('permissions') or ','.join(SCOPES)
+    )
     db.session.commit()
     try:
         service.subscribe(connection)  # Without this the Instagram Login API never delivers message webhooks.
@@ -93,14 +137,19 @@ def complete():
 @require('owner', 'admin')
 @limiter.limit('10 per minute')
 def verify():
-    row = service.active_connection(g.workspace_id)
+    row = service.active_connection(g.workspace_id, chosen())
     return service.verify_delivery(row)
 
 
 @bp.post('/instagram/disconnect')
 @require('owner', 'admin')
 def disconnect():
-    row = query(InstagramConnection).first()
+    identifier = chosen()
+    row = (
+        query(InstagramConnection).filter_by(id=identifier).first()
+        if identifier
+        else query(InstagramConnection).filter_by(active=True).order_by(InstagramConnection.created_at).first()
+    )
     if row:
         row.active, row.encrypted_token = False, ''
         db.session.commit()
@@ -111,7 +160,7 @@ def disconnect():
 @require('owner', 'admin')
 @limiter.limit('2 per hour')
 def refresh():
-    row = service.active_connection(g.workspace_id)
+    row = service.active_connection(g.workspace_id, chosen())
     token = service.cipher().decrypt(row.encrypted_token.encode()).decode()
     # Refresh is explicit; provider errors and credentials are never returned to the browser.
 

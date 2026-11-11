@@ -21,9 +21,9 @@ from .instagram import client as instagram_client
 BATCH_SIZE = 200
 
 
-def source(channel, workspace_id):
+def source(channel, workspace_id, connection_id=None):
     if channel == 'instagram':
-        row = instagram.active_connection(workspace_id)
+        row = instagram.active_connection(workspace_id, connection_id)
         return row, row.instagram_id
     row = WhatsAppConnection.query.filter_by(workspace_id=workspace_id).first()
     if not row:
@@ -218,7 +218,9 @@ def process(limit=2):
             workspace = db.session.get(Workspace, job.workspace_id)
             if not workspace or not workspace.active:
                 raise APIError('A conta foi desativada.', 409)
-            connection, identity = source(job.channel, job.workspace_id)
+            connection, identity = source(
+                job.channel, job.workspace_id, job.connection_id if job.channel == 'instagram' else None
+            )
             if connection.id != job.connection_id or identity != job.identity:
                 raise APIError('A conexão mudou. Inicie uma nova sincronização.', 409)
             job.status = 'running'

@@ -135,7 +135,6 @@
 .modal-header {
   display: flex;
   justify-content: space-between;
-  border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
   background: #fff;
@@ -159,7 +158,6 @@
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  border-top: 1px solid var(--line);
   margin-top: 8px;
   padding-top: 24px;
   gap: 12px;

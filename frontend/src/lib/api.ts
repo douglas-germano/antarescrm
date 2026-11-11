@@ -71,6 +71,16 @@ export const post = <T = unknown>(path: string, data: unknown) =>
 export const patch = <T = unknown>(path: string, data: unknown) =>
   api<T>(path, { method: 'PATCH', body: JSON.stringify(data) });
 export const remove = (path: string) => api(path, { method: 'DELETE' });
+/** Multipart upload: the browser sets the boundary, so no JSON content type is sent. */
+export async function upload<T = unknown>(path: string, body: FormData): Promise<T> {
+  const response = await fetch('/api/backend' + path, {
+    method: 'POST', body, cache: 'no-store',
+    headers: activeWorkspaceId ? { 'X-Workspace-ID': activeWorkspaceId } : {},
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new RequestError(data?.error?.message || 'Não foi possível enviar o arquivo.', response.status);
+  return data as T;
+}
 export function useData<T = unknown>(path: string | null) {
   return useSWR<T>(path, (url: string) => api<T>(url), {
     revalidateOnFocus: false,

@@ -18,20 +18,28 @@ type Sync = {
   mapped_records: number;
   error?: string;
   updated_at: string;
+  connection_id?: string;
 };
 const labels = { queued: 'Na fila', running: 'Em andamento', completed: 'Concluída', failed: 'Interrompida', cancelled: 'Pausada' };
 
-export function HistorySync({ channel, connected }: { channel: 'whatsapp' | 'instagram'; connected: boolean }) {
+export function HistorySync({ channel, connected, accounts = [] }: {
+  channel: 'whatsapp' | 'instagram'; connected: boolean;
+  /** Instagram workspaces may hold several profiles: the import runs for one at a time. */
+  accounts?: { id: string; label: string }[];
+}) {
   const path = '/history-sync/' + channel;
   const { workspace } = useSession();
   const state = useSWR<{ sync: Sync | null }>(workspace?.id ? ['history', workspace.id, path] : null, () => api<{ sync: Sync | null }>(path), { refreshInterval: 3000 });
   const { notify } = useNotify();
   const [busy, setBusy] = useState(false);
+  const [account, setAccount] = useState('');
   const sync = state.data?.sync;
+  const chosen = account || sync?.connection_id || accounts[0]?.id || '';
+  const syncing = accounts.find(a => a.id === sync?.connection_id)?.label;
   const active = sync?.status === 'queued' || sync?.status === 'running';
   async function action(action: 'start' | 'resume' | 'cancel') {
     setBusy(true);
-    try { await state.mutate(await post<{ sync: Sync | null }>(path, { action })); }
+    try { await state.mutate(await post<{ sync: Sync | null }>(path, { action, ...(action === 'start' && chosen ? { connection_id: chosen } : {}) })); }
     catch (e) { notify((e as Error).message, 'error'); }
     finally { setBusy(false); }
   }
@@ -43,12 +51,18 @@ export function HistorySync({ channel, connected }: { channel: 'whatsapp' | 'ins
     </div>
     {state.error && <p role="alert">Não foi possível consultar a sincronização. <Button variant="secondary" onClick={() => state.mutate()}>Tentar novamente</Button></p>}
     {sync && <div role="status" aria-live="polite">
-      <strong>{labels[sync.status]}{active && sync.phase === 'mapping' ? ' · Identificando contatos' : ''}</strong>
+      <strong>{labels[sync.status]}{active && sync.phase === 'mapping' ? ' · Identificando contatos' : ''}{accounts.length > 1 && syncing ? ' · ' + syncing : ''}</strong>
       <p>{sync.imported.toLocaleString('pt-BR')} importadas · {sync.duplicates.toLocaleString('pt-BR')} já existentes · {sync.skipped.toLocaleString('pt-BR')} ignoradas</p>
       <p className="muted">{(sync.phase === 'mapping' ? sync.mapped_records : sync.scanned).toLocaleString('pt-BR')} mensagens verificadas{channel === 'whatsapp' && sync.total ? ` de aproximadamente ${sync.total.toLocaleString('pt-BR')} registros` : ''}.</p>
       {sync.unresolved > 0 && <p>{sync.unresolved.toLocaleString('pt-BR')} registros sem associação segura ao telefone. Podem ser verificados em uma nova sincronização.</p>}
       {sync.error && <p role="alert">{sync.error}</p>}
       <small className="muted">Última atualização: {new Date(sync.updated_at).toLocaleString('pt-BR')}</small>
+    </div>}
+    {accounts.length > 1 && !active && <div className="field history-account">
+      <label htmlFor={'history-account-' + channel}>Perfil</label>
+      <select id={'history-account-' + channel} value={chosen} onChange={(e) => setAccount(e.target.value)}>
+        {accounts.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+      </select>
     </div>}
     <div className="row-actions">
       {active ? <Button variant="secondary" disabled={busy} onClick={() => action('cancel')}>Pausar sincronização</Button> : <>

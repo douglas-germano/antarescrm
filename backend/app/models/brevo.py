@@ -47,6 +47,7 @@ class EmailCampaign(TenantBase):
     content = db.Column(db.Text, nullable=False)
     audience = db.Column(db.JSON, nullable=False, default=dict)
     status = db.Column(db.String(20), nullable=False, default='draft')
+    archived = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     connection_id = db.Column(db.String(36), db.ForeignKey('brevo_connections.id'))
     connection_version = db.Column(db.Integer)
     whatsapp_connection_id = db.Column(db.String(36), db.ForeignKey('whatsapp_connections.id'))

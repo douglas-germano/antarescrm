@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Plus, Mail, MessageCircle, RefreshCw, Send, Eye, Copy, Pencil, Pause, Lock, PenLine, Users } from 'lucide-react';
-import { useData, useList, usePage, post, patch, refreshAll } from '@/lib/api';
+import { Plus, Mail, MessageCircle, RefreshCw, Send, Eye, Copy, Pencil, Pause, Lock, PenLine, Users, Archive, Trash2 } from 'lucide-react';
+import { useData, useList, usePage, post, patch, remove, refreshAll } from '@/lib/api';
 import { useSession, useNotify } from '@/components/providers';
-import { Button, PageHeader, DataState, FormDialog, Modal, EmptyState, Badge, Popover } from '@/components/ui';
+import { Button, PageHeader, DataState, FormDialog, Modal, EmptyState, Badge, Popover, ConfirmDialog } from '@/components/ui';
 import { PagedTable } from '@/components/fit';
 import { Card, CardBody, Tabs, Toolbar, ToolbarEnd } from '@/components/blocks';
 import type { Field, Row } from '@/lib/types';
 import styles from './page.module.css';
 
 type Channel = 'email' | 'whatsapp';
-type Campaign = { id: string; channel: Channel; name: string; subject: string; content: string; status: string; audience: { tag?: string; source?: string }; recipient_count: number; audience_hash: string; error?: string; metrics: Record<string, number> };
+type Campaign = { id: string; channel: Channel; name: string; subject: string; content: string; status: string; archived: boolean; audience: { tag?: string; source?: string }; recipient_count: number; audience_hash: string; error?: string; metrics: Record<string, number> };
 type Audience = { total: number; limit: number; excluded: Record<string, number>; sample: { contact_id: string; name: string; email?: string; phone?: string }[] };
 type Composer = { id?: string; channel: Channel; name: string; subject: string; content: string; tag: string; source: string; template: string };
 const channelNames = { email: 'E-mail', whatsapp: 'WhatsApp' };
@@ -32,12 +32,14 @@ export default function CampaignsPage() {
   const { user } = useSession();
   const canManage = ['owner', 'admin'].includes(user?.role || '');
   const { notify } = useNotify();
-  const campaigns = usePage<Campaign>('/campaigns');
+  const [tab, setTab] = useState('campaigns');
+  const showingArchived = tab === 'archived';
+  const campaigns = usePage<Campaign>(showingArchived ? '/campaigns?archived=true' : '/campaigns');
+  const [pendingAction, setPendingAction] = useState<{ row: Campaign; action: 'delete' | 'archive' } | null>(null);
   const templates = useList(canManage ? '/message-templates' : null);
   const connection = useData<{ connection: { configured: boolean; webhook_id: number | null } | null }>(canManage ? '/brevo/connection' : null);
   const channels = useData<{ items: { channel: string; configured: boolean }[] }>(canManage ? '/communications/channels' : null);
   const contacts = useData<{ tags: string[]; sources: string[] }>(canManage ? '/contacts?per_page=1' : null);
-  const [tab, setTab] = useState('campaigns');
   const [composer, setComposer] = useState<Composer | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -95,7 +97,8 @@ export default function CampaignsPage() {
     </PageHeader>
     <Toolbar>
       <Tabs value={tab} onChange={setTab} label="Campanhas e modelos" items={[
-        { value: 'campaigns', label: <>Campanhas <span className="tab-count">{campaigns.data?.total ?? 0}</span></> },
+        { value: 'campaigns', label: <>Campanhas {!showingArchived && <span className="tab-count">{campaigns.data?.total ?? 0}</span>}</> },
+        { value: 'archived', label: 'Arquivadas' },
         { value: 'templates', label: <>Modelos <span className="tab-count">{templateRows.length}</span></> },
       ]} />
       {tab === 'templates' && <ToolbarEnd><ChannelMenu label="Novo modelo" variant="soft" onPick={newTemplate} /></ToolbarEnd>}
@@ -116,7 +119,12 @@ export default function CampaignsPage() {
             <td><span className="channel-cell">{channelIcons[row.channel]}{channelNames[row.channel]}</span></td>
             <td><Badge value={row.status === 'sent' ? 'completed' : 'doing'} label={labels[row.status] || row.status} /></td>
             <td>{row.recipient_count ? plural(row.recipient_count, 'contato', 'contatos') : <span className="muted">Público a revisar</span>}</td>
-            <td><div className="row-actions"><Button variant="ghost" aria-label={'Abrir ' + row.name} data-tip="Abrir campanha" data-tip-align="end" onClick={event => { event.stopPropagation(); openCampaign(row); }}><Eye size={15} /></Button></div></td></tr>} />
+            <td><div className="row-actions">
+              <Button variant="ghost" aria-label={'Abrir ' + row.name} data-tip="Abrir campanha" onClick={event => { event.stopPropagation(); openCampaign(row); }}><Eye size={15} /></Button>
+              {!row.archived && !['preparing', 'importing', 'sending'].includes(row.status) && <Button variant="ghost" aria-label={'Arquivar ' + row.name} data-tip="Arquivar campanha" onClick={event => { event.stopPropagation(); setPendingAction({ row, action: 'archive' }); }}><Archive size={15} /></Button>}
+              {row.status === 'draft' && <Button variant="ghost" aria-label={'Apagar ' + row.name} data-tip="Apagar rascunho" data-tip-align="end" onClick={event => { event.stopPropagation(); setPendingAction({ row, action: 'delete' }); }}><Trash2 size={15} /></Button>}
+            </div></td></tr>} />
+          : showingArchived ? <EmptyState icon={<Archive />} title="Nenhuma campanha arquivada" />
           : <div className="campaign-empty">
             <h3>Nenhuma campanha ainda</h3>
             <p>Uma campanha leva a mesma mensagem a um grupo de contatos, por e-mail ou WhatsApp. Nada é enviado sem a sua revisão.</p>
@@ -133,7 +141,7 @@ export default function CampaignsPage() {
           <div className="campaign-detail-head">
             <span className="channel-cell">{channelIcons[selected.channel]}{channelNames[selected.channel]}</span>
             <Badge value={selected.status === 'sent' ? 'completed' : 'doing'} label={labels[selected.status] || selected.status} />
-            <div className="row-actions">{selected.status === 'draft' && <Button variant="secondary" disabled={busy} onClick={() => compose(selected.channel, selected, true)}><Pencil size={15} />Editar rascunho</Button>}<Button variant="ghost" disabled={busy} onClick={() => compose(selected.channel, selected)}><Copy size={15} />Copiar para novo rascunho</Button></div>
+            <div className="row-actions">{!selected.archived && selected.status === 'draft' && <Button variant="secondary" disabled={busy} onClick={() => compose(selected.channel, selected, true)}><Pencil size={15} />Editar rascunho</Button>}<Button variant="ghost" disabled={busy} onClick={() => compose(selected.channel, selected)}><Copy size={15} />Copiar para novo rascunho</Button></div>
           </div>
           {((isWhatsApp && !whatsappReady) || (!isWhatsApp && !emailReady)) && <div className="account-summary"><p>{isWhatsApp ? 'Conecte o WhatsApp desta conta para preparar e enviar a campanha.' : 'Conecte o Brevo e ative o acompanhamento para preparar e enviar a campanha.'}</p><Link className="btn btn-secondary" to="/configuracoes" search={{"tab": "conexoes"}}>Configurar conexão</Link></div>}
           <div className={styles.review}>
@@ -150,9 +158,9 @@ export default function CampaignsPage() {
           <div className={styles.metrics}>{Object.entries(isWhatsApp ? whatsappMetrics : emailMetrics).map(([key, label]) => <div key={key}><strong>{selected.metrics?.[key] || 0}</strong><small>{label}</small></div>)}</div>
           {(error || selected.error) && <p className="form-error" role="alert">{error || selected.error}</p>}
           <div className="row-actions">
-            {selected.status === 'draft' && <Button disabled={busy || !audience || !audience.total || audience.total > audience.limit || !(isWhatsApp ? whatsappReady : emailReady)} onClick={() => act('prepare')}>{isWhatsApp ? 'Preparar campanha' : 'Preparar no Brevo'}</Button>}
+            {!selected.archived && selected.status === 'draft' && <Button disabled={busy || !audience || !audience.total || audience.total > audience.limit || !(isWhatsApp ? whatsappReady : emailReady)} onClick={() => act('prepare')}>{isWhatsApp ? 'Preparar campanha' : 'Preparar no Brevo'}</Button>}
             {selected.status !== 'draft' && <Button variant="secondary" disabled={busy} onClick={() => act('refresh')}><RefreshCw size={15} />{isWhatsApp ? 'Atualizar resultados' : 'Consultar Brevo'}</Button>}
-            {selected.status === 'ready' && <Button disabled={busy} onClick={() => { setConsent(false); setConfirming(true); }}><Send size={15} />Revisar e enviar</Button>}
+            {!selected.archived && selected.status === 'ready' && <Button disabled={busy} onClick={() => { setConsent(false); setConfirming(true); }}><Send size={15} />Revisar e enviar</Button>}
             {isWhatsApp && selected.metrics.queued > 0 && !busy && <Button onClick={() => act('process')}><Send size={15} />Continuar envio</Button>}
             {isWhatsApp && busy && selected.metrics.queued > 0 && <Button variant="secondary" onClick={() => { paused.current = true; }}><Pause size={15} />Pausar após a mensagem atual</Button>}
             {!isWhatsApp && selected.status === 'unknown' && <a className="btn btn-secondary" href="https://app.brevo.com" target="_blank" rel="noreferrer">Abrir painel do Brevo</a>}
@@ -163,6 +171,22 @@ export default function CampaignsPage() {
         </div>}
       </Modal>
     </>}
+    <ConfirmDialog
+      open={Boolean(pendingAction)}
+      onClose={() => setPendingAction(null)}
+      title={pendingAction?.action === 'delete' ? 'Apagar rascunho' : 'Arquivar campanha'}
+      description={pendingAction?.action === 'delete'
+        ? `O rascunho “${pendingAction.row.name}” será apagado permanentemente.`
+        : pendingAction ? `A campanha “${pendingAction.row.name}” será movida para a aba Arquivadas, onde o histórico poderá ser consultado.` : ''}
+      onConfirm={async () => {
+        if (!pendingAction) return;
+        const { row, action } = pendingAction;
+        if (action === 'delete') await remove(`/campaigns/${row.id}`);
+        else await post(`/campaigns/${row.id}/archive`, {});
+        await refreshAll();
+        notify(action === 'delete' ? 'Rascunho apagado.' : 'Campanha arquivada.');
+      }}
+    />
     <Modal open={Boolean(composer)} onClose={() => { if (!saving) setComposer(null); }} title={`${composer?.id ? 'Editar' : 'Nova'} campanha de ${composer?.channel === 'whatsapp' ? 'WhatsApp' : 'e-mail'}`}>
       {composer && <form className="stack" onSubmit={async event => {
         event.preventDefault(); if (saving) return; setSaving(true); setFormError('');

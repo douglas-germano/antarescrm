@@ -98,7 +98,8 @@ def setup():
 @bp.get('/campaigns')
 @require('owner', 'admin')
 def listing():
-    return page(query(EmailCampaign).order_by(EmailCampaign.created_at.desc()), campaigns.serialize)
+    rows = query(EmailCampaign).filter_by(archived=request.args.get('archived') == 'true')
+    return page(rows.order_by(EmailCampaign.created_at.desc()), campaigns.serialize)
 
 
 @bp.post('/campaigns/audience')
@@ -127,7 +128,7 @@ def create():
 @require('owner', 'admin')
 def edit(identifier):
     row = get(EmailCampaign, identifier, lock=True)
-    if row.status != 'draft':
+    if row.status != 'draft' or row.archived:
         raise APIError('Somente rascunhos locais podem ser editados.', 409)
     data = payload(CampaignSchema, partial=True)
     if data.get('channel', row.channel) != row.channel:
@@ -139,13 +140,35 @@ def edit(identifier):
     return commit(row, serializer=campaigns.serialize)
 
 
+@bp.delete('/campaigns/<uuid:identifier>')
+@require('owner', 'admin')
+def delete_campaign(identifier):
+    row = get(EmailCampaign, identifier, lock=True)
+    if row.status != 'draft':
+        raise APIError('Somente rascunhos locais podem ser apagados.', 409)
+    audit('campaign_delete', row)
+    db.session.delete(row)
+    db.session.commit()
+    return '', 204
+
+
 @bp.post('/campaigns/<uuid:identifier>/<action>')
 @require('owner', 'admin')
 @limiter.limit(lambda: '120 per minute' if request.view_args.get('action') == 'process' else '15 per minute')
 def action(identifier, action):
-    if action not in ('prepare', 'refresh', 'send', 'process'):
+    if action not in ('prepare', 'refresh', 'send', 'process', 'archive'):
         raise APIError('Ação indisponível.', 404)
     row = get(EmailCampaign, identifier, lock=True)
+    if action == 'archive':
+        if not row.archived:
+            status = campaigns_whatsapp.progress(row)[0] if row.channel == 'whatsapp' else row.status
+            if status in ('preparing', 'importing', 'sending'):
+                raise APIError('Aguarde a conclusão do processamento para arquivar a campanha.', 409)
+            row.archived = True
+            audit('campaign_archive', row)
+        return commit(row, serializer=campaigns.serialize)
+    if row.archived and action != 'refresh':
+        raise APIError('A campanha está arquivada.', 409)
     if action == 'send':
         data = payload(SendSchema)
         audit('campaign_send_requested', row, {'consent_confirmed': True})

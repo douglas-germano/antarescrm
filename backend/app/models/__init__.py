@@ -11,7 +11,15 @@ from .domains import CustomDomain
 from .fishing import FishingDraft, FishingPost, FishingSettings, FishingUsage
 from .funnels import Funnel, FunnelEvent, FunnelStep
 from .history import HistorySync
-from .instagram import InstagramComment, InstagramConnection, InstagramEvent, InstagramOAuthState
+from .instagram import (
+    InstagramComment,
+    InstagramConnection,
+    InstagramEvent,
+    InstagramInsightSnapshot,
+    InstagramMedia,
+    InstagramOAuthState,
+    InstagramPost,
+)
 from .notifications import MessageNotification, NotificationReadState
 from .projects import Project, ProjectApproval, ProjectEvent, ProjectFile, ProjectStage
 from .tenancy import AuditLog, User, Workspace, WorkspaceAccess
@@ -67,6 +75,9 @@ __all__ = [
     'AutomationJob',
     'WorkerHeartbeat',
     'InstagramConnection',
+    'InstagramInsightSnapshot',
+    'InstagramMedia',
+    'InstagramPost',
     'InstagramOAuthState',
     'InstagramEvent',
     'InstagramComment',

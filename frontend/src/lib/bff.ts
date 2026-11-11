@@ -269,6 +269,24 @@ export async function handlePublicApproval(request: Request, path: string[], env
   } catch { return failure('Não foi possível acessar a aprovação. Tente novamente.', 502); }
 }
 
+/** Post media for Instagram's servers to download: one exact GET route, no cookies or JWTs forwarded. */
+export async function handlePublicMedia(request: Request, token: string, env: GatewayEnv): Promise<Response> {
+  if (!['GET', 'HEAD'].includes(request.method) || !/^[A-Za-z0-9_-]{30,100}$/.test(token)) return failure('Rota indisponível.', 404);
+  try {
+    const upstream = await fetch(`${base(env)}/public/instagram-media/${token}`, {
+      method: request.method, cache: 'no-store', signal: AbortSignal.timeout(60000),
+      headers: request.headers.get('range') ? { Range: request.headers.get('range')! } : {},
+    });
+    const headers = new Headers({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' });
+    for (const name of ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control', 'etag', 'last-modified']) {
+      const value = upstream.headers.get(name);
+      if (value) headers.set(name, value);
+    }
+    if (!upstream.ok && upstream.status !== 206) headers.set('Cache-Control', 'no-store');
+    return new Response(request.method === 'HEAD' ? null : upstream.body, { status: upstream.status, headers });
+  } catch { return failure('Arquivo indisponível.', 502); }
+}
+
 /** Evolution callbacks authenticate in Flask with the per-instance secret, without a user session. */
 export async function handleEvolutionWebhook(request: Request, env: GatewayEnv): Promise<Response> {
   if (request.method !== 'POST') return failure('Método não permitido.', 405);

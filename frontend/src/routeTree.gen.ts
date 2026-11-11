@@ -24,6 +24,7 @@ import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoe
 import { Route as AppContatosRouteImport } from './routes/_app.contatos'
 import { Route as AppCrmRouteImport } from './routes/_app.crm'
 import { Route as AppEmpresasRouteImport } from './routes/_app.empresas'
+import { Route as AppInstagramRouteImport } from './routes/_app.instagram'
 import { Route as AppMensagensRouteImport } from './routes/_app.mensagens'
 import { Route as AppOperacaoRouteImport } from './routes/_app.operacao'
 import { Route as AppPescaRouteImport } from './routes/_app.pesca'
@@ -54,6 +55,7 @@ import { Route as ApiPublicApprovalsSplatRouteImport } from './routes/api.public
 import { Route as ApiPublicBookingSplatRouteImport } from './routes/api.public.booking.$'
 import { Route as ApiPublicFormsFormIdRouteImport } from './routes/api.public.forms.$formId'
 import { Route as ApiPublicFunnelsSplatRouteImport } from './routes/api.public.funnels.$'
+import { Route as ApiPublicMediaTokenRouteImport } from './routes/api.public.media.$token'
 import { Route as ApiV1InstagramCallbackRouteImport } from './routes/api.v1.instagram.callback'
 import { Route as ApiV1InstagramWebhookRouteImport } from './routes/api.v1.instagram.webhook'
 import { Route as ApiV1WhatsappWebhookRouteImport } from './routes/api.v1.whatsapp.webhook'
@@ -131,6 +133,11 @@ const AppCrmRoute = AppCrmRouteImport.update({
 const AppEmpresasRoute = AppEmpresasRouteImport.update({
   id: '/empresas',
   path: '/empresas',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInstagramRoute = AppInstagramRouteImport.update({
+  id: '/instagram',
+  path: '/instagram',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMensagensRoute = AppMensagensRouteImport.update({
@@ -283,6 +290,11 @@ const ApiPublicFunnelsSplatRoute = ApiPublicFunnelsSplatRouteImport.update({
   path: '/api/public/funnels/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicMediaTokenRoute = ApiPublicMediaTokenRouteImport.update({
+  id: '/api/public/media/$token',
+  path: '/api/public/media/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiV1InstagramCallbackRoute = ApiV1InstagramCallbackRouteImport.update({
   id: '/api/v1/instagram/callback',
   path: '/api/v1/instagram/callback',
@@ -325,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/contatos': typeof AppContatosRoute
   '/crm': typeof AppCrmRoute
   '/empresas': typeof AppEmpresasRoute
+  '/instagram': typeof AppInstagramRoute
   '/mensagens': typeof AppMensagensRoute
   '/operacao': typeof AppOperacaoRoute
   '/pesca': typeof AppPescaRoute
@@ -355,6 +368,7 @@ export interface FileRoutesByFullPath {
   '/api/public/booking/$': typeof ApiPublicBookingSplatRoute
   '/api/public/forms/$formId': typeof ApiPublicFormsFormIdRouteWithChildren
   '/api/public/funnels/$': typeof ApiPublicFunnelsSplatRoute
+  '/api/public/media/$token': typeof ApiPublicMediaTokenRoute
   '/api/v1/instagram/callback': typeof ApiV1InstagramCallbackRoute
   '/api/v1/instagram/webhook': typeof ApiV1InstagramWebhookRoute
   '/api/v1/whatsapp/webhook': typeof ApiV1WhatsappWebhookRoute
@@ -375,6 +389,7 @@ export interface FileRoutesByTo {
   '/contatos': typeof AppContatosRoute
   '/crm': typeof AppCrmRoute
   '/empresas': typeof AppEmpresasRoute
+  '/instagram': typeof AppInstagramRoute
   '/mensagens': typeof AppMensagensRoute
   '/operacao': typeof AppOperacaoRoute
   '/pesca': typeof AppPescaRoute
@@ -405,6 +420,7 @@ export interface FileRoutesByTo {
   '/api/public/booking/$': typeof ApiPublicBookingSplatRoute
   '/api/public/forms/$formId': typeof ApiPublicFormsFormIdRouteWithChildren
   '/api/public/funnels/$': typeof ApiPublicFunnelsSplatRoute
+  '/api/public/media/$token': typeof ApiPublicMediaTokenRoute
   '/api/v1/instagram/callback': typeof ApiV1InstagramCallbackRoute
   '/api/v1/instagram/webhook': typeof ApiV1InstagramWebhookRoute
   '/api/v1/whatsapp/webhook': typeof ApiV1WhatsappWebhookRoute
@@ -427,6 +443,7 @@ export interface FileRoutesById {
   '/_app/contatos': typeof AppContatosRoute
   '/_app/crm': typeof AppCrmRoute
   '/_app/empresas': typeof AppEmpresasRoute
+  '/_app/instagram': typeof AppInstagramRoute
   '/_app/mensagens': typeof AppMensagensRoute
   '/_app/operacao': typeof AppOperacaoRoute
   '/_app/pesca': typeof AppPescaRoute
@@ -458,6 +475,7 @@ export interface FileRoutesById {
   '/api/public/booking/$': typeof ApiPublicBookingSplatRoute
   '/api/public/forms/$formId': typeof ApiPublicFormsFormIdRouteWithChildren
   '/api/public/funnels/$': typeof ApiPublicFunnelsSplatRoute
+  '/api/public/media/$token': typeof ApiPublicMediaTokenRoute
   '/api/v1/instagram/callback': typeof ApiV1InstagramCallbackRoute
   '/api/v1/instagram/webhook': typeof ApiV1InstagramWebhookRoute
   '/api/v1/whatsapp/webhook': typeof ApiV1WhatsappWebhookRoute
@@ -480,6 +498,7 @@ export interface FileRouteTypes {
     | '/contatos'
     | '/crm'
     | '/empresas'
+    | '/instagram'
     | '/mensagens'
     | '/operacao'
     | '/pesca'
@@ -510,6 +529,7 @@ export interface FileRouteTypes {
     | '/api/public/booking/$'
     | '/api/public/forms/$formId'
     | '/api/public/funnels/$'
+    | '/api/public/media/$token'
     | '/api/v1/instagram/callback'
     | '/api/v1/instagram/webhook'
     | '/api/v1/whatsapp/webhook'
@@ -530,6 +550,7 @@ export interface FileRouteTypes {
     | '/contatos'
     | '/crm'
     | '/empresas'
+    | '/instagram'
     | '/mensagens'
     | '/operacao'
     | '/pesca'
@@ -560,6 +581,7 @@ export interface FileRouteTypes {
     | '/api/public/booking/$'
     | '/api/public/forms/$formId'
     | '/api/public/funnels/$'
+    | '/api/public/media/$token'
     | '/api/v1/instagram/callback'
     | '/api/v1/instagram/webhook'
     | '/api/v1/whatsapp/webhook'
@@ -581,6 +603,7 @@ export interface FileRouteTypes {
     | '/_app/contatos'
     | '/_app/crm'
     | '/_app/empresas'
+    | '/_app/instagram'
     | '/_app/mensagens'
     | '/_app/operacao'
     | '/_app/pesca'
@@ -612,6 +635,7 @@ export interface FileRouteTypes {
     | '/api/public/booking/$'
     | '/api/public/forms/$formId'
     | '/api/public/funnels/$'
+    | '/api/public/media/$token'
     | '/api/v1/instagram/callback'
     | '/api/v1/instagram/webhook'
     | '/api/v1/whatsapp/webhook'
@@ -639,6 +663,7 @@ export interface RootRouteChildren {
   ApiPublicBookingSplatRoute: typeof ApiPublicBookingSplatRoute
   ApiPublicFormsFormIdRoute: typeof ApiPublicFormsFormIdRouteWithChildren
   ApiPublicFunnelsSplatRoute: typeof ApiPublicFunnelsSplatRoute
+  ApiPublicMediaTokenRoute: typeof ApiPublicMediaTokenRoute
   ApiV1InstagramCallbackRoute: typeof ApiV1InstagramCallbackRoute
   ApiV1InstagramWebhookRoute: typeof ApiV1InstagramWebhookRoute
   ApiV1WhatsappWebhookRoute: typeof ApiV1WhatsappWebhookRoute
@@ -750,6 +775,13 @@ declare module '@tanstack/react-router' {
       path: '/empresas'
       fullPath: '/empresas'
       preLoaderRoute: typeof AppEmpresasRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/instagram': {
+      id: '/_app/instagram'
+      path: '/instagram'
+      fullPath: '/instagram'
+      preLoaderRoute: typeof AppInstagramRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/mensagens': {
@@ -962,6 +994,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicFunnelsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/media/$token': {
+      id: '/api/public/media/$token'
+      path: '/api/public/media/$token'
+      fullPath: '/api/public/media/$token'
+      preLoaderRoute: typeof ApiPublicMediaTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/instagram/callback': {
       id: '/api/v1/instagram/callback'
       path: '/api/v1/instagram/callback'
@@ -1009,6 +1048,7 @@ interface AppRouteChildren {
   AppContatosRoute: typeof AppContatosRoute
   AppCrmRoute: typeof AppCrmRoute
   AppEmpresasRoute: typeof AppEmpresasRoute
+  AppInstagramRoute: typeof AppInstagramRoute
   AppMensagensRoute: typeof AppMensagensRoute
   AppOperacaoRoute: typeof AppOperacaoRoute
   AppPescaRoute: typeof AppPescaRoute
@@ -1035,6 +1075,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppContatosRoute: AppContatosRoute,
   AppCrmRoute: AppCrmRoute,
   AppEmpresasRoute: AppEmpresasRoute,
+  AppInstagramRoute: AppInstagramRoute,
   AppMensagensRoute: AppMensagensRoute,
   AppOperacaoRoute: AppOperacaoRoute,
   AppPescaRoute: AppPescaRoute,
@@ -1099,6 +1140,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBookingSplatRoute: ApiPublicBookingSplatRoute,
   ApiPublicFormsFormIdRoute: ApiPublicFormsFormIdRouteWithChildren,
   ApiPublicFunnelsSplatRoute: ApiPublicFunnelsSplatRoute,
+  ApiPublicMediaTokenRoute: ApiPublicMediaTokenRoute,
   ApiV1InstagramCallbackRoute: ApiV1InstagramCallbackRoute,
   ApiV1InstagramWebhookRoute: ApiV1InstagramWebhookRoute,
   ApiV1WhatsappWebhookRoute: ApiV1WhatsappWebhookRoute,

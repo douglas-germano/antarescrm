@@ -45,3 +45,32 @@ A função `recover_outgoing_events(connection)` permite materializar eventos de
 preservou em `instagram_events` sem exibir nas conversas. A execução é transacional, não chama a API de envio
 e pode ser repetida: mensagens existentes são ignoradas. Anexos preservados sem texto aparecem como
 `[Anexo enviado no Instagram]`; isso não equivale a armazenar o arquivo binário original.
+
+## Várias contas, publicação e métricas — 11/11/2026
+
+Um workspace pode ter vários perfis do Instagram; cada perfil continua pertencendo a um único workspace
+(`instagram_id` único). Conversas são endereçadas por `<instagram_id>:<remetente>`: respostas, automações,
+Atlas e importação de histórico usam sempre o perfil que recebeu a conversa. A Caixa de entrada mostra
+`via @perfil` quando há mais de um perfil conectado.
+
+O OAuth passa a pedir também `instagram_business_content_publish` e `instagram_business_manage_insights`.
+As permissões concedidas ficam em `instagram_connections.scopes`; conexões anteriores aparecem sem esses
+recursos até serem reautorizadas em Configurações → Conexões. No painel da Meta, as duas permissões precisam
+estar adicionadas ao caso de uso do Instagram (login do Instagram) antes de reautorizar. Perfis de clientes só
+autorizam enquanto forem testadores do app ou depois do App Review com acesso avançado.
+
+Tela `/instagram`: publicações (imagem JPEG, carrossel de 2 a 10 itens, Reel) agora ou agendadas, e métricas
+(totais, alcance diário, público, 12 publicações recentes). A mídia enviada fica no volume de anexos e é
+servida à Meta por `/api/public/media/<token>` somente enquanto a publicação está pendente. O worker cria os
+contêineres, aguarda o processamento e publica; a publicação é marcada `publishing` antes da chamada e um
+resultado ambíguo vira `unknown`, sem nova tentativa automática. Publicar não depende de `--dispatch`, pois é
+sempre uma ação explícita de proprietário ou administrador; membros criam rascunhos e leem métricas.
+
+Métricas ficam em `instagram_insight_snapshots` (uma por perfil, dia e período), com cache de 1 hora,
+atualização manual limitada a cada 5 minutos e uma captura diária pelo worker, que forma o histórico de
+seguidores.
+
+Publicado na release `instagram-publishing-20261111T132454Z` (migração `20261111_instagram_publishing`),
+com backup verificado, migração testada antes em cópia do banco (upgrade, downgrade e upgrade), 387 testes de
+backend, 35 de gateway, tipos e build aprovados. Nenhuma publicação foi feita e nenhuma mensagem enviada na
+verificação.
