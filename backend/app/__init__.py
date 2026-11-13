@@ -3,6 +3,7 @@ from flask_cors import CORS
 
 from .cli import register_commands
 from .config import Config, TestingConfig
+from .error_reporting import init_error_reporting
 from .errors import register_error_handlers
 from .extensions import db, jwt, limiter, migrate
 from .observability import register_observability
@@ -16,6 +17,7 @@ def create_app(config=None):
     if isinstance(config, dict):
         app.config.update(config)
     validate_production_config(app)
+    init_error_reporting(app)
     register_observability(app)
 
     db.init_app(app)
