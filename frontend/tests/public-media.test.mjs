@@ -38,3 +38,20 @@ test('unavailable files are not cached', async () => {
     assert.equal(response.headers.get('cache-control'), 'no-store');
   });
 });
+
+test('MCP forwards only the token and protocol headers, never cookies', async () => {
+  const { handleMcp } = await import('../src/lib/bff.ts');
+  await mockFetch(async (url, init) => {
+    assert.equal(url, 'http://backend.test/api/v1/mcp');
+    assert.equal(init.headers.authorization, 'Bearer antares_x');
+    assert.equal(init.headers['mcp-protocol-version'], '2025-06-18');
+    assert.ok(!init.headers.cookie);
+    return Response.json({ jsonrpc: '2.0', id: 1, result: {} });
+  }, async () => {
+    const response = await handleMcp(new Request('http://crm.test/mcp', { method: 'POST', body: '{"jsonrpc":"2.0","id":1,"method":"ping"}',
+      headers: { 'Content-Type': 'application/json', authorization: 'Bearer antares_x', cookie: 'crm_access=secret', 'mcp-protocol-version': '2025-06-18' } }), env);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { jsonrpc: '2.0', id: 1, result: {} });
+  });
+  assert.equal((await handleMcp(new Request('http://crm.test/mcp'), env)).status, 405);
+});

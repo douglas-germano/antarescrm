@@ -5118,6 +5118,178 @@
         ]
       }
     },
+    "/api-tokens": {
+      "get": {
+        "operationId": "mcp_tokens_get_api_tokens",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "mcp"
+        ]
+      },
+      "post": {
+        "operationId": "mcp_token_create_post_api_tokens",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
+    "/api-tokens/{token_id}": {
+      "delete": {
+        "operationId": "mcp_token_revoke_delete_api_tokens_token_id",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "mcp"
+        ]
+      }
+    },
     "/atlas/connection": {
       "get": {
         "operationId": "atlas_get_connection_get_atlas_connection",
@@ -13480,6 +13652,122 @@
         ],
         "tags": [
           "instagram"
+        ]
+      }
+    },
+    "/mcp": {
+      "delete": {
+        "operationId": "mcp_mcp_stream_delete_mcp",
+        "parameters": [],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mcp"
+        ]
+      },
+      "get": {
+        "operationId": "mcp_mcp_stream_get_mcp",
+        "parameters": [],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mcp"
+        ]
+      },
+      "post": {
+        "operationId": "mcp_mcp_endpoint_post_mcp",
+        "parameters": [],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mcp"
         ]
       }
     },

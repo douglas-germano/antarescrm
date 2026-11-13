@@ -287,6 +287,29 @@ export async function handlePublicMedia(request: Request, token: string, env: Ga
   } catch { return failure('Arquivo indisponível.', 502); }
 }
 
+/** MCP for AI clients: authenticated by the API token in Authorization, never by browser cookies. */
+export async function handleMcp(request: Request, env: GatewayEnv): Promise<Response> {
+  if (request.method !== 'POST') return Response.json({ error: { message: 'Use POST com JSON-RPC.' } }, { status: 405, headers: { Allow: 'POST', 'Cache-Control': 'no-store' } });
+  const max = 1024 * 1024;
+  if (Number(request.headers.get('content-length')) > max) return failure('Solicitação muito grande.', 413);
+  try {
+    const body = await request.arrayBuffer();
+    if (body.byteLength > max) return failure('Solicitação muito grande.', 413);
+    const headers: Record<string, string> = { 'Content-Type': request.headers.get('content-type') || 'application/json' };
+    for (const name of ['authorization', 'origin', 'mcp-protocol-version', 'accept']) {
+      const value = request.headers.get(name);
+      if (value) headers[name] = value;
+    }
+    const upstream = await fetch(`${base(env)}/mcp`, { method: 'POST', headers, body, cache: 'no-store', signal: AbortSignal.timeout(90000) });
+    const out = new Headers({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+    for (const name of ['content-type', 'www-authenticate', 'retry-after']) {
+      const value = upstream.headers.get(name);
+      if (value) out.set(name, value);
+    }
+    return new Response([202, 204].includes(upstream.status) ? null : upstream.body, { status: upstream.status, headers: out });
+  } catch { return failure('Não foi possível conectar ao Antares. Tente novamente.', 502); }
+}
+
 /** Evolution callbacks authenticate in Flask with the per-instance secret, without a user session. */
 export async function handleEvolutionWebhook(request: Request, env: GatewayEnv): Promise<Response> {
   if (request.method !== 'POST') return failure('Método não permitido.', 405);

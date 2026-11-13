@@ -1,3 +1,7 @@
+import pytest
+
+pytest.skip("Copiloto de Pesca desativado", allow_module_level=True)
+
 """Copilot behavior with deterministic providers; never sends real comments or AI requests."""
 
 import json

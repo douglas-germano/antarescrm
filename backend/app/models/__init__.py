@@ -1,5 +1,6 @@
 """Modelos SQLAlchemy organizados por domínio; reexportados aqui para `from app.models import X`."""
 
+from .api_tokens import TOKEN_SCOPES, ApiToken
 from .atlas import AtlasConnection, AtlasCredential, AtlasJob, AtlasTarget
 from .automation import AutomationJob, AutomationRule, AutomationRun, FormSubmission, LeadForm, WorkerHeartbeat
 from .base import Base, TenantBase, UTCDateTime, now, uid
@@ -74,6 +75,8 @@ __all__ = [
     'AutomationRun',
     'AutomationJob',
     'WorkerHeartbeat',
+    'ApiToken',
+    'TOKEN_SCOPES',
     'InstagramConnection',
     'InstagramInsightSnapshot',
     'InstagramMedia',

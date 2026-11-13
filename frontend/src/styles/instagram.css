@@ -77,3 +77,11 @@
   .ig-post-actions { grid-column: 1 / -1; justify-content: flex-end; }
   .ig-account-picker { min-width: 0; width: 100%; }
 }
+
+/* Settings: AI access (MCP) */
+.mcp-copy { display: flex; gap: var(--space-2); }
+.mcp-copy input { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.mcp-snippet { margin: 0; padding: var(--space-3); border-radius: var(--radius); background: #25282b; color: #f2f2f2; font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+.mcp-scopes { border: 0; padding: 0; margin: 0; gap: var(--space-2); }
+.mcp-scopes .checkbox-label { align-items: flex-start; color: var(--foreground); }
+.mcp-scopes em { color: var(--warning); font-style: normal; }

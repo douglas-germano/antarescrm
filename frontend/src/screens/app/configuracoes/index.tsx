@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from '@/lib/navigation';
-import { KanbanSquare, FolderKanban, Plug, UserCircle, Users, Building2, Activity, Globe, Briefcase, Bell, CalendarClock, RefreshCw, Bot, FishSymbol } from 'lucide-react';
+import { KanbanSquare, FolderKanban, Plug, UserCircle, Users, Building2, Activity, Globe, Briefcase, Bell, CalendarClock, RefreshCw, Bot, KeyRound } from 'lucide-react';
 import { AtlasSettings } from '@/components/settings/atlas-settings';
-import { FishingSettings } from '@/components/fishing/settings';
 import { ConnectionsSettings } from '@/components/settings/connections-settings';
 import { DomainsSettings } from '@/components/settings/domains-settings';
+import { McpSettings } from '@/components/settings/mcp-settings';
 import { ProfileSettings } from '@/components/settings/profile-settings';
 import { ProjectStageSettings } from '@/components/settings/project-stage-settings';
 import { PipelineSettings } from '@/components/settings/pipeline-settings';
@@ -47,10 +47,10 @@ export default function SettingsPage() {
     ] },
     { title: 'IA', items: [
       { key: 'atlas', label: 'Atlas', icon: <Bot size={16} />, description: 'Roteiro de atendimento do Atlas', show: canManage },
-      { key: 'pesca', label: 'Pesca', icon: <FishSymbol size={16} />, description: 'Marca, IA e limites do Copiloto de prospecção', show: canManage },
     ] },
     { title: 'Integrações', items: [
       { key: 'conexoes', label: 'Conexões', icon: <Plug size={16} />, description: 'WhatsApp, Instagram, e-mail e ChatGPT', show: canManage },
+      { key: 'mcp', label: 'Acesso para IAs', icon: <KeyRound size={16} />, description: 'Tokens MCP para Claude, ChatGPT e agentes', show: canManage },
       { key: 'dominios', label: 'Domínios', icon: <Globe size={16} />, description: 'Domínios próprios das páginas', show: canManage },
     ] },
     { title: 'Sistema', items: [
@@ -109,8 +109,8 @@ export default function SettingsPage() {
           {tab === 'projetos' && <ProjectStageSettings />}
           {tab === 'agendamento' && <BookingSettings />}
           {tab === 'atlas' && canManage && <AtlasSettings key={workspace?.id} />}
-          {tab === 'pesca' && canManage && <FishingSettings key={workspace?.id} />}
-          {tab === 'conexoes' && canManage && <ConnectionsSettings />}
+            {tab === 'conexoes' && canManage && <ConnectionsSettings />}
+          {tab === 'mcp' && canManage && <McpSettings />}
           {tab === 'dominios' && canManage && <DomainsSettings />}
           {tab === 'operacao' && canManage && <OperationsSettings />}
         </div>

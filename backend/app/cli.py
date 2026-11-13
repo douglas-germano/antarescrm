@@ -29,7 +29,6 @@ def register_commands(app):
         from .services.atlas_runner import process as process_atlas
         from .services.automations import process
         from .services.communications import dispatch as dispatch_messages
-        from .services.fishing import process as process_fishing
         from .services.history import process as process_history
         from .services.instagram.insights import process as process_insights
         from .services.instagram.publishing import process as process_posts
@@ -42,7 +41,6 @@ def register_commands(app):
                 history_batches = process_history(limit=2)
                 process_posts(limit=5)
                 process_insights()
-                process_fishing(limit=1)
                 process_atlas()
                 if actions or messages or once:
                     click.echo(f'{len(actions)} etapa(s), {len(messages)} mensagem(ns).')

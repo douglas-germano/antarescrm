@@ -3,7 +3,6 @@ import { Link } from '@tanstack/react-router';
 import { usePathname } from '@/lib/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
-  Fish,
   House,
   MessageCircle,
   Users,
@@ -39,7 +38,6 @@ const links = [
   { href: '/projetos', label: 'Projetos', icon: FolderKanban },
   { href: '/tarefas', label: 'Tarefas', icon: CheckSquare },
   { href: '/agenda', label: 'Atividades', icon: CalendarDays },
-  { href: '/pesca', label: 'Pesca', icon: Fish },
   { href: '/relatorios', label: 'Relatórios', icon: BarChart3 },
 ];
 export function AppShell({ children }: { children: React.ReactNode }) {

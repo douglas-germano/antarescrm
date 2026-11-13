@@ -1,3 +1,7 @@
+import pytest
+
+pytest.skip("Copiloto de Pesca desativado", allow_module_level=True)
+
 """Real transactional limits: simultaneous reviews and worker budget reservations."""
 
 from concurrent.futures import ThreadPoolExecutor

@@ -10,14 +10,16 @@ from . import client, messages
 COMMENT_REPLIES_PER_HOUR = 60
 
 
-def process_comment(connection, value):
-    """Stores a top-level comment from someone else, links a contact, and fires `instagram.comment` automations."""
+def store_comment(connection, value):
+    """Stores a top-level comment from someone else and links a contact. Returns the row, or None when the
+    comment must not be tracked (own comments, replies, archived contacts)."""
     comment_id, author = str(value.get('id') or ''), value.get('from') or {}
     sender, username = str(author.get('id') or ''), str(author.get('username') or '')[:150]
     if not comment_id or not sender.isdigit() or sender == connection.instagram_id or value.get('parent_id'):
-        return  # Own comments and replies never trigger anything: no loops.
-    if InstagramComment.query.filter_by(comment_id=comment_id).first():
-        return
+        return None  # Own comments and replies never trigger anything: no loops.
+    existing = InstagramComment.query.filter_by(comment_id=comment_id).first()
+    if existing:
+        return existing if existing.connection_id == connection.id else None
     contact = None
     thread = InboxThread.query.filter_by(
         workspace_id=connection.workspace_id, channel='instagram', address=connection.instagram_id + ':' + sender
@@ -32,7 +34,7 @@ def process_comment(connection, value):
         )
         contact = db.session.get(Contact, earlier.contact_id) if earlier else None
     if contact and contact.archived:
-        return
+        return None
     if not contact:
         contact = Contact(
             workspace_id=connection.workspace_id,
@@ -58,6 +60,17 @@ def process_comment(connection, value):
     )
     db.session.add(row)
     db.session.flush()
+    return row
+
+
+def process_comment(connection, value):
+    """Stores a webhook comment and fires `instagram.comment` automations once."""
+    if InstagramComment.query.filter_by(comment_id=str(value.get('id') or '')).first():
+        return
+    row = store_comment(connection, value)
+    if not row:
+        return
+    comment_id, contact = row.comment_id, db.session.get(Contact, row.contact_id)
     from ..automations import emit
 
     emit(
@@ -144,3 +157,25 @@ def comment_action(kind, comment, contact, content, workspace, buttons=None, qui
     messages.confirm_reply(message, message_id)
     thread.updated_at = now()
     return comment.id
+
+
+def manual_reply(connection, comment_id, text, private=False):
+    """A reply written by a person or an AI client (not an automation). Fetches the comment from Instagram,
+    so it works for comments that arrived before webhooks were active. Each comment is answered once per kind."""
+    from ...models import Workspace
+
+    if not str(comment_id).isdigit():
+        raise APIError('Comentário inválido.', 422)
+    token = client.cipher().decrypt(connection.encrypted_token.encode()).decode()
+    value = client.graph(str(comment_id), token, params={'fields': 'id,text,from,username,media,parent_id'})
+    row = store_comment(connection, value)
+    if not row:
+        raise APIError(
+            'Este comentário não pode ser respondido por aqui (é seu, é uma resposta ou o contato foi arquivado).', 409
+        )
+    contact = db.session.get(Contact, row.contact_id)
+    workspace = db.session.get(Workspace, connection.workspace_id)
+    result = comment_action('private_reply' if private else 'reply_comment', row, contact, text, workspace)
+    if result is None:
+        raise APIError('Este comentário já foi respondido ' + ('em privado.' if private else 'publicamente.'), 409)
+    return row

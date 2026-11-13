@@ -14,6 +14,7 @@ import { Route as LegalRouteImport } from './routes/_legal'
 import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as DefinirSenhaRouteImport } from './routes/definir-senha'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as RecuperarAcessoRouteImport } from './routes/recuperar-acesso'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppAgendaRouteImport } from './routes/_app.agenda'
@@ -27,7 +28,6 @@ import { Route as AppEmpresasRouteImport } from './routes/_app.empresas'
 import { Route as AppInstagramRouteImport } from './routes/_app.instagram'
 import { Route as AppMensagensRouteImport } from './routes/_app.mensagens'
 import { Route as AppOperacaoRouteImport } from './routes/_app.operacao'
-import { Route as AppPescaRouteImport } from './routes/_app.pesca'
 import { Route as AppRelatoriosRouteImport } from './routes/_app.relatorios'
 import { Route as AppTarefasRouteImport } from './routes/_app.tarefas'
 import { Route as AppWhatsappRouteImport } from './routes/_app.whatsapp'
@@ -83,6 +83,11 @@ const DefinirSenhaRoute = DefinirSenhaRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RecuperarAcessoRoute = RecuperarAcessoRouteImport.update({
@@ -148,11 +153,6 @@ const AppMensagensRoute = AppMensagensRouteImport.update({
 const AppOperacaoRoute = AppOperacaoRouteImport.update({
   id: '/operacao',
   path: '/operacao',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPescaRoute = AppPescaRouteImport.update({
-  id: '/pesca',
-  path: '/pesca',
   getParentRoute: () => AppRoute,
 } as any)
 const AppRelatoriosRoute = AppRelatoriosRouteImport.update({
@@ -328,6 +328,7 @@ export interface FileRoutesByFullPath {
   '/cadastro': typeof CadastroRoute
   '/definir-senha': typeof DefinirSenhaRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/recuperar-acesso': typeof RecuperarAcessoRoute
   '/agenda': typeof AppAgendaRoute
   '/agendamentos': typeof AppAgendamentosRoute
@@ -340,7 +341,6 @@ export interface FileRoutesByFullPath {
   '/instagram': typeof AppInstagramRoute
   '/mensagens': typeof AppMensagensRoute
   '/operacao': typeof AppOperacaoRoute
-  '/pesca': typeof AppPescaRoute
   '/relatorios': typeof AppRelatoriosRoute
   '/tarefas': typeof AppTarefasRoute
   '/whatsapp': typeof AppWhatsappRoute
@@ -380,6 +380,7 @@ export interface FileRoutesByTo {
   '/cadastro': typeof CadastroRoute
   '/definir-senha': typeof DefinirSenhaRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/recuperar-acesso': typeof RecuperarAcessoRoute
   '/agenda': typeof AppAgendaRoute
   '/agendamentos': typeof AppAgendamentosRoute
@@ -392,7 +393,6 @@ export interface FileRoutesByTo {
   '/instagram': typeof AppInstagramRoute
   '/mensagens': typeof AppMensagensRoute
   '/operacao': typeof AppOperacaoRoute
-  '/pesca': typeof AppPescaRoute
   '/relatorios': typeof AppRelatoriosRoute
   '/tarefas': typeof AppTarefasRoute
   '/whatsapp': typeof AppWhatsappRoute
@@ -434,6 +434,7 @@ export interface FileRoutesById {
   '/cadastro': typeof CadastroRoute
   '/definir-senha': typeof DefinirSenhaRoute
   '/login': typeof LoginRoute
+  '/mcp': typeof McpRoute
   '/recuperar-acesso': typeof RecuperarAcessoRoute
   '/_app/agenda': typeof AppAgendaRoute
   '/_app/agendamentos': typeof AppAgendamentosRoute
@@ -446,7 +447,6 @@ export interface FileRoutesById {
   '/_app/instagram': typeof AppInstagramRoute
   '/_app/mensagens': typeof AppMensagensRoute
   '/_app/operacao': typeof AppOperacaoRoute
-  '/_app/pesca': typeof AppPescaRoute
   '/_app/relatorios': typeof AppRelatoriosRoute
   '/_app/tarefas': typeof AppTarefasRoute
   '/_app/whatsapp': typeof AppWhatsappRoute
@@ -489,6 +489,7 @@ export interface FileRouteTypes {
     | '/cadastro'
     | '/definir-senha'
     | '/login'
+    | '/mcp'
     | '/recuperar-acesso'
     | '/agenda'
     | '/agendamentos'
@@ -501,7 +502,6 @@ export interface FileRouteTypes {
     | '/instagram'
     | '/mensagens'
     | '/operacao'
-    | '/pesca'
     | '/relatorios'
     | '/tarefas'
     | '/whatsapp'
@@ -541,6 +541,7 @@ export interface FileRouteTypes {
     | '/cadastro'
     | '/definir-senha'
     | '/login'
+    | '/mcp'
     | '/recuperar-acesso'
     | '/agenda'
     | '/agendamentos'
@@ -553,7 +554,6 @@ export interface FileRouteTypes {
     | '/instagram'
     | '/mensagens'
     | '/operacao'
-    | '/pesca'
     | '/relatorios'
     | '/tarefas'
     | '/whatsapp'
@@ -594,6 +594,7 @@ export interface FileRouteTypes {
     | '/cadastro'
     | '/definir-senha'
     | '/login'
+    | '/mcp'
     | '/recuperar-acesso'
     | '/_app/agenda'
     | '/_app/agendamentos'
@@ -606,7 +607,6 @@ export interface FileRouteTypes {
     | '/_app/instagram'
     | '/_app/mensagens'
     | '/_app/operacao'
-    | '/_app/pesca'
     | '/_app/relatorios'
     | '/_app/tarefas'
     | '/_app/whatsapp'
@@ -649,6 +649,7 @@ export interface RootRouteChildren {
   CadastroRoute: typeof CadastroRoute
   DefinirSenhaRoute: typeof DefinirSenhaRoute
   LoginRoute: typeof LoginRoute
+  McpRoute: typeof McpRoute
   RecuperarAcessoRoute: typeof RecuperarAcessoRoute
   AgendamentoTokenRoute: typeof AgendamentoTokenRoute
   AgendarCalendarIdRoute: typeof AgendarCalendarIdRoute
@@ -705,6 +706,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/recuperar-acesso': {
@@ -796,13 +804,6 @@ declare module '@tanstack/react-router' {
       path: '/operacao'
       fullPath: '/operacao'
       preLoaderRoute: typeof AppOperacaoRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/pesca': {
-      id: '/_app/pesca'
-      path: '/pesca'
-      fullPath: '/pesca'
-      preLoaderRoute: typeof AppPescaRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/relatorios': {
@@ -1051,7 +1052,6 @@ interface AppRouteChildren {
   AppInstagramRoute: typeof AppInstagramRoute
   AppMensagensRoute: typeof AppMensagensRoute
   AppOperacaoRoute: typeof AppOperacaoRoute
-  AppPescaRoute: typeof AppPescaRoute
   AppRelatoriosRoute: typeof AppRelatoriosRoute
   AppTarefasRoute: typeof AppTarefasRoute
   AppWhatsappRoute: typeof AppWhatsappRoute
@@ -1078,7 +1078,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppInstagramRoute: AppInstagramRoute,
   AppMensagensRoute: AppMensagensRoute,
   AppOperacaoRoute: AppOperacaoRoute,
-  AppPescaRoute: AppPescaRoute,
   AppRelatoriosRoute: AppRelatoriosRoute,
   AppTarefasRoute: AppTarefasRoute,
   AppWhatsappRoute: AppWhatsappRoute,
@@ -1126,6 +1125,7 @@ const rootRouteChildren: RootRouteChildren = {
   CadastroRoute: CadastroRoute,
   DefinirSenhaRoute: DefinirSenhaRoute,
   LoginRoute: LoginRoute,
+  McpRoute: McpRoute,
   RecuperarAcessoRoute: RecuperarAcessoRoute,
   AgendamentoTokenRoute: AgendamentoTokenRoute,
   AgendarCalendarIdRoute: AgendarCalendarIdRoute,
