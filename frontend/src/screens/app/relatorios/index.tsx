@@ -6,7 +6,7 @@ import { useData } from '@/lib/api';
 import { brl, day, kinds, today } from '@/lib/format';
 import { PageHeader, DataState, EmptyState, Button, Popover } from '@/components/ui';
 import { Card, CardHeader, CardBody, Tabs } from '@/components/blocks';
-import { Bars, EvolutionChart, FunnelChart, Kpi, TeamTable, channelName, exportCsv, plural } from '@/components/reports/report-parts';
+import { Bars, EvolutionChart, FunnelChart, JourneyTable, Kpi, TeamTable, channelName, exportCsv, firstResponseLabel, plural } from '@/components/reports/report-parts';
 import type { Row } from '@/lib/types';
 
 const PERIODS = [
@@ -129,6 +129,12 @@ export default function ReportsPage() {
               </div>
 
               <Card as="section">
+                <CardHeader title="Da origem à venda" description="Contatos que chegaram no período, por origem, acompanhados até hoje · % sobre os novos contatos de cada origem" />
+                {r.journey?.items.length ? <JourneyTable items={r.journey.items} total={r.journey.total} />
+                  : <CardBody><EmptyState icon={<BarChart3 />} title="Sem novos contatos" description="Nenhum contato novo no período." /></CardBody>}
+              </Card>
+
+              <Card as="section">
                 <CardHeader title="Saúde do funil agora" description="Posição atual, sem relação com o período escolhido" />
                 <CardBody>
                   <div className="rep-health">
@@ -206,6 +212,10 @@ export default function ReportsPage() {
                     {(r.messages.channels || []).length ? r.messages.channels.map((c: Row) => (
                       <p key={c.channel}><span>{channelName(c.channel)}</span><strong>{plural(c.received, 'recebida', 'recebidas')} · {plural(c.sent, 'enviada', 'enviadas')}</strong></p>
                     )) : <p className="muted">Nenhuma mensagem no período.</p>}
+                    {r.first_response && <p title="Mediana entre a primeira mensagem do contato ainda sem resposta e a resposta da equipe que saiu, no período">
+                      <span>1ª resposta (mediana)</span>
+                      <strong>{firstResponseLabel(r.first_response.current.median_seconds)}<small className="rep-sub">{plural(r.first_response.current.sample, 'resposta', 'respostas')} · antes {firstResponseLabel(r.first_response.previous.median_seconds)}</small></strong>
+                    </p>}
                   </CardBody>
                 </Card>
                 <Card as="section">

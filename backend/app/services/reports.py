@@ -3,6 +3,7 @@
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 from decimal import Decimal
+from statistics import median
 from zoneinfo import ZoneInfo
 
 from ..access import account_users
@@ -17,9 +18,11 @@ from ..models import (
     PipelineStage,
     StageHistory,
     Task,
+    WhatsAppConversation,
     WhatsAppMessage,
     Workspace,
 )
+from .inbox import first_response_samples
 
 SALES_STALE_DAYS = 14
 
@@ -45,6 +48,59 @@ def bucket_key(day, granularity):
     if granularity == 'week':
         return day - timedelta(days=day.weekday())
     return day
+
+
+def first_response(workspace_id, lower, upper):
+    """Median seconds between a contact's first unanswered message and the team's reply, for replies in the window."""
+    inbox = (
+        db.session.query(InboxMessage.thread_id, InboxMessage.direction, InboxMessage.status, InboxMessage.created_at)
+        .filter(
+            InboxMessage.workspace_id == workspace_id,
+            InboxMessage.created_at >= lower,
+            InboxMessage.created_at < upper,
+        )
+        .order_by(InboxMessage.thread_id, InboxMessage.created_at)
+        .all()
+    )
+    whatsapp = (
+        db.session.query(
+            WhatsAppMessage.conversation_id,
+            WhatsAppMessage.direction,
+            WhatsAppMessage.status,
+            WhatsAppMessage.occurred_at,
+        )
+        .filter(
+            WhatsAppMessage.workspace_id == workspace_id,
+            WhatsAppMessage.occurred_at >= lower,
+            WhatsAppMessage.occurred_at < upper,
+        )
+        .order_by(WhatsAppMessage.conversation_id, WhatsAppMessage.occurred_at)
+        .all()
+    )
+    samples = first_response_samples(inbox) + first_response_samples(whatsapp)
+    return {'median_seconds': round(median(samples)) if samples else None, 'sample': len(samples)}
+
+
+def contacts_with_conversation(workspace_id, contact_ids):
+    """Contacts (among the given ones) with at least one message, in any channel, at any time."""
+    if not contact_ids:
+        return set()
+    ids = list(contact_ids)
+    inbox = (
+        db.session.query(InboxThread.contact_id)
+        .join(InboxMessage, InboxMessage.thread_id == InboxThread.id)
+        .filter(InboxThread.workspace_id == workspace_id, InboxThread.contact_id.in_(ids))
+        .distinct()
+        .all()
+    )
+    whatsapp = (
+        db.session.query(WhatsAppConversation.contact_id)
+        .join(WhatsAppMessage, WhatsAppMessage.conversation_id == WhatsAppConversation.id)
+        .filter(WhatsAppConversation.workspace_id == workspace_id, WhatsAppConversation.contact_id.in_(ids))
+        .distinct()
+        .all()
+    )
+    return {row[0] for row in inbox} | {row[0] for row in whatsapp}
 
 
 def build(workspace_id, start, end, pipeline_id=None, today=None):
@@ -254,6 +310,31 @@ def build(workspace_id, start, end, pipeline_id=None, today=None):
         ({'source': k, **v} for k, v in sources.items()), key=lambda r: (-r['won_amount'], -r['contacts'])
     )[:8]
 
+    # Journey: contacts that arrived in the period, by origin, followed until today through conversation, deal and sale.
+    talked = contacts_with_conversation(workspace_id, {c.id for c in new_contacts})
+    deals_by_contact = defaultdict(list)
+    for o in deals:
+        if o.contact_id:
+            deals_by_contact[o.contact_id].append(o)
+
+    def journey_row(source):
+        return {'source': source, 'contacts': 0, 'conversation': 0, 'deal': 0, 'won': 0, 'won_amount': 0.0}
+
+    journey = {}
+    total_journey = journey_row('Total')
+    for c in new_contacts:
+        mine = deals_by_contact.get(c.id, [])
+        sold = [o for o in mine if o.status == 'won']
+        for row in (journey.setdefault(c.source or 'Sem origem', journey_row(c.source or 'Sem origem')), total_journey):
+            row['contacts'] += 1
+            row['conversation'] += c.id in talked
+            row['deal'] += bool(mine)
+            row['won'] += bool(sold)
+            row['won_amount'] += sum(money(o.amount) for o in sold)
+    for row in [*journey.values(), total_journey]:
+        row['won_rate'] = round(100 * row['won'] / row['contacts'], 1) if row['contacts'] else 0
+    journey_rows = sorted(journey.values(), key=lambda r: (-r['won_amount'], -r['contacts'], r['source']))
+
     reasons = defaultdict(lambda: {'count': 0, 'amount': 0.0})
     for o in lost:
         r = reasons[(o.loss_reason or 'Não informado').strip() or 'Não informado']
@@ -318,6 +399,12 @@ def build(workspace_id, start, end, pipeline_id=None, today=None):
         'tasks': task_stats,
         'messages': message_stats,
         'automations': automation_stats,
+        'journey': {'items': journey_rows, 'total': total_journey},
+        'first_response': {
+            'current': first_response(workspace_id, lower, upper),
+            'previous': first_response(workspace_id, p_lower, p_upper),
+            'unit': 'seconds',
+        },
         'top_open': [deal_row(o) for o in top_open],
         'top_stale': [deal_row(o) for o in top_stale],
     }

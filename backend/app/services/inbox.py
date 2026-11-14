@@ -180,6 +180,11 @@ def _first_responses(account, model, thread_col, at_col, since):
         .order_by(thread_col, at_col)
         .all()
     )
+    return first_response_samples(rows)
+
+
+def first_response_samples(rows):
+    """Rows of (thread, direction, status, at), ordered by thread and time: one sample per answered wait."""
     samples, pending = [], {}
     for thread_id, direction, status, at in rows:
         if direction == 'in':

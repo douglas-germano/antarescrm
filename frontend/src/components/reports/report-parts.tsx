@@ -4,6 +4,7 @@ import { BarChart3 } from 'lucide-react';
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, type TooltipProps } from 'recharts';
 import { brl, day, initials, kinds } from '@/lib/format';
 import type { Row } from '@/lib/types';
+import { durationLabel } from '@/components/whatsapp/ThreadList';
 
 export const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 const compactBrl = (value: number) =>
@@ -143,6 +144,38 @@ export function TeamTable({ team }: { team: Row[] }) {
   );
 }
 
+const pct = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
+
+/** Contacts that arrived in the period, by origin, followed until today: talked, became a deal, bought. */
+export function JourneyTable({ items, total }: { items: Row[]; total: Row }) {
+  const cells = (r: Row) => <>
+    <td className="text-right">{r.contacts}</td>
+    {(['conversation', 'deal', 'won'] as const).map((key) => (
+      <td key={key} className="text-right">{r[key]}<small className="rep-sub">{pct(r[key], r.contacts)}%</small></td>
+    ))}
+    <td className="text-right">{brl(r.won_amount)}</td>
+  </>;
+  return (
+    <div className="table-wrap">
+      <table className="data-table rep-journey">
+        <thead><tr><th>Origem</th><th className="text-right">Novos contatos</th><th className="text-right">Conversaram</th><th className="text-right">Viraram negócio</th><th className="text-right">Compraram</th><th className="text-right">Vendido</th></tr></thead>
+        <tbody>
+          {items.map((r) => (
+            <tr key={r.source}>
+              <td><RecordLink href={'/contatos?origem=' + encodeURIComponent(r.source)}><strong>{r.source}</strong></RecordLink></td>
+              {cells(r)}
+            </tr>
+          ))}
+        </tbody>
+        {items.length > 1 && <tfoot><tr><td><strong>Total</strong></td>{cells(total)}</tr></tfoot>}
+      </table>
+    </div>
+  );
+}
+
+/** Median wait for the team's first reply, or a dash when nobody was answered in the window. */
+export const firstResponseLabel = (seconds: number | null) => (seconds === null ? '—' : durationLabel(seconds));
+
 const CHANNELS: Record<string, string> = { whatsapp: 'WhatsApp', instagram: 'Instagram', email: 'E-mail', sms: 'SMS' };
 export const channelName = (channel: string) => CHANNELS[channel] || channel;
 
@@ -170,6 +203,12 @@ export function exportCsv(r: Row, funnelName: string) {
     [],
     ['Responsável', 'Vendido (R$)', 'Ganhos', 'Perdidos', 'Conversão (%)', 'Em aberto', 'Em aberto (R$)', 'Atividades', 'Tarefas'],
     ...r.team.map((m: Row) => [m.name, m.won_amount, m.won_count, m.lost_count, m.conversion_rate, m.open_count, m.open_amount, m.activities_done, m.tasks_done]),
+    [],
+    ['Da origem à venda (contatos que chegaram no período)', 'Novos contatos', 'Conversaram', 'Viraram negócio', 'Compraram', 'Vendido (R$)'],
+    ...(r.journey?.items || []).map((s: Row) => [s.source, s.contacts, s.conversation, s.deal, s.won, s.won_amount]),
+    ...(r.journey ? [['Total', r.journey.total.contacts, r.journey.total.conversation, r.journey.total.deal, r.journey.total.won, r.journey.total.won_amount]] : []),
+    [],
+    ['1ª resposta (mediana, minutos)', r.first_response?.current.median_seconds == null ? '' : Math.round(r.first_response.current.median_seconds / 60), r.first_response?.previous.median_seconds == null ? '' : Math.round(r.first_response.previous.median_seconds / 60)],
     [],
     ['Origem', 'Novos contatos', 'Negócios', 'Ganhos', 'Vendido (R$)'],
     ...r.sources.map((s: Row) => [s.source, s.contacts, s.deals, s.won_count, s.won_amount]),

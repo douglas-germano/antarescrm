@@ -90,3 +90,7 @@
   .rep-three, .rep-ops { grid-template-columns: 1fr; }
   .rep-bar .toolbar-end { width: 100%; margin-left: 0; }
 }
+
+.rep-journey td { white-space: nowrap; vertical-align: middle; }
+.rep-journey tfoot td { border-top: 1px solid var(--border); }
+.rep-ops-list .rep-sub { text-align: right; font-weight: 400; }
