@@ -753,6 +753,8 @@ test('glass chrome keeps task fields solid and dialog/menu keyboard navigation u
     await page.goto(origin + '/tarefas');
     await page.getByText('Tarefa 01', { exact: true }).waitFor();
     const blur = selector => page.locator(selector).evaluate(el => getComputedStyle(el).backdropFilter);
+    assert.equal(await page.locator('.app-content').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(23, 23, 30)');
+    assert.equal(await page.locator('.app-content').evaluate(el => getComputedStyle(el).backgroundImage), 'none');
     assert.match(await blur('.sidebar'), /blur/);
     assert.match(await blur('.page-header'), /blur/);
     assert.equal(await page.locator('.task-card').evaluate(el => getComputedStyle(el).backdropFilter), 'none');
