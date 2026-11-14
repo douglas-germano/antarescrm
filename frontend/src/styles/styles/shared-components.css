@@ -25,7 +25,7 @@
   display: inline-flex;
   align-items: center;
   border-radius: 5px;
-  background: #f2f2f2;
+  background: var(--surface-muted);
   color: var(--ink);
   white-space: nowrap;
   font-weight: 600;
@@ -48,8 +48,8 @@
 .badge-approval,
 .badge-high,
 .badge-partial {
-  background: #f8efdb;
-  color: #9a782c;
+  background: var(--warning-soft);
+  color: var(--warning-ink);
 }
 .badge-paid,
 .badge-done,
@@ -69,8 +69,8 @@
 .badge-measuring,
 .badge-review,
 .badge-installation {
-  background: #eaf0f2;
-  color: #5d7b86;
+  background: var(--surface-muted);
+  color: var(--info-ink);
 }
 .progress {
   height: 6px;
@@ -103,9 +103,9 @@
   align-items: flex-start;
   gap: 12px;
   padding: 16px;
-  color: #9f4a36;
-  background: #fcf1ec;
-  border: 1px solid #f1dacf;
+  color: var(--danger-ink);
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-line);
   border-radius: 6px;
   font-size: 14px;
   line-height: 1.6;
@@ -155,7 +155,7 @@
   line-height: 1.6;
 }
 .modal-content {
-  background: #fff;
+  background: var(--surface);
   padding: 24px;
 }
 .modal-footer {
@@ -189,7 +189,7 @@
 }
 .kanban-column {
   border-radius: var(--radius);
-  background: #f0f0f4;
+  background: var(--surface-muted);
   display: flex;
   flex-direction: column;
   flex: 0 0 292px;
@@ -197,7 +197,7 @@
   max-width: none;
   padding: 12px;
   gap: 12px;
-  border: 1px solid #eaeaea;
+  border: 1px solid var(--line);
 }
 .kanban-column > header,
 .kanban-column-header {
@@ -210,7 +210,7 @@
   font-weight: 600;
 }
 .kanban-card {
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--line);
   box-shadow: none;
   padding: 16px;
@@ -221,7 +221,7 @@
   gap: 8px;
 }
 .kanban-card:hover {
-  border-color: #a6a6a6;
+  border-color: var(--line-strong);
 }
 .kanban-card h3 {
   letter-spacing: -0.015em;
@@ -242,7 +242,7 @@
   font-size: 11px;
 }
 .kanban-card select {
-  background: #faf8fb;
+  background: var(--surface-muted);
   font-size: 13px;
   min-height: 40px;
   padding: 8px 12px;
@@ -287,7 +287,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   box-shadow: none;
   padding: 16px 16px;
@@ -297,8 +297,8 @@
   animation: arrive 0.2s ease-out;
 }
 .toast.error {
-  border-color: #edc9bc;
-  color: #9a4935;
+  border-color: var(--danger-line);
+  color: var(--danger-ink);
 }
 .toast > span {
   flex: 1;
@@ -317,7 +317,7 @@
   padding: 12px 24px;
   background: #fff;
   z-index: 200;
-  color: var(--primary);
+  color: var(--primary-text);
   border-radius: 6px;
 }
 .skip-link:focus {
@@ -350,9 +350,9 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: #f2f2f2;
+  background: var(--surface-muted);
   border-radius: 6px;
-  color: #888888;
+  color: var(--subtle);
   flex-shrink: 0;
   font-weight: 600;
   width: 48px;
@@ -435,7 +435,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: white;
+  background: var(--surface);
   color: var(--foreground);
 }
 .assistant-teaser h3 {
@@ -452,6 +452,6 @@
   font-size: 13px;
 }
 .toast.message { border-color: var(--primary); }
-.toast.message > svg { color: var(--primary); }
-.toast-action { display: block; margin-top: 4px; color: var(--primary); font-weight: 600; text-decoration: underline; }
+.toast.message > svg { color: var(--primary-text); }
+.toast-action { display: block; margin-top: 4px; color: var(--primary-text); font-weight: 600; text-decoration: underline; }
 .toast.message > span { min-width: 0; overflow-wrap: anywhere; }

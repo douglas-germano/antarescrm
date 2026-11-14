@@ -22,7 +22,18 @@
   --warning: #f2c874;
   --info: #a8cfff;
   --surface-input: #24242e;
-  --surface-hover: #ffffff0d;
+  --surface: var(--card);
+  --surface-muted: #ffffff0f;
+  --surface-hover: #ffffff12;
+  --on-ink: #17171e;
+  --primary-text: #ff80ad;
+  --subtle: #a6a6b8;
+  --line-strong: #ffffff52;
+  --success-soft: #8cdbaf18; --success-ink: #8cdbaf;
+  --warning-soft: #f2c87418; --warning-ink: #f2c874; --warning-line: #f2c87438;
+  --danger-soft: #ff9eaa18;  --danger-ink: #ff9eaa;  --danger-line: #ff9eaa38;
+  --info-soft: #a8cfff18;    --info-ink: #a8cfff;
+  --violet-soft: #c5b0ff20;  --violet-ink: #cdbbff;  --violet-line: #c5b0ff40;
   --glass-surface: #292933;
   --glass-border: #ffffff24;
   --glass-shadow: 0 10px 28px #00000018, inset 0 1px 0 #ffffff0d;
@@ -59,7 +70,7 @@
 .app .btn-danger { background: #8f2a3c; border-color: #b93f55; color: #fff; }
 .app :is(.btn-ghost, .icon-btn) { background: transparent; color: var(--muted); }
 .app :is(.btn-ghost, .icon-btn):hover { background: var(--surface-hover); color: var(--foreground); }
-.app :is(.tabs, .tab-count, .badge, .avatar, .owner-avatar, .date-tile,
+.app :is(.tabs, .tab-count, .badge, .date-tile,
   .timeline-symbol, .file-preview, .approval-decision, .auto-step, .flow-node-body,
   .flow-index, .bld-segmented, .rep-step-rate, .calendar-event, .deal-days,
   .wa-file-chip, .wa-day span, .channel-list li, .ig-avatar, .pipeline-name,
@@ -72,6 +83,9 @@
   background: #414153;
   color: var(--foreground);
 }
+/* Initials are text: they take the main text colour on their quiet fill. */
+.app :is(.avatar, .owner-avatar) { background: #ffffff14; color: var(--foreground); }
+.app .tab.active .tab-count { background: #ffffff1a; color: var(--foreground); }
 .app :is(.tabs-line .tab.active, .tabs-line .tab.active .tab-count) { background: transparent; color: var(--foreground); }
 .app :is(.menu-panel button:hover:not(:disabled), .entity-list li.active,
   .data-table tbody tr:hover, .dash-row:hover, .task-row:hover, .calendar-cell:hover,
@@ -117,6 +131,8 @@
 .app :is(.billing-banner a, .gate-icon) { color: var(--foreground); }
 .app :is(.wa-agent-tabs button, .drop-zone) { background: var(--card); color: var(--foreground); border-color: var(--line); }
 .app .btn-ghost { border-color: transparent; }
+/* The automation editor's bar matches the page top bar. */
+.app .flow-topbar { background: #25252f; border-color: var(--glass-border); }
 .app .mobile-menu { background: #292933; color: var(--foreground); border-color: var(--line); }
 /* Rendered customer pages inside the builder preserve their published light controls. */
 .app :is(.fp-page, .fv-page) { color-scheme: light; --foreground: #25282b; --muted: #6b6e71; --ink: #25282b; }

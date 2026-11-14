@@ -271,7 +271,7 @@
   text-decoration: underline;
 }
 .due-list .due-bad strong {
-  color: var(--danger, #b3261e);
+  color: var(--danger, var(--danger-ink));
 }
 .fit-table td:last-child {
   max-width: none;
@@ -346,7 +346,7 @@
   justify-content: center;
   flex: none;
   min-height: 72px;
-  border: 1px dashed #d9d9d9;
+  border: 1px dashed var(--line);
   border-radius: 6px;
   color: var(--muted);
   font-size: 13px;
@@ -368,7 +368,7 @@
   line-height: 1.45;
 }
 .kanban-card-title:hover {
-  color: var(--primary);
+  color: var(--primary-text);
 }
 .kanban-card-text {
   display: block;
@@ -381,7 +381,7 @@
   margin: 0;
 }
 .kanban-card-text a:hover {
-  color: var(--primary);
+  color: var(--primary-text);
 }
 .kanban-card-meta {
   display: flex;
@@ -413,7 +413,7 @@
   padding: 4px 28px 4px 10px;
   font-size: 13px;
   border-radius: 6px;
-  background-color: #faf8fb;
+  background-color: var(--surface-muted);
   background-position: right 8px center;
 }
 .project-page { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
@@ -543,7 +543,7 @@
 .wa-qr p { font-size: 13px; color: var(--muted); line-height: 1.8; max-width: 400px; }
 
 .wa-agent-tabs { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
-.wa-agent-tabs button { border: 1px solid var(--line); background: #fff; color: var(--foreground); border-radius: 6px; padding: 12px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.wa-agent-tabs button { border: 1px solid var(--line); background: var(--surface); color: var(--foreground); border-radius: 6px; padding: 12px 12px; font: inherit; font-size: 13px; cursor: pointer; }
 .wa-agent-tabs button[aria-selected="true"] { background: var(--line); border-color: var(--muted); color: var(--foreground); font-weight: 700; }
 .wa-agent-panel { min-height: 220px; }
 .wa-agent-features { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -588,7 +588,7 @@
   margin-bottom: 16px;
   padding: 8px 12px;
   border-radius: 6px;
-  background: #f6ead6;
+  background: var(--warning-soft);
   color: var(--warning);
   font-size: 13px;
   font-weight: 600;
@@ -642,7 +642,7 @@
 .billing-rows span:first-child {
   color: var(--muted);
 }
-.badge-paid, .badge-done, .badge-completed, .badge-won, .badge-approved { background: #e5f2e9; color: #326747; }
+.badge-paid, .badge-done, .badge-completed, .badge-won, .badge-approved { background: var(--surface-muted); color: var(--success-ink); }
 .wa-dot.online { background: #359264; box-shadow: 0 0 0 3px #35926422; }
 @media (max-width: 960px) { .wa-page .header-actions { width: 100%; gap: 8px; } .wa-connection-controls { display: contents; } .wa-connection-status { flex-basis: 100%; min-height: 24px; } .wa-page .header-actions .btn { flex: 1; } }
 

@@ -6,9 +6,9 @@
 .list li { display: flex; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .list a { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; color: inherit; border-radius: 6px; }
 .list a:hover { background: var(--background); }
-.list a > svg { flex-shrink: 0; color: var(--primary); }
+.list a > svg { flex-shrink: 0; color: var(--primary-text); }
 .list a > div { display: grid; gap: 4px; min-width: 0; flex: 1; }
 .list strong { display: flex; align-items: center; justify-content: space-between; gap: 8px; overflow-wrap: anywhere; }
-.list strong span { font-size: 11px; color: var(--primary); }
+.list strong span { font-size: 11px; color: var(--primary-text); }
 .list small { color: var(--muted); }
 .list p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

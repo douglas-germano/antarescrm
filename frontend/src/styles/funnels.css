@@ -59,8 +59,8 @@
 .fp-page .fv-form { --f-accent: var(--p-accent); --f-text: var(--p-text); --f-radius: var(--p-radius); --f-button-radius: var(--p-radius); font-family: var(--p-font); }
 /* Editor chrome */
 .fe-title { flex: 1; min-width: 160px; max-width: 360px; font: inherit; font-size: 16px; font-weight: 800; border: 1px solid transparent; border-radius: var(--radius); padding: var(--space-1) var(--space-2); background: transparent; }
-.fe-title:hover, .fe-title:focus { border-color: var(--ink); background: #fff; }
-.fe-step-number { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.fe-title:hover, .fe-title:focus { border-color: var(--ink); background: var(--surface); }
+.fe-step-number { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--on-ink); font-size: 11px; font-weight: 700; flex-shrink: 0; }
 .fe-settings { display: grid; gap: var(--space-4); max-width: 640px; margin-top: var(--space-4); }
 .fe-templates { border: 0; padding: 0; margin: 0; display: grid; gap: var(--space-3); }
 .fe-templates legend { font-size: 13px; font-weight: 700; margin-bottom: var(--space-2); padding: 0; }
