@@ -9,7 +9,12 @@ export const Route = createFileRoute('/_app')({
   beforeLoad: async ({ location }) => {
     const session = await getEntrySession();
     if (location.pathname === '/' && session.publicFunnel) return session;
-    if (!session.hasSession) throw redirect({ to: '/login' });
+    if (!session.hasSession) {
+      throw redirect({
+        to: '/login',
+        search: { next: location.pathname === '/assinatura' ? 'assinatura' : undefined },
+      });
+    }
     return session;
   },
   component: AuthenticatedLayout,

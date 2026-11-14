@@ -4,6 +4,7 @@ from .api_tokens import TOKEN_SCOPES, ApiToken
 from .atlas import AtlasConnection, AtlasCredential, AtlasJob, AtlasTarget
 from .automation import AutomationJob, AutomationRule, AutomationRun, FormSubmission, LeadForm, WorkerHeartbeat
 from .base import Base, TenantBase, UTCDateTime, now, uid
+from .billing import BillingEvent, Subscription
 from .booking import Booking, BookingCalendar
 from .brevo import BrevoConnection, BrevoEvent, CampaignRecipient, EmailCampaign, UserAccessToken
 from .communications import CommunicationSuppression, InboxMessage, InboxThread, MessageTemplate
@@ -62,6 +63,7 @@ __all__ = [
     'PipelineStage',
     'Opportunity',
     'StageHistory',
+    'Subscription',
     'Activity',
     'Task',
     'SavedContactView',
@@ -89,6 +91,7 @@ __all__ = [
     'InboxMessage',
     'CommunicationSuppression',
     'BookingCalendar',
+    'BillingEvent',
     'Booking',
     'ProjectStage',
     'Project',

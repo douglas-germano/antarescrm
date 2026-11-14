@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { ArrowRight, Loader2, Eye, EyeOff, AlertCircle, ArrowUpFromLine } from 'lucide-react';
 import { ACCOUNT_KEY, AuthShell, PREFILL_KEY, readStorage, writeStorage } from '@/components/auth/auth-shell';
 
-export function AuthForm() {
+export function AuthForm({ openSubscription = false }: { openSubscription?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [show, setShow] = useState(false);
@@ -32,7 +32,7 @@ export function AuthForm() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error?.message || 'Não foi possível entrar. Revise os dados.');
       writeStorage('local', ACCOUNT_KEY, String(data.slug).trim());
-      window.location.replace('/');
+      window.location.replace(openSubscription ? '/assinatura' : '/');
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);

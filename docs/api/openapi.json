@@ -962,6 +962,20 @@
         },
         "type": "object"
       },
+      "BillingSubscribeInput": {
+        "additionalProperties": false,
+        "properties": {
+          "cpf_cnpj": {
+            "maxLength": 18,
+            "minLength": 11,
+            "type": "string"
+          }
+        },
+        "required": [
+          "cpf_cnpj"
+        ],
+        "type": "object"
+      },
       "BookingCalendarInput": {
         "additionalProperties": false,
         "properties": {
@@ -2317,260 +2331,6 @@
           "tag": {
             "default": "",
             "maxLength": 80,
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "FishingDecisionInput": {
-        "additionalProperties": false,
-        "properties": {
-          "action": {
-            "enum": [
-              "publicado",
-              "pulado",
-              "desfazer"
-            ],
-            "type": "string"
-          }
-        },
-        "required": [
-          "action"
-        ],
-        "type": "object"
-      },
-      "FishingOpenInput": {
-        "additionalProperties": false,
-        "properties": {
-          "draft_id": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "text": {
-            "maxLength": 220,
-            "minLength": 1,
-            "pattern": "\\S",
-            "type": "string"
-          }
-        },
-        "required": [
-          "draft_id",
-          "text"
-        ],
-        "type": "object"
-      },
-      "FishingPostInput": {
-        "additionalProperties": false,
-        "properties": {
-          "author": {
-            "default": "",
-            "pattern": "^@?[a-zA-Z0-9_.]{0,30}$",
-            "type": "string"
-          },
-          "caption": {
-            "maxLength": 5000,
-            "minLength": 1,
-            "pattern": "\\S",
-            "type": "string"
-          },
-          "image_data": {
-            "default": null,
-            "maxLength": 5600000,
-            "nullable": true,
-            "type": "string"
-          },
-          "url": {
-            "maxLength": 500,
-            "minLength": 1,
-            "pattern": "\\S",
-            "type": "string"
-          }
-        },
-        "required": [
-          "caption",
-          "url"
-        ],
-        "type": "object"
-      },
-      "FishingSettingsInput": {
-        "additionalProperties": false,
-        "properties": {
-          "allowed_topics": {
-            "default": "",
-            "maxLength": 2000,
-            "type": "string"
-          },
-          "blocked_authors": {
-            "items": {
-              "maxLength": 30,
-              "minLength": 1,
-              "pattern": "\\S",
-              "type": "string"
-            },
-            "maxItems": 200,
-            "type": "array"
-          },
-          "brand_name": {
-            "maxLength": 150,
-            "minLength": 1,
-            "pattern": "\\S",
-            "type": "string"
-          },
-          "brand_profile": {
-            "maxLength": 3000,
-            "minLength": 1,
-            "pattern": "\\S",
-            "type": "string"
-          },
-          "daily_ai_limit": {
-            "default": 100,
-            "maximum": 500,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "daily_limit": {
-            "default": 40,
-            "maximum": 100,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "examples": {
-            "default": "",
-            "maxLength": 2000,
-            "type": "string"
-          },
-          "forbidden_words": {
-            "items": {
-              "maxLength": 80,
-              "minLength": 1,
-              "pattern": "\\S",
-              "type": "string"
-            },
-            "maxItems": 100,
-            "type": "array"
-          },
-          "objective": {
-            "default": "visitas",
-            "enum": [
-              "seguidores",
-              "visitas",
-              "dms"
-            ],
-            "type": "string"
-          },
-          "own_username": {
-            "default": "",
-            "pattern": "^[a-zA-Z0-9_.]{0,30}$",
-            "type": "string"
-          },
-          "score_threshold": {
-            "default": 60,
-            "maximum": 100,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "tone": {
-            "maxLength": 300,
-            "minLength": 1,
-            "pattern": "\\S",
-            "type": "string"
-          }
-        },
-        "required": [
-          "brand_name",
-          "brand_profile",
-          "enabled",
-          "tone"
-        ],
-        "type": "object"
-      },
-      "FishingSettingsPatchInput": {
-        "additionalProperties": false,
-        "properties": {
-          "allowed_topics": {
-            "default": "",
-            "maxLength": 2000,
-            "type": "string"
-          },
-          "blocked_authors": {
-            "items": {
-              "maxLength": 30,
-              "minLength": 1,
-              "pattern": "\\S",
-              "type": "string"
-            },
-            "maxItems": 200,
-            "type": "array"
-          },
-          "brand_name": {
-            "maxLength": 150,
-            "minLength": 1,
-            "pattern": "\\S",
-            "type": "string"
-          },
-          "brand_profile": {
-            "maxLength": 3000,
-            "minLength": 1,
-            "pattern": "\\S",
-            "type": "string"
-          },
-          "daily_ai_limit": {
-            "default": 100,
-            "maximum": 500,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "daily_limit": {
-            "default": 40,
-            "maximum": 100,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "examples": {
-            "default": "",
-            "maxLength": 2000,
-            "type": "string"
-          },
-          "forbidden_words": {
-            "items": {
-              "maxLength": 80,
-              "minLength": 1,
-              "pattern": "\\S",
-              "type": "string"
-            },
-            "maxItems": 100,
-            "type": "array"
-          },
-          "objective": {
-            "default": "visitas",
-            "enum": [
-              "seguidores",
-              "visitas",
-              "dms"
-            ],
-            "type": "string"
-          },
-          "own_username": {
-            "default": "",
-            "pattern": "^[a-zA-Z0-9_.]{0,30}$",
-            "type": "string"
-          },
-          "score_threshold": {
-            "default": 60,
-            "maximum": 100,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "tone": {
-            "maxLength": 300,
-            "minLength": 1,
-            "pattern": "\\S",
             "type": "string"
           }
         },
@@ -7007,6 +6767,166 @@
         ]
       }
     },
+    "/billing": {
+      "get": {
+        "operationId": "billing_status_get_billing",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/billing/asaas/webhook": {
+      "post": {
+        "operationId": "billing_asaas_webhook_post_billing_asaas_webhook",
+        "parameters": [],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/billing/subscribe": {
+      "post": {
+        "operationId": "billing_subscribe_post_billing_subscribe",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingSubscribeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/booking-calendars": {
       "get": {
         "operationId": "booking_calendars_get_booking_calendars",
@@ -10051,573 +9971,6 @@
         ],
         "tags": [
           "domains"
-        ]
-      }
-    },
-    "/fishing/metrics": {
-      "get": {
-        "operationId": "fishing_metrics_get_fishing_metrics",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Workspace-ID",
-            "required": false,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "2XX": {
-            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Falha de validação, acesso ou processamento.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "fishing"
-        ]
-      }
-    },
-    "/fishing/posts": {
-      "get": {
-        "operationId": "fishing_posts_get_fishing_posts",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Workspace-ID",
-            "required": false,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "2XX": {
-            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Falha de validação, acesso ou processamento.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "fishing"
-        ]
-      },
-      "post": {
-        "operationId": "fishing_add_post_post_fishing_posts",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Workspace-ID",
-            "required": false,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FishingPostInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "2XX": {
-            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Falha de validação, acesso ou processamento.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "fishing"
-        ]
-      }
-    },
-    "/fishing/posts/{identifier}/decide": {
-      "post": {
-        "operationId": "fishing_decide_post_fishing_posts_identifier_decide",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "identifier",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Workspace-ID",
-            "required": false,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FishingDecisionInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "2XX": {
-            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Falha de validação, acesso ou processamento.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "fishing"
-        ]
-      }
-    },
-    "/fishing/posts/{identifier}/image": {
-      "get": {
-        "operationId": "fishing_image_get_fishing_posts_identifier_image",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "identifier",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Workspace-ID",
-            "required": false,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "2XX": {
-            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Falha de validação, acesso ou processamento.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "fishing"
-        ]
-      }
-    },
-    "/fishing/posts/{identifier}/open": {
-      "post": {
-        "operationId": "fishing_open_post_post_fishing_posts_identifier_open",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "identifier",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Workspace-ID",
-            "required": false,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FishingOpenInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "2XX": {
-            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Falha de validação, acesso ou processamento.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "fishing"
-        ]
-      }
-    },
-    "/fishing/posts/{identifier}/regenerate": {
-      "post": {
-        "operationId": "fishing_regenerate_post_fishing_posts_identifier_regenerate",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "identifier",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "X-Workspace-ID",
-            "required": false,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "2XX": {
-            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Falha de validação, acesso ou processamento.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "fishing"
-        ]
-      }
-    },
-    "/fishing/settings": {
-      "get": {
-        "operationId": "fishing_get_settings_get_fishing_settings",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Workspace-ID",
-            "required": false,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "2XX": {
-            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Falha de validação, acesso ou processamento.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "fishing"
-        ]
-      },
-      "patch": {
-        "operationId": "fishing_save_settings_patch_fishing_settings",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Workspace-ID",
-            "required": false,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FishingSettingsPatchInput"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "2XX": {
-            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "default": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Falha de validação, acesso ou processamento.",
-            "headers": {
-              "X-Request-ID": {
-                "description": "Identificador da operação nos logs do backend.",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "tags": [
-          "fishing"
         ]
       }
     },

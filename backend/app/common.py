@@ -23,6 +23,11 @@ def current_account():
     return AccountContext(workspace_id=g.workspace_id, user_id=g.user.id)
 
 
+def _billing_exempt():
+    """Billing, session and account-switch calls must keep working while an account is read-only."""
+    return request.blueprint == 'billing' or request.path.startswith('/api/v1/auth/')
+
+
 def require(*roles):
     """Authenticate and authorize the account selected in the signed session."""
 
@@ -45,6 +50,11 @@ def require(*roles):
             if roles and role not in roles:
                 raise APIError('Você não tem permissão para esta operação.', 403)
             g.user, g.workspace_id, g.role = user, workspace_id, role
+            if request.method not in ('GET', 'HEAD', 'OPTIONS') and not _billing_exempt():
+                from .services.billing import READ_ONLY_MESSAGE, workspace_access
+
+                if workspace_access(workspace) == 'read_only':
+                    raise APIError(READ_ONLY_MESSAGE, 402, code='subscription_required')
             return fn(*args, **kwargs)
 
         return wrapped

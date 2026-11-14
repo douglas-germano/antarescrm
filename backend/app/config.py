@@ -24,6 +24,14 @@ class Config:
     FISHING_DISABLE_REASONING = os.getenv('FISHING_DISABLE_REASONING', 'false').lower() == 'true'
     FISHING_ALLOW_FREE_MODEL_TRAINING = os.getenv('FISHING_ALLOW_FREE_MODEL_TRAINING', 'false').lower() == 'true'
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+    # Billing (Asaas). Off by default: with BILLING_ENABLED unset nobody is blocked or charged.
+    BILLING_ENABLED = os.getenv('BILLING_ENABLED', 'false').lower() == 'true'
+    ASAAS_API_KEY = os.getenv('ASAAS_API_KEY')
+    ASAAS_ENV = os.getenv('ASAAS_ENV', 'sandbox')  # sandbox | production
+    ASAAS_WEBHOOK_TOKEN = os.getenv('ASAAS_WEBHOOK_TOKEN')
+    BILLING_PRICE_BRL = os.getenv('BILLING_PRICE_BRL')  # monthly price, e.g. 197.00
+    BILLING_TRIAL_DAYS = int(os.getenv('BILLING_TRIAL_DAYS', '14'))
+    BILLING_GRACE_DAYS = int(os.getenv('BILLING_GRACE_DAYS', '5'))
     BACKUP_STATUS_PATH = os.getenv(
         'BACKUP_STATUS_PATH', str(Path.home() / '.antarescrm-deploy-backups/automatic/latest.json')
     )
@@ -76,6 +84,10 @@ class Config:
 
 
 class TestingConfig(Config):
+    BILLING_ENABLED = False
+    ASAAS_API_KEY = None
+    ASAAS_WEBHOOK_TOKEN = None
+    BILLING_PRICE_BRL = None
     ATLAS_ENCRYPTION_KEY = None
     OPENROUTER_API_KEY = None
     FISHING_TRIAGE_MODEL = ''

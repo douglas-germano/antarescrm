@@ -54,6 +54,8 @@ export type BaseField = { "label"?: string; "placeholder"?: string; "required"?:
 
 export type BaseFields = { "email"?: BaseField; "name"?: BaseField; "phone"?: BaseField; };
 
+export type BillingSubscribeInput = { "cpf_cnpj": string; };
+
 export type BookingCalendarInput = { "active"?: boolean; "assignee_id"?: string | null; "availability"?: Record<string, Array<Window>>; "buffer_minutes"?: number; "description"?: string; "duration_minutes"?: number; "horizon_days"?: number; "lead_minutes"?: number; "name": string; };
 
 export type BookingCalendarPatchInput = { "active"?: boolean; "assignee_id"?: string | null; "availability"?: Record<string, Array<Window>>; "buffer_minutes"?: number; "description"?: string; "duration_minutes"?: number; "horizon_days"?: number; "lead_minutes"?: number; "name"?: string; };
@@ -121,16 +123,6 @@ export type DomainsDomainUpdatePatchInput = { "funnel_id"?: string | null; };
 export type ErrorResponse = { "error": { "code": string; "details"?: unknown; "message": string; }; };
 
 export type Filters = { "archived"?: boolean; "company"?: string; "email"?: "" | "true" | "false"; "owner"?: string; "search"?: string; "source"?: string; "tag"?: string; };
-
-export type FishingDecisionInput = { "action": "publicado" | "pulado" | "desfazer"; };
-
-export type FishingOpenInput = { "draft_id": string; "text": string; };
-
-export type FishingPostInput = { "author"?: string; "caption": string; "image_data"?: string | null; "url": string; };
-
-export type FishingSettingsInput = { "allowed_topics"?: string; "blocked_authors"?: Array<string>; "brand_name": string; "brand_profile": string; "daily_ai_limit"?: number; "daily_limit"?: number; "enabled": boolean; "examples"?: string; "forbidden_words"?: Array<string>; "objective"?: "seguidores" | "visitas" | "dms"; "own_username"?: string; "score_threshold"?: number; "tone": string; };
-
-export type FishingSettingsPatchInput = { "allowed_topics"?: string; "blocked_authors"?: Array<string>; "brand_name"?: string; "brand_profile"?: string; "daily_ai_limit"?: number; "daily_limit"?: number; "enabled"?: boolean; "examples"?: string; "forbidden_words"?: Array<string>; "objective"?: "seguidores" | "visitas" | "dms"; "own_username"?: string; "score_threshold"?: number; "tone"?: string; };
 
 export type FormField = { "help_text"?: string; "key": string; "label": string; "map_to"?: string | null; "options"?: Array<string>; "placeholder"?: string; "required"?: boolean; "show_if"?: Record<string, unknown> | null | Visibility; "type": "text" | "textarea" | "number" | "date" | "select" | "checkbox" | "email" | "phone" | "url" | "radio" | "multiselect" | "heading" | "paragraph" | "divider"; "width"?: "full" | "half"; };
 

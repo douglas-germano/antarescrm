@@ -23,6 +23,7 @@ from ..schemas import (
     text,
 )
 from ..services import access_email, brevo
+from ..services.billing import start_trial
 
 bp = Blueprint('auth', __name__)
 
@@ -121,6 +122,7 @@ def register():
         title='Proprietário',
     )
     db.session.add(user)
+    start_trial(workspace.id)
     for i, name in enumerate(DEFAULT_STAGES):
         db.session.add(PipelineStage(workspace_id=workspace.id, name=name, position=i))
     db.session.commit()

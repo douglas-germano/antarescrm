@@ -16,9 +16,11 @@ import { Route as DefinirSenhaRouteImport } from './routes/definir-senha'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as RecuperarAcessoRouteImport } from './routes/recuperar-acesso'
+import { Route as VendasRouteImport } from './routes/vendas'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppAgendaRouteImport } from './routes/_app.agenda'
 import { Route as AppAgendamentosRouteImport } from './routes/_app.agendamentos'
+import { Route as AppAssinaturaRouteImport } from './routes/_app.assinatura'
 import { Route as AppCampanhasRouteImport } from './routes/_app.campanhas'
 import { Route as AppClientesRouteImport } from './routes/_app.clientes'
 import { Route as AppConfiguracoesRouteImport } from './routes/_app.configuracoes'
@@ -60,6 +62,7 @@ import { Route as ApiV1InstagramCallbackRouteImport } from './routes/api.v1.inst
 import { Route as ApiV1InstagramWebhookRouteImport } from './routes/api.v1.instagram.webhook'
 import { Route as ApiV1WhatsappWebhookRouteImport } from './routes/api.v1.whatsapp.webhook'
 import { Route as ApiPublicFormsFormIdSubmitRouteImport } from './routes/api.public.forms.$formId.submit'
+import { Route as ApiV1BillingAsaasWebhookRouteImport } from './routes/api.v1.billing.asaas.webhook'
 import { Route as ApiV1BrevoWebhookConnectionIdRouteImport } from './routes/api.v1.brevo.webhook.$connectionId'
 
 const AppRoute = AppRouteImport.update({
@@ -95,6 +98,11 @@ const RecuperarAcessoRoute = RecuperarAcessoRouteImport.update({
   path: '/recuperar-acesso',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VendasRoute = VendasRouteImport.update({
+  id: '/vendas',
+  path: '/vendas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -108,6 +116,11 @@ const AppAgendaRoute = AppAgendaRouteImport.update({
 const AppAgendamentosRoute = AppAgendamentosRouteImport.update({
   id: '/agendamentos',
   path: '/agendamentos',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAssinaturaRoute = AppAssinaturaRouteImport.update({
+  id: '/assinatura',
+  path: '/assinatura',
   getParentRoute: () => AppRoute,
 } as any)
 const AppCampanhasRoute = AppCampanhasRouteImport.update({
@@ -316,6 +329,12 @@ const ApiPublicFormsFormIdSubmitRoute =
     path: '/submit',
     getParentRoute: () => ApiPublicFormsFormIdRoute,
   } as any)
+const ApiV1BillingAsaasWebhookRoute =
+  ApiV1BillingAsaasWebhookRouteImport.update({
+    id: '/api/v1/billing/asaas/webhook',
+    path: '/api/v1/billing/asaas/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiV1BrevoWebhookConnectionIdRoute =
   ApiV1BrevoWebhookConnectionIdRouteImport.update({
     id: '/api/v1/brevo/webhook/$connectionId',
@@ -330,8 +349,10 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
   '/recuperar-acesso': typeof RecuperarAcessoRoute
+  '/vendas': typeof VendasRoute
   '/agenda': typeof AppAgendaRoute
   '/agendamentos': typeof AppAgendamentosRoute
+  '/assinatura': typeof AppAssinaturaRoute
   '/campanhas': typeof AppCampanhasRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
@@ -373,6 +394,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/instagram/webhook': typeof ApiV1InstagramWebhookRoute
   '/api/v1/whatsapp/webhook': typeof ApiV1WhatsappWebhookRoute
   '/api/public/forms/$formId/submit': typeof ApiPublicFormsFormIdSubmitRoute
+  '/api/v1/billing/asaas/webhook': typeof ApiV1BillingAsaasWebhookRoute
   '/api/v1/brevo/webhook/$connectionId': typeof ApiV1BrevoWebhookConnectionIdRoute
 }
 export interface FileRoutesByTo {
@@ -382,8 +404,10 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
   '/recuperar-acesso': typeof RecuperarAcessoRoute
+  '/vendas': typeof VendasRoute
   '/agenda': typeof AppAgendaRoute
   '/agendamentos': typeof AppAgendamentosRoute
+  '/assinatura': typeof AppAssinaturaRoute
   '/campanhas': typeof AppCampanhasRoute
   '/clientes': typeof AppClientesRoute
   '/configuracoes': typeof AppConfiguracoesRoute
@@ -425,6 +449,7 @@ export interface FileRoutesByTo {
   '/api/v1/instagram/webhook': typeof ApiV1InstagramWebhookRoute
   '/api/v1/whatsapp/webhook': typeof ApiV1WhatsappWebhookRoute
   '/api/public/forms/$formId/submit': typeof ApiPublicFormsFormIdSubmitRoute
+  '/api/v1/billing/asaas/webhook': typeof ApiV1BillingAsaasWebhookRoute
   '/api/v1/brevo/webhook/$connectionId': typeof ApiV1BrevoWebhookConnectionIdRoute
 }
 export interface FileRoutesById {
@@ -436,8 +461,10 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
   '/recuperar-acesso': typeof RecuperarAcessoRoute
+  '/vendas': typeof VendasRoute
   '/_app/agenda': typeof AppAgendaRoute
   '/_app/agendamentos': typeof AppAgendamentosRoute
+  '/_app/assinatura': typeof AppAssinaturaRoute
   '/_app/campanhas': typeof AppCampanhasRoute
   '/_app/clientes': typeof AppClientesRoute
   '/_app/configuracoes': typeof AppConfiguracoesRoute
@@ -480,6 +507,7 @@ export interface FileRoutesById {
   '/api/v1/instagram/webhook': typeof ApiV1InstagramWebhookRoute
   '/api/v1/whatsapp/webhook': typeof ApiV1WhatsappWebhookRoute
   '/api/public/forms/$formId/submit': typeof ApiPublicFormsFormIdSubmitRoute
+  '/api/v1/billing/asaas/webhook': typeof ApiV1BillingAsaasWebhookRoute
   '/api/v1/brevo/webhook/$connectionId': typeof ApiV1BrevoWebhookConnectionIdRoute
 }
 export interface FileRouteTypes {
@@ -491,8 +519,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/mcp'
     | '/recuperar-acesso'
+    | '/vendas'
     | '/agenda'
     | '/agendamentos'
+    | '/assinatura'
     | '/campanhas'
     | '/clientes'
     | '/configuracoes'
@@ -534,6 +564,7 @@ export interface FileRouteTypes {
     | '/api/v1/instagram/webhook'
     | '/api/v1/whatsapp/webhook'
     | '/api/public/forms/$formId/submit'
+    | '/api/v1/billing/asaas/webhook'
     | '/api/v1/brevo/webhook/$connectionId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -543,8 +574,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/mcp'
     | '/recuperar-acesso'
+    | '/vendas'
     | '/agenda'
     | '/agendamentos'
+    | '/assinatura'
     | '/campanhas'
     | '/clientes'
     | '/configuracoes'
@@ -586,6 +619,7 @@ export interface FileRouteTypes {
     | '/api/v1/instagram/webhook'
     | '/api/v1/whatsapp/webhook'
     | '/api/public/forms/$formId/submit'
+    | '/api/v1/billing/asaas/webhook'
     | '/api/v1/brevo/webhook/$connectionId'
   id:
     | '__root__'
@@ -596,8 +630,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/mcp'
     | '/recuperar-acesso'
+    | '/vendas'
     | '/_app/agenda'
     | '/_app/agendamentos'
+    | '/_app/assinatura'
     | '/_app/campanhas'
     | '/_app/clientes'
     | '/_app/configuracoes'
@@ -640,6 +676,7 @@ export interface FileRouteTypes {
     | '/api/v1/instagram/webhook'
     | '/api/v1/whatsapp/webhook'
     | '/api/public/forms/$formId/submit'
+    | '/api/v1/billing/asaas/webhook'
     | '/api/v1/brevo/webhook/$connectionId'
   fileRoutesById: FileRoutesById
 }
@@ -651,6 +688,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   McpRoute: typeof McpRoute
   RecuperarAcessoRoute: typeof RecuperarAcessoRoute
+  VendasRoute: typeof VendasRoute
   AgendamentoTokenRoute: typeof AgendamentoTokenRoute
   AgendarCalendarIdRoute: typeof AgendarCalendarIdRoute
   AprovacaoTokenRoute: typeof AprovacaoTokenRoute
@@ -668,6 +706,7 @@ export interface RootRouteChildren {
   ApiV1InstagramCallbackRoute: typeof ApiV1InstagramCallbackRoute
   ApiV1InstagramWebhookRoute: typeof ApiV1InstagramWebhookRoute
   ApiV1WhatsappWebhookRoute: typeof ApiV1WhatsappWebhookRoute
+  ApiV1BillingAsaasWebhookRoute: typeof ApiV1BillingAsaasWebhookRoute
   ApiV1BrevoWebhookConnectionIdRoute: typeof ApiV1BrevoWebhookConnectionIdRoute
 }
 
@@ -722,6 +761,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RecuperarAcessoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vendas': {
+      id: '/vendas'
+      path: '/vendas'
+      fullPath: '/vendas'
+      preLoaderRoute: typeof VendasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/': {
       id: '/_app/'
       path: '/'
@@ -741,6 +787,13 @@ declare module '@tanstack/react-router' {
       path: '/agendamentos'
       fullPath: '/agendamentos'
       preLoaderRoute: typeof AppAgendamentosRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/assinatura': {
+      id: '/_app/assinatura'
+      path: '/assinatura'
+      fullPath: '/assinatura'
+      preLoaderRoute: typeof AppAssinaturaRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/campanhas': {
@@ -1030,6 +1083,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicFormsFormIdSubmitRouteImport
       parentRoute: typeof ApiPublicFormsFormIdRoute
     }
+    '/api/v1/billing/asaas/webhook': {
+      id: '/api/v1/billing/asaas/webhook'
+      path: '/api/v1/billing/asaas/webhook'
+      fullPath: '/api/v1/billing/asaas/webhook'
+      preLoaderRoute: typeof ApiV1BillingAsaasWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/brevo/webhook/$connectionId': {
       id: '/api/v1/brevo/webhook/$connectionId'
       path: '/api/v1/brevo/webhook/$connectionId'
@@ -1043,6 +1103,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppAgendaRoute: typeof AppAgendaRoute
   AppAgendamentosRoute: typeof AppAgendamentosRoute
+  AppAssinaturaRoute: typeof AppAssinaturaRoute
   AppCampanhasRoute: typeof AppCampanhasRoute
   AppClientesRoute: typeof AppClientesRoute
   AppConfiguracoesRoute: typeof AppConfiguracoesRoute
@@ -1069,6 +1130,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAgendaRoute: AppAgendaRoute,
   AppAgendamentosRoute: AppAgendamentosRoute,
+  AppAssinaturaRoute: AppAssinaturaRoute,
   AppCampanhasRoute: AppCampanhasRoute,
   AppClientesRoute: AppClientesRoute,
   AppConfiguracoesRoute: AppConfiguracoesRoute,
@@ -1127,6 +1189,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   McpRoute: McpRoute,
   RecuperarAcessoRoute: RecuperarAcessoRoute,
+  VendasRoute: VendasRoute,
   AgendamentoTokenRoute: AgendamentoTokenRoute,
   AgendarCalendarIdRoute: AgendarCalendarIdRoute,
   AprovacaoTokenRoute: AprovacaoTokenRoute,
@@ -1144,6 +1207,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiV1InstagramCallbackRoute: ApiV1InstagramCallbackRoute,
   ApiV1InstagramWebhookRoute: ApiV1InstagramWebhookRoute,
   ApiV1WhatsappWebhookRoute: ApiV1WhatsappWebhookRoute,
+  ApiV1BillingAsaasWebhookRoute: ApiV1BillingAsaasWebhookRoute,
   ApiV1BrevoWebhookConnectionIdRoute: ApiV1BrevoWebhookConnectionIdRoute,
 }
 export const routeTree = rootRouteImport

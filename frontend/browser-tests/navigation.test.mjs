@@ -702,3 +702,44 @@ test('message notifications recover after a temporary API failure without presen
   await page.locator('.toast.message').filter({ hasText: 'Recebida depois da reconexão' }).waitFor({ timeout: 12000 });
   await context.close();
 });
+
+test('sales page leads account owners to their Asaas invoice', async () => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    const page = await context.newPage();
+    await page.goto(origin + '/vendas');
+    await page.getByRole('heading', { name: /saiba com quem falar/i }).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+    await page.getByRole('button', { name: 'Proposta', exact: true }).click();
+    await page.getByText('Projeto de móveis sob medida').waitFor();
+    await page.getByRole('button', { name: 'Retorno', exact: true }).click();
+    await page.getByText('Retomar a proposta com o cliente').waitFor();
+    await page.getByText('O preço é por usuário?', { exact: true }).click();
+    await page.getByText('A assinatura é de R$ 197 por mês por conta (workspace).', { exact: true }).waitFor();
+    await page.getByRole('link', { name: /abrir assinatura/i }).click();
+    await page.waitForURL('**/login?next=assinatura');
+
+    const billing = { enabled: true, managed_by_agency: false, status: 'trialing', price: '197.00', can_subscribe: true };
+    const invoiceUrl = 'https://sandbox.asaas.com/i/test';
+    await page.route('**/api/backend/billing', route => route.fulfill({ json: billing }));
+    await page.route('**/api/backend/billing/subscribe', route => {
+      assert.equal(route.request().headers()['x-workspace-id'], workspace.id);
+      assert.deepEqual(route.request().postDataJSON(), { cpf_cnpj: '52998224725' });
+      return route.fulfill({
+        json: { ...billing, can_subscribe: false, invoice_url: invoiceUrl, next_due_date: '2026-11-27' },
+      });
+    });
+    await page.getByLabel('Conta', { exact: true }).fill('test');
+    await page.getByLabel('E-mail', { exact: true }).fill('fixture@example.test');
+    await page.getByLabel('Senha', { exact: true }).fill('password');
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await page.waitForURL('**/assinatura');
+    await page.getByLabel('CPF ou CNPJ').fill('52998224725');
+    await page.getByRole('button', { name: 'Gerar fatura no Asaas' }).click();
+    const invoice = page.getByRole('link', { name: 'Abrir fatura no Asaas' });
+    await invoice.waitFor();
+    assert.equal(await invoice.getAttribute('href'), invoiceUrl);
+  } finally {
+    await context.close();
+  }
+});
