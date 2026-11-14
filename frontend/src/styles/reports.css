@@ -5,13 +5,13 @@
 .rep-bar .toolbar-end { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-left: auto; }
 .rep-bar select { min-height: 40px; }
 .rep-range { margin-top: calc(var(--space-2) * -1); color: var(--muted); font-size: 12px; }
-.text-success { color: #2e7d4f; }
+.text-success { color: var(--success-ink); }
 
 /* KPIs: Visão geral cards; the linked ones lift on hover. */
 .rep-kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .rep-kpis .stat-value { font-size: 22px; }
 .rep-kpi-link { color: inherit; transition: border-color .15s, box-shadow .15s; }
-.rep-kpi-link:hover { border-color: #d6d6da; box-shadow: 0 4px 14px #25282b0f; }
+.rep-kpi-link:hover { border-color: var(--line); box-shadow: 0 4px 14px #25282b0f; }
 
 .rep-grid { display: grid; gap: var(--gap-section); min-width: 0; }
 .rep-main { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); }
@@ -35,7 +35,7 @@
 .rep-funnel-track { display: flex; justify-content: center; }
 .rep-funnel-track span { display: grid; place-items: center; min-width: 28px; height: 26px; border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .rep-funnel small { margin-left: calc(110px + var(--space-3)); color: var(--muted); font-size: 11px; text-align: center; }
-.rep-step-rate { align-self: center; margin-left: calc(110px + var(--space-3)); padding: 1px 8px; border-radius: 999px; background: #f4f4f5; color: var(--muted); font-size: 10px; font-weight: 700; }
+.rep-step-rate { align-self: center; margin-left: calc(110px + var(--space-3)); padding: 1px 8px; border-radius: 999px; background: var(--surface-muted); color: var(--muted); font-size: 10px; font-weight: 700; }
 .rep-funnel-foot { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--line-soft); font-size: 12px; color: var(--muted); }
 .rep-funnel-foot b { font-size: 14px; }
 
@@ -45,22 +45,22 @@
 .rep-bar-top span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .rep-bars small { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
 .rep-bar-link { display: block; margin: calc(var(--space-2) * -1); padding: var(--space-2); border-radius: 8px; color: inherit; }
-.rep-bar-link:hover { background: #f7f7f8; }
-.rep-bar-link:hover .rep-bar-top span { color: var(--primary); }
+.rep-bar-link:hover { background: var(--surface-hover); }
+.rep-bar-link:hover .rep-bar-top span { color: var(--primary-text); }
 
 /* Health */
 .rep-health { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--gap-group); }
 .rep-health > div { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) var(--space-4); border: 1px solid var(--line-soft); border-radius: var(--radius-card); }
-.rep-health > div.warn { border-color: #f1d28c; background: #fbf3e4; }
+.rep-health > div.warn { border-color: var(--warning-line); background: var(--warning-soft); }
 .rep-health span { font-size: 11px; color: var(--muted); }
 .rep-health strong { font-size: 18px; font-variant-numeric: tabular-nums; }
 .rep-health small { font-size: 11px; color: var(--muted); }
 
 /* Deal lists */
 .rep-list { display: flex; flex-direction: column; padding-block: var(--space-2); }
-.rep-deal { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid #f0f0f0; }
+.rep-deal { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
 .rep-deal:last-child { border-bottom: 0; }
-.rep-deal:hover strong { color: var(--primary); }
+.rep-deal:hover strong { color: var(--primary-text); }
 .rep-deal > div { display: flex; flex-direction: column; min-width: 0; }
 .rep-deal strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rep-deal small { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -76,7 +76,7 @@
 .rep-sub { display: block; }
 
 /* Operação */
-.rep-ops-list p { display: flex; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) 0; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+.rep-ops-list p { display: flex; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) 0; font-size: 13px; border-bottom: 1px solid var(--line); }
 .rep-ops-list p:last-child { border-bottom: 0; }
 .rep-ops-list strong { text-align: right; }
 
