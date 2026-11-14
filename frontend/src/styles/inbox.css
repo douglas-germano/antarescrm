@@ -233,3 +233,17 @@ a.contact-row:hover { border-color: #d6d6da; }
 .owner-select select { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; opacity: 0; cursor: pointer; }
 /* Chats jump to the latest message; the page-wide smooth scrolling would animate (and lose) that jump. */
 .wa-messages { scroll-behavior: auto; overscroll-behavior: contain; }
+
+/* Queue signals: owner, wait against the reply target, failed delivery. */
+.inbox-views { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+.inbox-view { white-space: nowrap; flex-shrink: 0; }
+.inbox-sla { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 11.5px; }
+.wa-item-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; min-width: 0; flex-wrap: wrap; }
+.wa-owner-chip, .wa-wait, .wa-failed { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px 0 3px; border-radius: 10px; font-size: 11px; font-weight: 600; line-height: 1; white-space: nowrap; }
+.wa-owner-chip { background: rgba(127, 127, 140, .14); color: var(--ink); max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+.wa-owner-chip .owner-avatar { width: 16px; height: 16px; font-size: 7px; }
+.wa-owner-chip.none { padding: 0 7px; color: var(--muted); background: transparent; border: 1px dashed rgba(127, 127, 140, .4); }
+.wa-wait, .wa-failed { padding: 0 7px; }
+.wa-wait.ok { background: rgba(127, 127, 140, .14); color: var(--muted); }
+.wa-wait.warn { background: rgba(245, 158, 11, .16); color: var(--warning, #d97706); }
+.wa-wait.late, .wa-failed { background: rgba(239, 68, 68, .16); color: var(--danger, #dc2626); }

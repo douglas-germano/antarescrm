@@ -1,4 +1,4 @@
-import { Handshake, Instagram, Mail, MessageCircle, Search, SlidersHorizontal, Smartphone, X } from 'lucide-react';
+import { AlertTriangle, Clock, Handshake, Instagram, Mail, MessageCircle, Search, SlidersHorizontal, Smartphone, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { EmptyState, Popover } from '@/components/ui';
 import { initials } from '@/lib/format';
@@ -23,12 +23,47 @@ export function ThreadAvatar({ name, channel }: { name: string; channel: string 
   );
 }
 
-export type InboxView = 'all' | 'unread' | 'mine';
+export type InboxView = 'all' | 'unread' | 'mine' | 'unassigned' | 'waiting' | 'failed';
 const VIEWS: { value: InboxView; label: string }[] = [
   { value: 'all', label: 'Todas' },
   { value: 'unread', label: 'Não lidas' },
   { value: 'mine', label: 'Minhas' },
+  { value: 'unassigned', label: 'Sem responsável' },
+  { value: 'waiting', label: 'Aguardando equipe' },
+  { value: 'failed', label: 'Falhas' },
 ];
+
+/** Whether a conversation belongs to a quick filter; `me` is the signed-in user's id. */
+export function inInboxView(thread: Row, view: InboxView, me?: string) {
+  if (view === 'unread') return Number(thread.unread_count || 0) > 0;
+  if (view === 'mine') return Boolean(me) && thread.assigned_to_id === me;
+  if (view === 'unassigned') return !thread.assigned_to_id;
+  if (view === 'waiting') return thread.waiting_on === 'team';
+  if (view === 'failed') return Boolean(thread.delivery_failed);
+  return true;
+}
+
+/** Minutes the contact has waited for the team, or null when nobody waits on us. */
+export function waitingMinutes(thread: Row, at = Date.now()) {
+  if (thread.waiting_on !== 'team' || !thread.waiting_since) return null;
+  return Math.max(0, Math.floor((at - new Date(thread.waiting_since).getTime()) / 60000));
+}
+
+/** Short wait label: "4 min", "2 h", "3 d". */
+export function waitLabel(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 60 * 24) return `${Math.floor(minutes / 60)} h`;
+  return `${Math.floor(minutes / 1440)} d`;
+}
+
+/** Up to 15 min is fine, up to an hour is a warning, beyond that is late. */
+export const slaLevel = (minutes: number) => (minutes > 60 ? 'late' : minutes > 15 ? 'warn' : 'ok');
+
+/** "Mediana 12 min" style text for the first-response line. */
+export function durationLabel(seconds: number) {
+  if (seconds < 60) return `${seconds} s`;
+  return waitLabel(Math.round(seconds / 60));
+}
 const STATUSES = [
   { value: 'open', label: 'Abertas' },
   { value: 'closed', label: 'Encerradas' },
@@ -38,7 +73,7 @@ const STATUSES = [
 /** The unified conversation list: views with counts, channel chips, extra filters, then one row per thread. */
 export function ThreadList({
   threads, counts, channels, nameOf, ownerOf, selected, onSelect, search, onSearch,
-  view, onView, status, onStatus, channel, onChannel, unassigned, onUnassigned, footer,
+  view, onView, status, onStatus, channel, onChannel, firstResponse, footer,
 }: {
   threads: Row[];
   counts: Record<InboxView, number>;
@@ -56,11 +91,11 @@ export function ThreadList({
   onStatus: (value: string) => void;
   channel: string;
   onChannel: (value: string) => void;
-  unassigned: boolean;
-  onUnassigned: (value: boolean) => void;
+  /** Median first response of the last days, from the inbox summary. */
+  firstResponse?: { median: number | null; sample: number; days: number };
   footer?: ReactNode;
 }) {
-  const extraFilters = (status !== 'open' ? 1 : 0) + (unassigned ? 1 : 0);
+  const extraFilters = status !== 'open' ? 1 : 0;
   return (
     <aside className="wa-list">
       <div className="wa-list-head tips-below">
@@ -74,7 +109,6 @@ export function ThreadList({
             badge={extraFilters ? <span className="popover-badge">{extraFilters}</span> : undefined}>{() => <>
             <label className="field"><span>Situação</span>
               <select value={status} onChange={(e) => onStatus(e.target.value)}>{STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select></label>
-            <label className="checkbox-label"><input type="checkbox" checked={unassigned} onChange={(e) => onUnassigned(e.target.checked)} />Somente sem responsável</label>
           </>}</Popover>
         </div>
         <div className="inbox-views" role="tablist" aria-label="Conversas">
@@ -84,6 +118,11 @@ export function ThreadList({
             </button>
           ))}
         </div>
+        {firstResponse && (
+          <p className="inbox-sla" data-tip={`Tempo entre a mensagem do contato e a primeira resposta da equipe, em ${firstResponse.sample} atendimento(s).`}>
+            <Clock size={12} /> 1ª resposta ({firstResponse.days} dias): {firstResponse.median == null ? 'sem dados' : 'mediana ' + durationLabel(firstResponse.median)}
+          </p>
+        )}
         {channels.length > 1 && (
           <div className="inbox-channels" role="group" aria-label="Canal">
             <button type="button" className={'inbox-channel' + (channel === 'all' ? ' active' : '')} onClick={() => onChannel('all')}>Todos</button>
@@ -101,8 +140,11 @@ export function ThreadList({
           const name = nameOf(thread);
           const active = selected?.id === thread.id && selected?.source === thread.source;
           const unread = Number(thread.unread_count || 0);
-          const waiting = thread.last_direction === 'in' && thread.status !== 'closed';
+          const waiting = thread.waiting_on === 'team';
           const owner = ownerOf(thread);
+          const minutes = waitingMinutes(thread);
+          const failed = Boolean(thread.delivery_failed);
+          const isOpen = thread.status !== 'closed';
           return (
             <button type="button" key={thread.source + thread.id} className={'wa-item' + (active ? ' selected' : '') + (unread ? ' unread' : '') + (waiting ? ' waiting' : '')} aria-current={active || undefined} onClick={() => onSelect(thread)}>
               <ThreadAvatar name={name} channel={thread.channel} />
@@ -116,14 +158,22 @@ export function ThreadList({
                 <span className="wa-item-bottom">
                   <span className="wa-item-preview">{thread.preview || 'Conversa iniciada'}</span>
                   {thread.has_open_deal && <span className="wa-item-deal" data-tip="Tem negócio em aberto" aria-label="Tem negócio em aberto"><Handshake size={12} /></span>}
-                  {owner && <span className="owner-avatar" data-tip={'Responsável: ' + owner} aria-label={'Responsável: ' + owner}>{initials(owner)}</span>}
                   {unread > 0 && <span className="wa-unread" aria-label={`${unread} não lidas`}>{unread}</span>}
                 </span>
+                {(isOpen || failed) && (
+                  <span className="wa-item-meta">
+                    {owner
+                      ? <span className="wa-owner-chip" title={'Responsável: ' + owner}><span className="owner-avatar">{initials(owner)}</span>{owner.split(' ')[0]}</span>
+                      : isOpen && <span className="wa-owner-chip none">Sem responsável</span>}
+                    {minutes != null && <span className={'wa-wait ' + slaLevel(minutes)} title="Tempo esperando resposta da equipe"><Clock size={11} />{waitLabel(minutes)}</span>}
+                    {failed && <span className="wa-failed" title={thread.delivery_error || 'Falha no envio'}><AlertTriangle size={11} />Falha no envio</span>}
+                  </span>
+                )}
               </span>
             </button>
           );
         })}
-        {!threads.length && <EmptyState icon={<MessageCircle />} title="Nenhuma conversa" description={view === 'mine' ? 'Nenhuma conversa atribuída a você com estes filtros.' : 'Inicie um atendimento ou ajuste os filtros.'} />}
+        {!threads.length && <EmptyState icon={<MessageCircle />} title="Nenhuma conversa" description={view === 'failed' ? 'Nenhuma conversa com falha de envio.' : view === 'mine' ? 'Nenhuma conversa atribuída a você com estes filtros.' : 'Inicie um atendimento ou ajuste os filtros.'} />}
       </div>
       {footer}
     </aside>

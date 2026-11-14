@@ -11568,6 +11568,61 @@
         ]
       }
     },
+    "/inbox/summary": {
+      "get": {
+        "operationId": "communications_inbox_summary_get_inbox_summary",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Workspace-ID",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Operação concluída. Schemas de resposta detalhados estão disponíveis para os recursos CRM principais.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Falha de validação, acesso ou processamento.",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Identificador da operação nos logs do backend.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "communications"
+        ]
+      }
+    },
     "/inbox/{source}/{thread_id}": {
       "get": {
         "operationId": "communications_inbox_thread_get_inbox_source_thread_id",

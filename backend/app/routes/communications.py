@@ -99,6 +99,13 @@ def inbox():
     return inbox_service.list_threads(current_account())
 
 
+@bp.get('/inbox/summary')
+@require()
+def inbox_summary():
+    """Quick-filter counts and the week's median first response for the inbox header."""
+    return inbox_service.summary(current_account())
+
+
 @bp.patch('/inbox/inbox/<uuid:thread_id>')
 @require()
 def inbox_thread_update(thread_id):
