@@ -6,7 +6,7 @@ import { ChatPane } from '@/components/whatsapp/ChatPane';
 import { ConnectionBar } from '@/components/whatsapp/ConnectionBar';
 import { ConversationDetailsDialog, NewConversationDialog } from '@/components/whatsapp/ConversationDialogs';
 import { OtherThread } from '@/components/whatsapp/OtherThread';
-import { ThreadList, type InboxView } from '@/components/whatsapp/ThreadList';
+import { ThreadList, inInboxView, type InboxView } from '@/components/whatsapp/ThreadList';
 import { CreateInboxOpportunityDialog } from '@/components/inbox/create-opportunity-dialog';
 import { MessageNotificationButton } from '@/components/inbox/message-notifications';
 import { ContactPanel } from '@/components/inbox/contact-panel';
@@ -25,13 +25,13 @@ export default function MessagesPage() {
   const { notify } = useNotify();
   const manage = ['owner', 'admin'].includes(user?.role || '');
   const threads = useSWR<{ items: Row[] }>('/inbox', api, { refreshInterval: 5000 });
+  const summary = useSWR<{ first_response_median: number | null; first_response_sample: number; period_days: number }>('/inbox/summary', api, { refreshInterval: 60000 });
   const contacts = useList('/contacts');
   const staff = useList('/users');
   const instagram = useData<{ configured: boolean; connected: boolean }>('/instagram/connection');
   const [channel, setChannel] = useState('all');
   const [status, setStatus] = useState('open');
   const [view, setView] = useState<InboxView>('all');
-  const [unassigned, setUnassigned] = useState(false);
   const [search, setSearch] = useState('');
   const [showNew, setShowNew] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -61,7 +61,7 @@ export default function MessagesPage() {
     if (openedLink === key) return;
     const row = threads.data?.items.find(item => item.source === requestedSource && item.id === requestedId) || requestedThread.data;
     if (row) {
-      setSelected(row); setStatus('all'); setChannel('all'); setView('all'); setUnassigned(false); setSearch(''); setOpenedLink(key);
+      setSelected(row); setStatus('all'); setChannel('all'); setView('all'); setSearch(''); setOpenedLink(key);
     }
   }, [requestedId, requestedSource, requestedThread.data, threads.data, openedLink]);
 
@@ -71,18 +71,18 @@ export default function MessagesPage() {
   // Unlinked Instagram threads have an internal address; their @ is the readable name.
   const handle = (thread: Row) => (thread.channel === 'instagram' && thread.display_address !== 'Instagram' ? thread.display_address : undefined);
   const nameOf = (thread: Row) => contactOf(thread)?.name || thread.contact_name || handle(thread) || (thread.channel === 'instagram' ? 'Instagram' : thread.address);
-  const ownerOf = (thread: Row) => (thread.assigned_to_id ? staff.data?.find((u) => u.id === thread.assigned_to_id)?.name : undefined);
+  const ownerOf = (thread: Row) => (thread.assigned_to_id ? staff.data?.find((u) => u.id === thread.assigned_to_id)?.name || thread.assigned_to_name : undefined);
 
-  // Status, unassigned, channel and search narrow everything; the view tabs and their counts apply on top.
+  // Status, channel and search narrow everything; the view tabs and their counts apply on top.
   const filtered = allThreads.filter(
     (thread) =>
       (status === 'all' || thread.status === status || (status === 'open' && !thread.status)) &&
-      (!unassigned || !thread.assigned_to_id) &&
       searchMatch(search, [thread.contact_name, thread.address, thread.display_address, thread.preview, nameOf(thread), contactOf(thread)?.phone]),
   );
-  const inView = (thread: Row, v: InboxView) => v === 'all' || (v === 'unread' ? Number(thread.unread_count || 0) > 0 : thread.assigned_to_id === user?.id);
+  const inView = (thread: Row, v: InboxView) => inInboxView(thread, v, user?.id);
   const byChannel = filtered.filter((t) => channel === 'all' || t.channel === channel);
-  const counts = { all: 0, unread: byChannel.filter((t) => inView(t, 'unread')).length, mine: byChannel.filter((t) => inView(t, 'mine')).length } as Record<InboxView, number>;
+  const counts = Object.fromEntries((['unread', 'mine', 'unassigned', 'waiting', 'failed'] as InboxView[]).map((v) => [v, byChannel.filter((t) => inView(t, v)).length])) as Record<InboxView, number>;
+  counts.all = 0;
   const visibleThreads = byChannel.filter((t) => inView(t, view));
   const channels = Array.from(new Set(allThreads.map((t) => t.channel))).sort().map((c) => ({
     channel: c, unread: filtered.filter((t) => t.channel === c && Number(t.unread_count || 0) > 0).length,
@@ -146,8 +146,7 @@ export default function MessagesPage() {
               onStatus={setStatus}
               channel={channel}
               onChannel={setChannel}
-              unassigned={unassigned}
-              onUnassigned={setUnassigned}
+              firstResponse={summary.data ? { median: summary.data.first_response_median, sample: summary.data.first_response_sample, days: summary.data.period_days } : undefined}
             />
             {selectedThread ? (
               <div className="wa-chat">
@@ -222,7 +221,6 @@ export default function MessagesPage() {
         setChannel('all');
         setStatus('all');
         setView('all');
-        setUnassigned(false);
         setSearch('');
         await threads.mutate();
       }} />

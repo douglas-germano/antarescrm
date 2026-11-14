@@ -1,0 +1,156 @@
+/* Authenticated workspace only. Public pages and editor previews keep their own palette. */
+.app {
+  color-scheme: dark;
+  color: var(--foreground);
+  --background: #17171e;
+  --ceramic: #202029;
+  --card: #292933;
+  --foreground: #f5f5f8;
+  --muted: #b7b7c7;
+  --ink: #f5f5f8;
+  --house: #30303e;
+  --line: #ffffff24;
+  --line-soft: #ffffff18;
+  --mint: #ef2f701f;
+  --primary-hover: #ff80ad;
+  --primary-soft: #ef2f7029;
+  --primary-soft-line: #ef2f705c;
+  --primary-selection: #92334f;
+  --primary-ring: #ef2f7040;
+  --danger: #ff9eaa;
+  --destructive: #ff9eaa;
+  --warning: #f2c874;
+  --info: #a8cfff;
+  --surface-input: #24242e;
+  --surface-hover: #ffffff0d;
+  --glass-surface: #292933;
+  --glass-border: #ffffff24;
+  --glass-shadow: 0 10px 28px #00000018, inset 0 1px 0 #ffffff0d;
+}
+.app :is(.card, .stat-card, .task-card, .kanban-card, .file-card, .approval-item,
+  .rule-card, .recipe, .auto-section, .proj-kpis > div, .import-stats > div,
+  .settings-nav, .bld-panel, .flow-node, .rep-health > div, .ig-account, .ig-preview) {
+  background: var(--glass-surface);
+  color: var(--foreground);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+.app :is(.modal, .popover-panel, .entity-list, .toast) {
+  background: var(--card);
+  color: var(--foreground);
+  border-color: var(--line);
+  box-shadow: 0 16px 48px #0005;
+}
+.app .modal { background: var(--glass-surface); }
+.app .modal-header { background: #24242ef5; border-color: var(--line); box-shadow: none; }
+.app .modal-content { background: transparent; }
+.app .modal::backdrop { background: #08080db3; }
+.app :is(input, select, textarea) { background-color: var(--surface-input); color: var(--foreground); border-color: #ffffff38; }
+.app :is(input, textarea)::placeholder { color: var(--muted); opacity: 1; }
+.app :is(input, select, textarea):hover { border-color: #ffffff65; }
+.app :is(input, select, textarea):focus { border-color: var(--brand); }
+.app select option { background: var(--surface-input); color: var(--foreground); }
+.app .search { background: var(--surface-input); border-color: #ffffff38; color: var(--muted); }
+.app .search input { background: transparent; border: 0; }
+.app .btn { background: var(--surface-input); color: var(--foreground); border-color: #ffffff38; }
+.app .btn:hover { background: #3b3b49; border-color: #ffffff65; }
+.app .btn-primary { background: var(--brand); border-color: var(--brand); color: var(--on-primary); }
+.app .btn-primary:hover { background: #ff548d; border-color: #ff548d; }
+.app .btn-danger { background: #8f2a3c; border-color: #b93f55; color: #fff; }
+.app :is(.btn-ghost, .icon-btn) { background: transparent; color: var(--muted); }
+.app :is(.btn-ghost, .icon-btn):hover { background: var(--surface-hover); color: var(--foreground); }
+.app :is(.tabs, .tab-count, .badge, .avatar, .owner-avatar, .date-tile,
+  .timeline-symbol, .file-preview, .approval-decision, .auto-step, .flow-node-body,
+  .flow-index, .bld-segmented, .rep-step-rate, .calendar-event, .deal-days,
+  .wa-file-chip, .wa-day span, .channel-list li, .ig-avatar, .pipeline-name,
+  .deal-chip, .role-badge.role-member, .slug-box code, .ig-thumb, .ig-preview-media, .ig-notes) {
+  background: #ffffff0d;
+  color: var(--muted);
+}
+.app :is(.tab.active, .wa-chip-btn.active, .bld-segmented button.active,
+  .fe-step-number, .auto-step-no, .tl-icon, .import-labels .deal-chip) {
+  background: #414153;
+  color: var(--foreground);
+}
+.app :is(.tabs-line .tab.active, .tabs-line .tab.active .tab-count) { background: transparent; color: var(--foreground); }
+.app :is(.menu-panel button:hover:not(:disabled), .entity-list li.active,
+  .data-table tbody tr:hover, .dash-row:hover, .task-row:hover, .calendar-cell:hover,
+  .settings-nav-item:hover, .flow-list-row:hover, .rep-bar-link:hover,
+  .wa-item:hover, .wa-item.selected, .wa-chip-btn:hover, .inbox-channel.active) { background: var(--surface-hover); }
+.app .data-table th { background: #ffffff08; color: var(--muted); }
+.app .data-table td { color: #d3d3de; border-color: var(--line-soft); }
+.app :is(.dash-row, .task-row, .rep-deal, .rep-ops-list p, .version-list, .deal-actions) { border-color: var(--line-soft); }
+.app :is(.card-link, .dash-more, .timeline-copy p, .workspace-switcher label,
+  .account-grant small, .wa-bubble.outgoing .wa-bubble-foot) { color: var(--muted); }
+.app :is(.kanban-column, .bld-canvas, .flow-editor, .wa-chat) { background-color: #1e1e27; border-color: var(--line); }
+.app :is(.kanban-card select, .settings-nav, .workspace-switcher,
+  .wa-list, .wa-chat-head, .wa-composer, .contact-panel, .wa-item,
+  .wa-connection-status, .wa-no-chat-icon, .inbox-channel, .connection-icon,
+  .owner-select, .composer-box, .chat-message .message-body, .bld-item,
+  .bld-palette button, .suggestions button, .import-drop) { background-color: var(--card); color: var(--foreground); border-color: var(--line); }
+.app .settings-nav { background: var(--glass-surface); }
+.app .wa-bubble { background: #30303c; color: var(--foreground); border-color: var(--line); }
+.app .wa-bubble.outgoing { background: #492b3b; border-color: var(--primary-soft-line); }
+.app .wa-composer textarea { background: var(--surface-input); border-color: var(--line); }
+.app .task-check { background: var(--surface-input); border-color: #ffffff65; }
+.app .task-check[aria-pressed='true'] { background: var(--brand); border-color: var(--brand); color: var(--on-primary); }
+.app .empty-icon { background: var(--mint); color: var(--muted); border-color: var(--line); }
+.app :is(.dash-bar, .dash-col > span.empty-col) { background: #ffffff18; }
+.app .dash-chart { background-image: repeating-linear-gradient(to top, transparent 0 calc(25% - 1px), #ffffff0a calc(25% - 1px) 25%); }
+.app .flow-canvas { background-color: #1e1e27; background-image: radial-gradient(#ffffff24 1px, transparent 1px); }
+.app .settings-nav-item.active { background: var(--primary-soft); color: #ff80ad; }
+.app :is(.calendar-cell.today, .bld-item[aria-current='true']) { background: var(--primary-soft); }
+.app :is(.text-success, .stat-trend.up, .project-done) { color: #8cdbaf; }
+.app :is(.badge-design, .badge-doing, .badge-in_progress, .badge-production,
+  .badge-approval, .badge-high, .badge-partial, .followup-reason, .deal-attention,
+  .deal-days.warn, .deal-chip.warn, .ig-warning, .billing-banner, .wa-banner-warning, .settings-confirm) { background: #f2c87418; color: #f2c874; border-color: #f2c87438; }
+.app :is(.proj-kpis > div.warn, .rep-health > div.warn) { background: #f2c87418; border-color: #f2c87438; }
+.app :is(.badge-measuring, .badge-review, .badge-installation, .deal-chip.info) { background: #a8cfff18; color: #a8cfff; }
+.app :is(.badge-lost, .badge-urgent, .badge-cancelled, .badge-overdue,
+  .followup-reason.overdue_action, .deal-attention.overdue_action,
+  .error-panel, .form-error, .flow-error) { background: #ff9eaa18; color: #ff9eaa; border-color: #ff9eaa38; }
+.app :is(.followup-reason.no_next_action, .deal-attention.no_next_action) { background: var(--mint); color: #ff80ad; }
+.app :is(.role-badge.role-admin) { background: #c5b0ff20; color: #cdbbff; }
+.app :is(.badge-paid, .badge-done, .badge-completed, .badge-won, .badge-approved,
+  .wa-state, .ig-window, .deal-chip.ok, .approval-decision.approved) { background: #8cdbaf18; color: #8cdbaf; }
+.app :is(.wa-unconfirmed, .wa-bubble:not(.outgoing) .wa-unconfirmed, .wa-bubble-error) { color: var(--warning); }
+.app :is(.billing-banner a, .gate-icon) { color: var(--foreground); }
+.app :is(.wa-agent-tabs button, .drop-zone) { background: var(--card); color: var(--foreground); border-color: var(--line); }
+.app .btn-ghost { border-color: transparent; }
+.app .mobile-menu { background: #292933; color: var(--foreground); border-color: var(--line); }
+/* Rendered customer pages inside the builder preserve their published light controls. */
+.app :is(.fp-page, .fv-page) { color-scheme: light; --foreground: #25282b; --muted: #6b6e71; --ink: #25282b; }
+.app :is(.fp-page, .fv-page) :is(input, select, textarea) { background-color: #fff; color: inherit; border-color: #25282b; }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .app { --glass-surface: linear-gradient(125deg, #ffffff10, #ffffff06); }
+  .app :is(.card, .stat-card, .task-card, .kanban-card, .file-card, .approval-item,
+    .rule-card, .recipe, .auto-section, .proj-kpis > div, .import-stats > div,
+    .settings-nav, .bld-panel, .flow-node, .rep-health > div, .ig-account, .ig-preview) {
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+  }
+  .app .page-header { background: #25252fe8; }
+  .app .modal { background: #292933ed; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .app { --glass-surface: #292933; }
+  .app :is(.sidebar, .page-header, .modal, .card, .stat-card, .task-card,
+    .kanban-card, .file-card, .approval-item, .rule-card, .recipe, .auto-section,
+    .proj-kpis > div, .import-stats > div, .settings-nav, .bld-panel,
+    .flow-node, .rep-health > div, .ig-account, .ig-preview) {
+    background: #292933;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (forced-colors: active) {
+  .app { color: CanvasText; --foreground: CanvasText; --muted: CanvasText; --ink: CanvasText; --line: ButtonBorder; --line-soft: ButtonBorder; --glass-border: ButtonBorder; --glass-surface: Canvas; }
+  .app :is(.card, .stat-card, .task-card, .kanban-card, .file-card, .approval-item,
+    .rule-card, .recipe, .auto-section, .proj-kpis > div, .import-stats > div,
+    .settings-nav, .bld-panel, .flow-node, .rep-health > div, .ig-account, .ig-preview) { background: Canvas; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+}
+
+@media (max-width: 720px) {
+  .app .board-bar .toolbar-end { max-width: 100%; margin-left: 0; }
+  .app .summary-inline { flex-wrap: wrap; white-space: normal; gap: var(--space-2) var(--space-4); }
+}

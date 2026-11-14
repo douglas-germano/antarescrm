@@ -115,10 +115,10 @@
 }
 .modal {
   padding: 0;
-  border: 1px solid var(--line);
-  box-shadow: none;
-  border-radius: 6px;
-  background: #fff;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 24px 80px #231a3533, inset 0 1px 0 #fff;
+  border-radius: 18px;
+  background: var(--glass-surface);
   color: var(--foreground);
   overflow: auto;
   width: min(620px,calc(100% - 32px));
@@ -127,6 +127,7 @@
 }
 .modal::backdrop {
   background: #231a356b;
+  -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
 }
 .modal-wide {
@@ -137,7 +138,8 @@
   justify-content: space-between;
   position: sticky;
   top: 0;
-  background: #fff;
+  background: #ffffff70;
+  border-bottom: 1px solid #ef2f7012;
   z-index: 2;
   padding: 24px 24px;
   align-items: flex-start;
@@ -153,6 +155,7 @@
   line-height: 1.6;
 }
 .modal-content {
+  background: #fff;
   padding: 24px;
 }
 .modal-footer {
