@@ -44,6 +44,8 @@ export default function AutomationEditorPage() {
   const templates = useList('/message-templates');
   const stages = useData<{ items: Row[] }>('/pipeline/stages');
   const [query, setQuery] = useState<URLSearchParams | null>(null);
+  // Bumped after restoring a version, so the editor reloads the restored configuration.
+  const [revision, setRevision] = useState(0);
   useEffect(() => setQuery(new URLSearchParams(window.location.search)), []);
 
   if (!manage) return <div className="page"><Card><EmptyState icon={<Workflow />} title="Acesso restrito" description="Somente administradores podem editar automações." /></Card></div>;
@@ -62,7 +64,7 @@ export default function AutomationEditorPage() {
           if (rule) initial = fromRule(rule);
         }
         if (!initial) return <div className="page"><Card><EmptyState icon={<Workflow />} title="Automação não encontrada" description="Ela pode ter sido excluída." action={<Link className="btn btn-primary" to="/automacoes">Ver automações</Link>} /></Card></div>;
-        return <FlowEditor key={initial.id || 'nova'} initial={initial} staff={staff.data || []} templates={templates.data || []} stages={stages.data?.items || []} />;
+        return <FlowEditor key={(initial.id || 'nova') + ':' + revision} onRestored={() => setRevision((n) => n + 1)} initial={initial} staff={staff.data || []} templates={templates.data || []} stages={stages.data?.items || []} />;
       })()}
     </DataState>
   );

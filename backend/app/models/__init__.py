@@ -2,7 +2,15 @@
 
 from .api_tokens import TOKEN_SCOPES, ApiToken
 from .atlas import AtlasConnection, AtlasCredential, AtlasJob, AtlasTarget
-from .automation import AutomationJob, AutomationRule, AutomationRun, FormSubmission, LeadForm, WorkerHeartbeat
+from .automation import (
+    AutomationJob,
+    AutomationRule,
+    AutomationRuleVersion,
+    AutomationRun,
+    FormSubmission,
+    LeadForm,
+    WorkerHeartbeat,
+)
 from .base import Base, TenantBase, UTCDateTime, now, uid
 from .billing import BillingEvent, Subscription
 from .booking import Booking, BookingCalendar
@@ -74,6 +82,7 @@ __all__ = [
     'LeadForm',
     'FormSubmission',
     'AutomationRule',
+    'AutomationRuleVersion',
     'AutomationRun',
     'AutomationJob',
     'WorkerHeartbeat',

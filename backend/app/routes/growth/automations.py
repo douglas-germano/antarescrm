@@ -1,4 +1,4 @@
-from flask import request
+from flask import g, request
 from marshmallow import fields as f
 from sqlalchemy import func
 
@@ -7,13 +7,15 @@ from ...extensions import db
 from ...models import (
     AutomationJob,
     AutomationRule,
+    AutomationRuleVersion,
     AutomationRun,
     Contact,
     Opportunity,
 )
 from ...schemas.base import StrictSchema, ref
 from ...schemas.growth import RuleSchema
-from ...services.conditions import matches
+from ...services.conditions import explain, matches
+from ...services.rule_versions import ensure_baseline, history, record, snapshot
 from ...services.rules import validate_rule
 from . import bp
 
@@ -52,7 +54,9 @@ def rules():
 def rule_create():
     data = payload(RuleSchema)
     validate_rule(data)
-    return commit(add(AutomationRule, data), 201)
+    row = add(AutomationRule, data)
+    record(row, g.user.id, 'Criada')
+    return commit(row, 201)
 
 
 @bp.patch('/automations/<uuid:rule_id>')
@@ -61,7 +65,9 @@ def rule_update(rule_id):
     row = get(AutomationRule, rule_id)
     data = payload(RuleSchema, partial=True)
     validate_rule(data, row)
+    ensure_baseline(row)
     update(row, data)
+    record(row, g.user.id)
     return commit(row)
 
 
@@ -71,9 +77,34 @@ def rule_delete(rule_id):
     row = get(AutomationRule, rule_id)
     if query(AutomationRun).filter_by(rule_id=row.id).first():
         raise APIError('Esta automação já foi executada e mantém histórico. Pause-a em vez de excluir.', 409)
+    query(AutomationRuleVersion).filter_by(rule_id=row.id).delete()
     db.session.delete(row)
     db.session.commit()
     return '', 204
+
+
+@bp.get('/automations/<uuid:rule_id>/versions')
+@require('owner', 'admin')
+def rule_versions(rule_id):
+    return {'items': history(get(AutomationRule, rule_id))}
+
+
+@bp.post('/automations/<uuid:rule_id>/versions/<int:number>/restore')
+@require('owner', 'admin')
+def rule_restore(rule_id, number):
+    row = get(AutomationRule, rule_id, lock=True)
+    version = query(AutomationRuleVersion).filter_by(rule_id=row.id, number=number).first()
+    if not version:
+        raise APIError('Versão não encontrada.', 404)
+    if version.snapshot == snapshot(row):
+        raise APIError('Esta já é a versão em uso.', 409)
+    # Saved versions are revalidated: a template, stage or user may no longer exist in the account.
+    data = dict(version.snapshot)
+    validate_rule(data, row)
+    ensure_baseline(row)
+    update(row, data)
+    record(row, g.user.id, f'Restaurada da versão {number}')
+    return commit(row)
 
 
 @bp.get('/automations/runs')
@@ -127,13 +158,45 @@ def rule_preview():
     if not deal.contact_id:
         raise APIError('Escolha um negócio vinculado a um contato.', 422)
     contact = get(Contact, deal.contact_id)
-    eligible = (
-        not contact.archived
-        and (not rule.get('source') or rule['source'].casefold() == (contact.source or '').casefold())
-        and (not rule.get('required_tag') or rule['required_tag'] in (contact.tags or []))
-        and matches(rule.get('conditions', {}), contact, deal)
-        and (rule['event'] != 'opportunity.stage_idle' or deal.status == 'open')
-    )
+    # Each filter of the trigger with what it saw, so the test says why the contact entered or not.
+    gates = [
+        {
+            'label': 'Contato ativo',
+            'passed': not contact.archived,
+            'actual': 'arquivado' if contact.archived else 'ativo',
+        }
+    ]
+    if rule.get('source'):
+        gates.append(
+            {
+                'label': 'Origem é ' + rule['source'],
+                'passed': rule['source'].casefold() == (contact.source or '').casefold(),
+                'actual': contact.source,
+            }
+        )
+    if rule.get('required_tag'):
+        gates.append(
+            {
+                'label': 'Tem a tag ' + rule['required_tag'],
+                'passed': rule['required_tag'] in (contact.tags or []),
+                'actual': contact.tags or [],
+            }
+        )
+    if rule['event'] == 'opportunity.stage_idle':
+        gates.append({'label': 'Negócio em aberto', 'passed': deal.status == 'open', 'actual': deal.status})
+    conditions = rule.get('conditions') or {}
+    checks = explain(conditions, contact, deal)
+    if checks:
+        gates.append(
+            {
+                'label': 'Condições do gatilho ('
+                + ('qualquer uma' if conditions.get('mode') == 'any' else 'todas')
+                + ')',
+                'passed': matches(conditions, contact, deal),
+                'checks': checks,
+            }
+        )
+    eligible = all(gate['passed'] for gate in gates)
     steps = []
     actions = rule.get('actions') or []
     while eligible and actions:
@@ -148,6 +211,8 @@ def rule_preview():
                         'outcome': ('Resposta recebida' if matched else 'Prazo venceu')
                         if waiting
                         else ('Sim' if matched else 'Não'),
+                        'checks': [] if waiting else explain(action.get('conditions', {}), contact, deal),
+                        'delay_minutes': action.get('delay_minutes', 0),
                     }
                 )
                 actions = action['yes' if matched else 'no']
@@ -158,8 +223,15 @@ def rule_preview():
                     'kind': kind,
                     'title': action.get('title'),
                     'outcome': 'Executaria' if applies else 'Condição não atendida',
+                    'checks': explain(action.get('conditions', {}), contact, deal),
+                    'delay_minutes': action.get('delay_minutes', 0),
+                    # The test never sends; this marks the steps that would reach the contact for real.
+                    'sends_message': applies and kind in SENDS_MESSAGE,
                 }
             )
         else:
             break
-    return {'eligible': eligible, 'steps': steps}
+    return {'eligible': eligible, 'gates': gates, 'steps': steps}
+
+
+SENDS_MESSAGE = ('send_message', 'reply_comment', 'private_reply', 'instagram_message')

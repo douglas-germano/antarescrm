@@ -49,6 +49,18 @@ class AutomationRule(TenantBase):
     active = db.Column(db.Boolean, nullable=False, default=False)
 
 
+class AutomationRuleVersion(TenantBase):
+    """Saved configuration of a rule; restoring one records a new version instead of rewriting history."""
+
+    __tablename__ = 'automation_rule_versions'
+    rule_id = db.Column(db.String(36), db.ForeignKey('automation_rules.id'), nullable=False, index=True)
+    number = db.Column(db.Integer, nullable=False)
+    snapshot = db.Column(db.JSON, nullable=False)
+    author_id = db.Column(db.String(36), db.ForeignKey('users.id'))
+    note = db.Column(db.String(200))
+    __table_args__ = (UniqueConstraint('rule_id', 'number'),)
+
+
 class AutomationRun(TenantBase):
     config_snapshot = db.Column(db.JSON, nullable=False, default=dict)
     __tablename__ = 'automation_runs'

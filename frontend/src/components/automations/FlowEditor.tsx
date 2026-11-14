@@ -13,6 +13,7 @@ import {
 import { actionIcon, eventIcon, isInstagram } from '@/components/automations/icons';
 import { InstagramButtons } from '@/components/automations/instagram-buttons';
 import { NODE_W, edgeCurve, layoutFlow, type FlowEdge, type FlowNode } from '@/components/automations/layout';
+import { PreviewReport, VersionHistory, type PreviewResult } from '@/components/automations/flow-test';
 import type { Row } from '@/lib/types';
 
 /** Everything the editor changes; `id` is present when the rule already exists. */
@@ -78,7 +79,7 @@ function NodeFooter({ onAdd, onBranch, disabled, branchDisabled }: { onAdd: () =
   );
 }
 
-export function FlowEditor({ initial, staff, templates, stages }: { initial: FlowDraft; staff: Row[]; templates: Row[]; stages: Row[] }) {
+export function FlowEditor({ initial, staff, templates, stages, onRestored }: { initial: FlowDraft; staff: Row[]; templates: Row[]; stages: Row[]; onRestored?: () => void }) {
   const router = useAppRouter();
   const { notify } = useNotify();
   const [draft, setDraft] = useState<FlowDraft>(initial);
@@ -97,7 +98,8 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
   const [previewDeal, setPreviewDeal] = useState('');
   const [previewSearch, setPreviewSearch] = useState('');
   const [previewReply, setPreviewReply] = useState(false);
-  const [preview, setPreview] = useState<{ eligible: boolean; steps: { kind: string; outcome: string; title?: string }[] } | null>(null);
+  const [preview, setPreview] = useState<PreviewResult | null>(null);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const deals = useList(previewOpen ? '/opportunities?search=' + encodeURIComponent(previewSearch) : null);
   const bookingTrigger = ['booking.created', 'booking.rescheduled'].includes(draft.event);
   const [editingName, setEditingName] = useState(!initial.id && !initial.name);
@@ -497,7 +499,8 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
               className={'switch' + (draft.active ? ' on' : '')} onClick={() => update({ active: !draft.active })}><span /></button>
             {draft.active ? 'Ativa' : 'Inativa'}
           </label>
-          <Button variant="secondary" onClick={() => setPreviewOpen(!previewOpen)}>Testar fluxo</Button>
+          {draft.id && <Button variant="secondary" onClick={() => { setVersionsOpen(!versionsOpen); setPreviewOpen(false); }}>Versões</Button>}
+          <Button variant="secondary" onClick={() => { setPreviewOpen(!previewOpen); setVersionsOpen(false); }}>Testar fluxo</Button>
           <Button disabled={busy} onClick={() => save()}>{busy ? 'Salvando…' : 'Salvar'}</Button>
         </div>
       </header>
@@ -515,11 +518,14 @@ export function FlowEditor({ initial, staff, templates, stages }: { initial: Flo
         </label>
         <label className="checkbox-label"><input type="checkbox" checked={previewReply} onChange={(e) => { setPreviewReply(e.target.checked); setPreview(null); }} />Simular resposta dentro do prazo</label>
         <Button variant="secondary" disabled={!previewDeal || busy} onClick={() => save(true)}>Simular</Button>
-        <small>Usa os dados atuais do negócio. Nenhuma ação é executada.</small>
-        {preview && <div role="status">{preview.eligible
-          ? <ol>{preview.steps.map((item, index) => <li key={index}>{item.title || ACTIONS[item.kind] || 'Ramificação'} · {item.outcome}</li>)}</ol>
-          : 'O negócio e o contato não atendem aos filtros do gatilho.'}</div>}
+        <small>Usa os dados atuais do negócio e do contato. Nenhuma ação é executada e nenhuma mensagem é enviada.</small>
+        {preview && <PreviewReport preview={preview} />}
       </section>}
+      {versionsOpen && draft.id && <VersionHistory ruleId={draft.id} dirty={dirty} onRestored={async () => {
+        await refreshAll();
+        notify('Versão restaurada.');
+        onRestored?.();
+      }} />}
 
       <div className="flow-body">
         {panel && (
