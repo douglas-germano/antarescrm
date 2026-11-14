@@ -745,7 +745,7 @@ test('sales page leads account owners to their Asaas invoice', async () => {
 });
 
 
-test('glass chrome keeps task fields solid and dialog/menu keyboard navigation usable', async () => {
+test('glass chrome keeps dark fields solid and dialog/menu keyboard navigation usable', async () => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   try {
     await context.request.post(origin + '/api/session/login', { headers: { origin }, data: { slug: 'test', email: 'fixture@example.test', password: 'fixture-only' } });
@@ -757,13 +757,13 @@ test('glass chrome keeps task fields solid and dialog/menu keyboard navigation u
     assert.equal(await page.locator('.app-content').evaluate(el => getComputedStyle(el).backgroundImage), 'none');
     assert.match(await blur('.sidebar'), /blur/);
     assert.match(await blur('.page-header'), /blur/);
-    assert.equal(await page.locator('.task-card').evaluate(el => getComputedStyle(el).backdropFilter), 'none');
+    assert.match(await blur('.task-card'), /blur/);
     await page.getByRole('button', { name: 'Nova tarefa', exact: true }).click();
     const modal = page.locator('dialog[open]');
     await modal.waitFor();
     assert.match(await blur('dialog[open]'), /blur/);
     const input = modal.locator('input').first();
-    assert.equal(await input.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+    assert.equal(await input.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(36, 36, 46)');
     assert.equal(await input.evaluate(el => document.activeElement === el), true);
     await input.fill('Retomar proposta');
     if (process.env.GLASS_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.GLASS_SCREENSHOT_DIR}/glass-desktop.png` });
@@ -786,6 +786,50 @@ test('glass chrome keeps task fields solid and dialog/menu keyboard navigation u
     await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }] });
     assert.equal(await blur('dialog[open]'), 'none');
     assert.equal(await blur('.sidebar'), 'none');
-    assert.equal(await page.locator('dialog[open]').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 250, 251)');
+    assert.equal(await page.locator('dialog[open]').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(41, 41, 51)');
+  } finally { await context.close(); }
+});
+
+
+test('dark glass cards keep text contrast, tables and public pages readable', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  try {
+    await context.request.post(origin + '/api/session/login', { headers: { origin }, data: { slug: 'test', email: 'fixture@example.test', password: 'fixture-only' } });
+    const page = await context.newPage();
+    const contrast = (a, b) => {
+      const luminance = c => c.map(v => v / 255).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4).reduce((s, v, i) => s + v * [.2126, .7152, .0722][i], 0);
+      const x = luminance(a), y = luminance(b);
+      return (Math.max(x, y) + .05) / (Math.min(x, y) + .05);
+    };
+    // The brightest glass stop (#ffffff10) over the canvas is darker than the solid fallback.
+    for (const text of [[245,245,248], [183,183,199], [211,211,222]]) assert.ok(contrast(text, [41,41,51]) >= 4.5);
+    await page.goto(origin + '/tarefas');
+    await page.getByText('Tarefa 01', { exact: true }).waitFor();
+    assert.equal(await page.locator('.task-card').first().evaluate(el => getComputedStyle(el).color), 'rgb(245, 245, 248)');
+    assert.equal(await page.locator('.task-group h3').first().evaluate(el => getComputedStyle(el).color), 'rgb(183, 183, 199)');
+    if (process.env.GLASS_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.GLASS_SCREENSHOT_DIR}/glass-cards-tasks-desktop.png` });
+    await page.goto(origin + '/crm');
+    await page.getByText('Negócio 01', { exact: true }).waitFor();
+    const card = page.locator('.kanban-card').first();
+    assert.match(await card.evaluate(el => getComputedStyle(el).backdropFilter), /blur/);
+    assert.equal(await card.evaluate(el => getComputedStyle(el).color), 'rgb(245, 245, 248)');
+    if (process.env.GLASS_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.GLASS_SCREENSHOT_DIR}/glass-cards-crm-desktop.png` });
+    await page.getByRole('tab', { name: 'Lista', exact: true }).click();
+    await page.locator('.data-table td').first().waitFor();
+    assert.equal(await page.locator('.data-table td').first().evaluate(el => getComputedStyle(el).color), 'rgb(211, 211, 222)');
+    await page.getByRole('tab', { name: 'Quadro', exact: true }).click();
+    await card.waitFor();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForFunction(() => parseFloat(getComputedStyle(document.querySelector('.app-content')).marginLeft) === 0);
+    await page.locator('.sidebar').evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
+    if (process.env.GLASS_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.GLASS_SCREENSHOT_DIR}/glass-cards-crm-mobile.png` });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }] });
+    assert.equal(await card.evaluate(el => getComputedStyle(el).backdropFilter), 'none');
+    assert.equal(await card.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(41, 41, 51)');
+    await page.goto(origin + '/login');
+    assert.equal(await page.locator('.auth-page').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+    assert.equal(await page.locator('input').first().evaluate(el => getComputedStyle(el).color), 'rgb(37, 40, 43)');
   } finally { await context.close(); }
 });

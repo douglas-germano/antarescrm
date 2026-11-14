@@ -15,6 +15,7 @@ import '@/styles/forms.css';
 import '@/styles/builder.css';
 import '@/styles/funnels.css';
 import '@/styles/native-navigation.css';
+import '@/styles/dark-glass.css';
 import { Providers } from '@/components/providers';
 import { ActionTooltip } from '@/components/layout/action-tooltip';
 import { NavigationProgress } from '@/components/layout/navigation-progress';
