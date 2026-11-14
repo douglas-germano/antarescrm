@@ -70,6 +70,8 @@ export const post = <T = unknown>(path: string, data: unknown) =>
   api<T>(path, { method: 'POST', body: JSON.stringify(data) });
 export const patch = <T = unknown>(path: string, data: unknown) =>
   api<T>(path, { method: 'PATCH', body: JSON.stringify(data) });
+export const put = <T = unknown>(path: string, data: unknown) =>
+  api<T>(path, { method: 'PUT', body: JSON.stringify(data) });
 export const remove = (path: string) => api(path, { method: 'DELETE' });
 /** Multipart upload: the browser sets the boundary, so no JSON content type is sent. */
 export async function upload<T = unknown>(path: string, body: FormData): Promise<T> {

@@ -84,7 +84,7 @@ type Version = {
 const when = (iso: string) => new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 /** Saved versions of a rule; restoring one saves it again as the newest version, so nothing is lost. */
-export function VersionHistory({ ruleId, dirty, onRestored }: { ruleId: string; dirty: boolean; onRestored: () => void | Promise<void> }) {
+export function VersionHistory({ ruleId, dirty, hasDraft = false, onRestored }: { ruleId: string; dirty: boolean; hasDraft?: boolean; onRestored: () => void | Promise<void> }) {
   const versions = useData<{ items: Version[] }>('/automations/' + ruleId + '/versions');
   const [restoring, setRestoring] = useState<Version | null>(null);
   const items = versions.data?.items || [];
@@ -106,7 +106,7 @@ export function VersionHistory({ ruleId, dirty, onRestored }: { ruleId: string; 
         ))}
       </ol>
       <ConfirmDialog open={restoring !== null} onClose={() => setRestoring(null)} title={'Restaurar a versão ' + (restoring?.number ?? '') + '?'}
-        description={(dirty ? 'As alterações não salvas serão descartadas. ' : '') + 'A configuração atual continua guardada no histórico. Se a automação estiver ativa, as próximas execuções já usam a versão restaurada.'}
+        description={(dirty ? 'As alterações não salvas serão descartadas. ' : '') + (hasDraft ? 'O rascunho não publicado também. ' : '') + 'A configuração atual continua guardada no histórico. Se a automação estiver ativa, as próximas execuções já usam a versão restaurada.'}
         onConfirm={async () => {
           if (!restoring) return;
           await post('/automations/' + ruleId + '/versions/' + restoring.number + '/restore', {});

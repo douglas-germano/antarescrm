@@ -47,6 +47,10 @@ class AutomationRule(TenantBase):
     due_days = db.Column(db.Integer, nullable=False, default=0)
     assignee_id = db.Column(db.String(36), db.ForeignKey('users.id'))
     active = db.Column(db.Boolean, nullable=False, default=False)
+    # Unpublished edits of the rule; runs keep using the columns above until the draft is published.
+    draft = db.Column(db.JSON)
+    draft_author_id = db.Column(db.String(36), db.ForeignKey('users.id'))
+    draft_saved_at = db.Column(UTCDateTime())
 
 
 class AutomationRuleVersion(TenantBase):

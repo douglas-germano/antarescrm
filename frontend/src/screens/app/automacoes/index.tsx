@@ -137,7 +137,7 @@ export default function AutomationsPage() {
                     <span className={'flow-row-icon' + (isInstagram(rule.event) ? ' ig' : '')}>{eventIcon(rule.event)}</span>
                     <div className="flow-list-name">
                       <strong>{rule.name}</strong>
-                      <span><span className="deal-chip">{EVENTS[rule.event]?.label || rule.event}</span><small>{steps} {steps === 1 ? 'passo' : 'passos'}</small></span>
+                      <span><span className="deal-chip">{EVENTS[rule.event]?.label || rule.event}</span><small>{steps} {steps === 1 ? 'passo' : 'passos'}</small>{rule.draft && <span className="deal-chip warn" data-tip="Há alterações salvas que ainda não foram publicadas">Rascunho</span>}</span>
                     </div>
                     <div className="flow-list-stat"><strong>{shortDate(rule.created_at)}</strong><small>Criada</small></div>
                     <div className="flow-list-stat"><strong>{shortDate(stats.last_run_at)}</strong><small>Última execução</small></div>

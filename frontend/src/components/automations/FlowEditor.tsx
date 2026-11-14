@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, ty
 import { Link } from '@tanstack/react-router';
 import { useAppRouter } from '@/lib/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Copy, Filter, GitBranch, LayoutGrid, Maximize2, Pencil, Plus, Trash2, X, Zap, ZoomIn, ZoomOut } from 'lucide-react';
-import { post, patch, refreshAll, useList } from '@/lib/api';
+import { post, patch, put, refreshAll, remove, useList } from '@/lib/api';
 import { useNotify } from '@/components/providers';
 import { Button, ConfirmDialog } from '@/components/ui';
 import { ConditionsEditor, emptyConditions, type Conditions } from '@/components/automations/conditions-editor';
@@ -21,6 +21,8 @@ export type FlowDraft = {
   id?: string; name: string; event: string; source: string; required_tag: string; assignee_id: string;
   active: boolean; stop_on_reply: boolean; conditions: Conditions; steps: Step[];
   stageDays?: number; bookingBefore?: number;
+  /** Published state of an existing rule: active rules are edited as a draft until published. */
+  live?: boolean; hasDraft?: boolean; draftSavedAt?: string;
 };
 type Selection = 'trigger' | StepPath | null;
 type View = { x: number; y: number; z: number };
@@ -100,6 +102,11 @@ export function FlowEditor({ initial, staff, templates, stages, onRestored }: { 
   const [previewReply, setPreviewReply] = useState(false);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [versionsOpen, setVersionsOpen] = useState(false);
+  // Edits of an active rule wait in a draft, so the running flow only changes when someone publishes.
+  const [live, setLive] = useState(Boolean(initial.live));
+  const [pending, setPending] = useState(Boolean(initial.hasDraft));
+  const [draftSavedAt, setDraftSavedAt] = useState(initial.draftSavedAt);
+  const [discarding, setDiscarding] = useState(false);
   const deals = useList(previewOpen ? '/opportunities?search=' + encodeURIComponent(previewSearch) : null);
   const bookingTrigger = ['booking.created', 'booking.rescheduled'].includes(draft.event);
   const [editingName, setEditingName] = useState(!initial.id && !initial.name);
@@ -151,13 +158,13 @@ export function FlowEditor({ initial, staff, templates, stages, onRestored }: { 
     setSelected([...listPath, index + 1]);
   };
 
-  async function save(simulate = false) {
-    if (busy) return;
-    if (!simulate && !draft.name.trim()) { setEditingName(true); setFailure('Dê um nome à automação.'); return; }
-    if (!draft.steps.length) { setFailure('Adicione ao menos um passo depois do gatilho.'); return; }
-    if (draft.event === 'opportunity.stage_idle' && !draft.stageDays) { setSelected('trigger'); setFailure('Informe o prazo de permanência na etapa.'); return; }
+  async function save(simulate = false, publishing = false): Promise<boolean | 'unchanged'> {
+    if (busy) return false;
+    if (!simulate && !draft.name.trim()) { setEditingName(true); setFailure('Dê um nome à automação.'); return false; }
+    if (!draft.steps.length) { setFailure('Adicione ao menos um passo depois do gatilho.'); return false; }
+    if (draft.event === 'opportunity.stage_idle' && !draft.stageDays) { setSelected('trigger'); setFailure('Informe o prazo de permanência na etapa.'); return false; }
     const broken = firstProblem(draft.steps, draft.event);
-    if (broken) { setSelected(broken.path); setFailure(broken.problem); return; }
+    if (broken) { setSelected(broken.path); setFailure(broken.problem); return false; }
     setBusy(true);
     setFailure('');
     const body = {
@@ -182,15 +189,50 @@ export function FlowEditor({ initial, staff, templates, stages, onRestored }: { 
         setPreview(await post<NonNullable<typeof preview>>('/automations/preview', {
           rule: body, opportunity_id: previewDeal, reply_received: previewReply,
         }));
-        return;
+        return true;
+      }
+      if (draft.id && live) {
+        const { active, ...config } = body;
+        const saved = await put<Row>('/automations/' + draft.id + '/draft', config);
+        if (!active) { await patch('/automations/' + draft.id, { active: false }); setLive(false); }
+        await refreshAll();
+        setPending(Boolean(saved.draft));
+        setDraftSavedAt(saved.draft_saved_at || undefined);
+        setDirty(false);
+        if (!publishing) notify(saved.draft ? 'Rascunho salvo. A automação continua rodando com a versão publicada.' : 'Igual à versão publicada: não há nada para publicar.');
+        return saved.draft ? true : 'unchanged';
       }
       if (draft.id) await patch('/automations/' + draft.id, body);
       const created = draft.id ? null : await post<{ id: string }>('/automations', body);
       await refreshAll();
       setDirty(false);
+      setPending(false);
+      setLive(draft.active);
       notify('Automação salva.');
       // A new rule continues in its own address, so reloading or sharing the page keeps it.
       if (created) router.replace('/automacoes/' + created.id);
+      return true;
+    } catch (error) {
+      setFailure((error as Error).message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+  /** Saves what is on screen as the draft (if changed) and makes it the running version. */
+  async function publish() {
+    if (!draft.id || busy) return;
+    if (dirty) {
+      const saved = await save(false, true);
+      if (!saved) return;
+      if (saved === 'unchanged') { notify('Igual à versão publicada: não há nada para publicar.'); return; }
+    }
+    setBusy(true);
+    try {
+      await post('/automations/' + draft.id + '/draft/publish', {});
+      await refreshAll();
+      setPending(false);
+      notify('Rascunho publicado. As próximas execuções já usam esta versão.');
     } catch (error) {
       setFailure((error as Error).message);
     } finally {
@@ -492,7 +534,7 @@ export function FlowEditor({ initial, staff, templates, stages, onRestored }: { 
             <span>{draft.name}</span><Pencil size={15} />
           </button>
         )}
-        <span className="flow-status muted">{busy ? 'Salvando…' : dirty ? 'Alterações não salvas' : 'Tudo salvo'}</span>
+        <span className="flow-status muted">{busy ? 'Salvando…' : dirty ? 'Alterações não salvas' : pending ? 'Rascunho não publicado' : 'Tudo salvo'}</span>
         <div className="flow-topbar-actions">
           <label className="flow-active">
             <button type="button" role="switch" aria-checked={draft.active} aria-label={draft.active ? 'Desativar automação' : 'Ativar automação'}
@@ -501,9 +543,24 @@ export function FlowEditor({ initial, staff, templates, stages, onRestored }: { 
           </label>
           {draft.id && <Button variant="secondary" onClick={() => { setVersionsOpen(!versionsOpen); setPreviewOpen(false); }}>Versões</Button>}
           <Button variant="secondary" onClick={() => { setPreviewOpen(!previewOpen); setVersionsOpen(false); }}>Testar fluxo</Button>
-          <Button disabled={busy} onClick={() => save()}>{busy ? 'Salvando…' : 'Salvar'}</Button>
+          {live && pending && !dirty && <Button variant="ghost" disabled={busy} onClick={() => setDiscarding(true)}>Descartar rascunho</Button>}
+          <Button variant={live ? 'secondary' : undefined} disabled={busy} onClick={() => save()}>{busy ? 'Salvando…' : live ? 'Salvar rascunho' : 'Salvar'}</Button>
+          {live && <Button disabled={busy || (!pending && !dirty)} onClick={publish}>Publicar</Button>}
         </div>
       </header>
+      {live && (pending || dirty) && <p className="flow-draft-note" role="status">
+        {pending && !dirty ? 'Rascunho salvo' + (draftSavedAt ? ' em ' + new Date(draftSavedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '') + '. ' : 'Você está editando uma automação ativa. '}
+        Ela continua rodando com a versão publicada até você clicar em Publicar. Use “Testar fluxo” para conferir antes.
+      </p>}
+      <ConfirmDialog open={discarding} onClose={() => setDiscarding(false)} title="Descartar o rascunho?"
+        description="As alterações não publicadas serão apagadas e o editor volta para a versão em uso."
+        onConfirm={async () => {
+          if (!draft.id) return;
+          await remove('/automations/' + draft.id + '/draft');
+          await refreshAll();
+          notify('Rascunho descartado.');
+          onRestored?.();
+        }} />
       {failure && <p className="flow-error" role="alert">{failure}<button type="button" aria-label="Fechar aviso" onClick={() => setFailure('')}><X size={14} /></button></p>}
 
       {previewOpen && <section className="flow-preview" aria-label="Testar fluxo">
@@ -521,7 +578,7 @@ export function FlowEditor({ initial, staff, templates, stages, onRestored }: { 
         <small>Usa os dados atuais do negócio e do contato. Nenhuma ação é executada e nenhuma mensagem é enviada.</small>
         {preview && <PreviewReport preview={preview} />}
       </section>}
-      {versionsOpen && draft.id && <VersionHistory ruleId={draft.id} dirty={dirty} onRestored={async () => {
+      {versionsOpen && draft.id && <VersionHistory ruleId={draft.id} dirty={dirty} hasDraft={pending} onRestored={async () => {
         await refreshAll();
         notify('Versão restaurada.');
         onRestored?.();

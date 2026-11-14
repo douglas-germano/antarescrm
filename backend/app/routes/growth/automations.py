@@ -12,10 +12,11 @@ from ...models import (
     Contact,
     Opportunity,
 )
+from ...models.base import now
 from ...schemas.base import StrictSchema, ref
 from ...schemas.growth import RuleSchema
 from ...services.conditions import explain, matches
-from ...services.rule_versions import ensure_baseline, history, record, snapshot
+from ...services.rule_versions import FIELDS, ensure_baseline, history, record, snapshot
 from ...services.rules import validate_rule
 from . import bp
 
@@ -67,6 +68,9 @@ def rule_update(rule_id):
     validate_rule(data, row)
     ensure_baseline(row)
     update(row, data)
+    if any(field in data for field in FIELDS):
+        # A direct save of the configuration replaces any pending draft (the editor started from it).
+        clear_draft(row)
     record(row, g.user.id)
     return commit(row)
 
@@ -103,7 +107,54 @@ def rule_restore(rule_id, number):
     validate_rule(data, row)
     ensure_baseline(row)
     update(row, data)
+    clear_draft(row)
     record(row, g.user.id, f'Restaurada da versão {number}')
+    return commit(row)
+
+
+def clear_draft(row):
+    row.draft, row.draft_author_id, row.draft_saved_at = None, None, None
+
+
+@bp.put('/automations/<uuid:rule_id>/draft')
+@require('owner', 'admin')
+def rule_draft_save(rule_id):
+    """Keeps edits aside: the running rule only changes when the draft is published."""
+    row = get(AutomationRule, rule_id, lock=True)
+    data = payload(RuleSchema)
+    data.pop('active', None)
+    validate_rule(data, row)
+    draft = {**snapshot(row), **{field: data[field] for field in FIELDS if field in data}}
+    if draft == snapshot(row):
+        clear_draft(row)
+    else:
+        row.draft, row.draft_author_id, row.draft_saved_at = draft, g.user.id, now()
+    return commit(row)
+
+
+@bp.post('/automations/<uuid:rule_id>/draft/publish')
+@require('owner', 'admin')
+def rule_draft_publish(rule_id):
+    row = get(AutomationRule, rule_id, lock=True)
+    if not row.draft:
+        raise APIError('Esta automação não tem rascunho para publicar.', 409)
+    # Revalidated: a template, stage or user may have been removed since the draft was saved.
+    data = {field: row.draft[field] for field in FIELDS if field in row.draft}
+    validate_rule(data, row)
+    ensure_baseline(row)
+    update(row, data)
+    clear_draft(row)
+    record(row, g.user.id, 'Rascunho publicado')
+    return commit(row)
+
+
+@bp.delete('/automations/<uuid:rule_id>/draft')
+@require('owner', 'admin')
+def rule_draft_discard(rule_id):
+    row = get(AutomationRule, rule_id, lock=True)
+    if not row.draft:
+        raise APIError('Esta automação não tem rascunho.', 409)
+    clear_draft(row)
     return commit(row)
 
 
