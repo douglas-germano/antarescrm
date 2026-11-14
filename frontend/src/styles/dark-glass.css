@@ -103,7 +103,7 @@
 .app :is(.text-success, .stat-trend.up, .project-done) { color: #8cdbaf; }
 .app :is(.badge-design, .badge-doing, .badge-in_progress, .badge-production,
   .badge-approval, .badge-high, .badge-partial, .followup-reason, .deal-attention,
-  .deal-days.warn, .deal-chip.warn, .ig-warning, .billing-banner, .wa-banner-warning, .settings-confirm) { background: #f2c87418; color: #f2c874; border-color: #f2c87438; }
+  .deal-days.warn, .deal-chip.warn, .ig-warning, .billing-banner, .flow-draft-note, .wa-banner-warning, .settings-confirm) { background: #f2c87418; color: #f2c874; border-color: #f2c87438; }
 .app :is(.proj-kpis > div.warn, .rep-health > div.warn) { background: #f2c87418; border-color: #f2c87438; }
 .app :is(.badge-measuring, .badge-review, .badge-installation, .deal-chip.info) { background: #a8cfff18; color: #a8cfff; }
 .app :is(.badge-lost, .badge-urgent, .badge-cancelled, .badge-overdue,

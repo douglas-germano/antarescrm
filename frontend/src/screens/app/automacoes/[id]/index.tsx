@@ -17,15 +17,20 @@ const blank = (): FlowDraft => ({
   conditions: emptyConditions(), steps: [],
 });
 
-function fromRule(rule: Row, copy = false): FlowDraft {
+function fromRule(published: Row, copy = false): FlowDraft {
+  // An active rule edited as a draft opens with the draft; `live` and `active` stay those of the published rule.
+  const rule = !copy && published.draft ? { ...published, ...published.draft } : published;
   return {
+    live: !copy && published.active,
+    hasDraft: !copy && Boolean(published.draft),
+    draftSavedAt: copy ? undefined : published.draft_saved_at,
     id: copy ? undefined : rule.id,
     name: copy ? rule.name + ' (cópia)' : rule.name,
     event: rule.event,
     source: rule.source || '',
     required_tag: rule.required_tag || '',
     assignee_id: rule.assignee_id || '',
-    active: copy ? false : rule.active,
+    active: copy ? false : published.active,
     stop_on_reply: rule.stop_on_reply || false,
     conditions: { ...emptyConditions(), ...rule.conditions },
     steps: stepsOf(rule),
