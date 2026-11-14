@@ -743,3 +743,47 @@ test('sales page leads account owners to their Asaas invoice', async () => {
     await context.close();
   }
 });
+
+
+test('glass chrome keeps task fields solid and dialog/menu keyboard navigation usable', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  try {
+    await context.request.post(origin + '/api/session/login', { headers: { origin }, data: { slug: 'test', email: 'fixture@example.test', password: 'fixture-only' } });
+    const page = await context.newPage();
+    await page.goto(origin + '/tarefas');
+    await page.getByText('Tarefa 01', { exact: true }).waitFor();
+    const blur = selector => page.locator(selector).evaluate(el => getComputedStyle(el).backdropFilter);
+    assert.match(await blur('.sidebar'), /blur/);
+    assert.match(await blur('.page-header'), /blur/);
+    assert.equal(await page.locator('.task-card').evaluate(el => getComputedStyle(el).backdropFilter), 'none');
+    await page.getByRole('button', { name: 'Nova tarefa', exact: true }).click();
+    const modal = page.locator('dialog[open]');
+    await modal.waitFor();
+    assert.match(await blur('dialog[open]'), /blur/);
+    const input = modal.locator('input').first();
+    assert.equal(await input.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+    assert.equal(await input.evaluate(el => document.activeElement === el), true);
+    await input.fill('Retomar proposta');
+    if (process.env.GLASS_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.GLASS_SCREENSHOT_DIR}/glass-desktop.png` });
+    await page.keyboard.press('Escape');
+    await modal.waitFor({ state: 'hidden' });
+    await page.setViewportSize({ width: 390, height: 844 });
+    const menu = page.getByRole('button', { name: 'Abrir menu', exact: true });
+    await menu.click();
+    await page.getByRole('button', { name: 'Fechar navegação', exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    if (process.env.GLASS_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.GLASS_SCREENSHOT_DIR}/glass-mobile-menu.png` });
+    await page.keyboard.press('Escape');
+    assert.equal(await menu.evaluate(el => document.activeElement === el), true);
+    await page.getByRole('button', { name: 'Nova tarefa', exact: true }).click();
+    await modal.waitFor();
+    const bounds = await modal.boundingBox();
+    assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= 390);
+    if (process.env.GLASS_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.GLASS_SCREENSHOT_DIR}/glass-mobile-modal.png` });
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }] });
+    assert.equal(await blur('dialog[open]'), 'none');
+    assert.equal(await blur('.sidebar'), 'none');
+    assert.equal(await page.locator('dialog[open]').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 250, 251)');
+  } finally { await context.close(); }
+});

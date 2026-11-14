@@ -29,6 +29,11 @@
   --sidebar-width: 64px;
   --rail-top: #d91c5b;
   --rail-bottom: #f7789f;
+  /* Opaque defaults also serve browsers without backdrop-filter. */
+  --glass-surface: #fffafb;
+  --glass-rail: #382331;
+  --glass-border: #ffffffb3;
+  --glass-shadow: 0 8px 28px #3823310a, inset 0 1px 0 #fff;
   /* Light tint of the brand for selected items, badges and sent messages. */
   --primary-soft: #fde8ef;
   --primary-soft-line: #f8c9d9;
@@ -76,7 +81,7 @@ button:focus-visible,a:focus-visible { outline: 2px solid var(--primary); outlin
 .sidebar {
   position: fixed; inset: 0 auto 0 0; z-index: 40; width: var(--sidebar-width); height: 100dvh;
   display: flex; flex-direction: column; align-items: center; padding: 0 0 var(--space-3);
-  background: transparent; border-right: 0;
+  background: var(--glass-rail); border-right: 1px solid #ffffff24; box-shadow: inset 1px 0 0 #ffffff12, 4px 0 24px #38233112;
   transition: transform .3s var(--ease), visibility .3s;
 }
 .sidebar-header { height: 72px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -103,10 +108,10 @@ button:focus-visible,a:focus-visible { outline: 2px solid var(--primary); outlin
 .sidebar-close { display: none; background: transparent; color: #fff; width: 32px; height: 32px; border-radius: 8px; align-items: center; justify-content: center; }
 .sidebar-scrim { display: none; }
 .mobile-menu { display: none; position: fixed; top: 10px; left: 12px; z-index: 50; width: 38px; height: 38px; align-items: center; justify-content: center; background: #fff; color: var(--primary); border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow); }
-.app-content { width: calc(100% - var(--sidebar-width)); margin-left: var(--sidebar-width); min-width: 0; background: var(--background); border-radius: 20px 0 0 0; }
+.app-content { width: calc(100% - var(--sidebar-width)); margin-left: var(--sidebar-width); min-width: 0; background: radial-gradient(ellipse at 8% 0%, #ef2f700b, transparent 55%), var(--background); border-radius: 20px 0 0 0; }
 .main-content { display: flex; flex-direction: column; width: 100%; max-width: var(--content-max); margin: 0 auto; padding: var(--page-pad-y) var(--page-pad-x); min-height: 100dvh; }
 .page { display: flex; flex-direction: column; gap: var(--gap-section); min-width: 0; }
-.page-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); flex-shrink: 0; min-height: 72px; margin: calc(var(--page-pad-y) * -1) calc(var(--page-pad-x) * -1) 0; padding: var(--space-3) var(--page-pad-x); background: var(--card); border-bottom: 1px solid var(--line-soft); }
+.page-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); flex-shrink: 0; min-height: 72px; margin: calc(var(--page-pad-y) * -1) calc(var(--page-pad-x) * -1) 0; padding: var(--space-3) var(--page-pad-x); background: var(--glass-surface); border-bottom: 1px solid var(--glass-border); box-shadow: var(--glass-shadow); }
 .page-header .eyebrow { display: none; }
 .page-header h1,.compact-header h1 { font-size: 22px; line-height: 1.25; letter-spacing: -.4px; font-weight: 700; text-transform: none; color: var(--foreground); }
 .page-description { color: var(--muted); font-size: 13px; line-height: 1.6; margin-top: 8px; }
@@ -277,7 +282,7 @@ input[type='checkbox'] { width: 15px; height: 15px; min-height: 15px; accent-col
   .sidebar.sidebar-open { transform: translateX(0); visibility: visible; box-shadow: 10px 0 50px #30213d18; }
   .sidebar-close,.mobile-menu { display: inline-flex; }
   .sidebar-scrim { display: block; position: fixed; inset: 0; z-index: 39; background: #30213d50; backdrop-filter: blur(2px); }
-  .sidebar { --sidebar-width: 248px; align-items: stretch; padding: 0 var(--space-3) var(--space-4); background: linear-gradient(180deg, var(--rail-top) 0%, var(--rail-bottom) 100%); }
+  .sidebar { --sidebar-width: 248px; align-items: stretch; padding: 0 var(--space-3) var(--space-4); }
   .sidebar-header { justify-content: space-between; height: 80px; }
   .sidebar .brand > span,.sidebar nav a > span,.settings-link > span { display: inline; }
   .sidebar .brand > span { font-size: 22px; letter-spacing: -.5px; font-weight: 500; }
@@ -288,7 +293,7 @@ input[type='checkbox'] { width: 15px; height: 15px; min-height: 15px; accent-col
     .sidebar-open + .mobile-menu { left: calc(248px + 12px); }
   .app-content { width: 100%; margin-left: 0; border-radius: 0; }
   .main-content { padding: 64px var(--space-4) var(--space-4); min-height: 100dvh; }
-  .page-header { align-items: flex-start; flex-wrap: wrap; gap: var(--space-4); min-height: 40px; margin: 0; padding: 0; background: transparent; border-bottom: 0; }
+  .page-header { align-items: flex-start; flex-wrap: wrap; gap: var(--space-4); min-height: 40px; margin: 0; padding: var(--space-3); border: 1px solid var(--glass-border); border-radius: var(--radius-card); }
   .header-actions { flex-wrap: wrap; }
   .stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .card-fill { min-height: 300px; overflow: visible; }
@@ -440,4 +445,24 @@ a.dash-name:hover { color: var(--primary); }
   .auth-brand { display: none; }
   .auth-logo-mobile { display: flex; }
   .auth-panel { place-items: start center; padding: 48px 20px; }
+}
+
+/* Glass belongs to navigation and dialog chrome. Data cards and fields stay solid.
+   No animated blur: only these few shared surfaces incur the compositing cost. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --glass-surface: linear-gradient(120deg, #ffffffed, #fff5f9d9);
+    --glass-rail: linear-gradient(165deg, #32242feb, #57223ee6 60%, #362633ed);
+  }
+  .sidebar, .page-header, .modal {
+    -webkit-backdrop-filter: blur(18px) saturate(125%);
+    backdrop-filter: blur(18px) saturate(125%);
+  }
+}
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  :root { --glass-surface: #fffafb; --glass-rail: #382331; }
+  .sidebar, .page-header, .modal, .modal::backdrop, .sidebar-scrim {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
